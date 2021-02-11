@@ -16,6 +16,13 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+if [ $portainerPassword -eq "" ]
+then
+  #password is empty -> let's generate a new one
+  $portainerPassword=$(curl -L https://passwordsgenerator.net/calc.php?Length=16&Symbols=1&Lowercase=1&Uppercase=1&Numbers=1&Nosimilar=1&Last=1317 | head -c16)
+fi
+
 echo "PortainerPassword: $portainerPassword"
 echo "SecurityToken: $securityToken"
 #disable swap
@@ -47,3 +54,10 @@ rm -f packages-microsoft-prod.deb
 wget -q https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/utils/createPortainerStack.ps1
 pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword qaz123WSX -StackFileName ./portainer-agent-stack.yml
 rm -f createPortainerStack.ps1 portainer-agent-stack.yml
+
+#output
+clear
+echo "Portainer is running:"
+echo "Url:       http://localhost:9000"
+echo "User:      admin"
+echo "Password:  $portainerPassword"
