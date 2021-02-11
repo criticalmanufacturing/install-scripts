@@ -37,15 +37,15 @@ sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 #install docker
 curl -fsSL "$REPOSITORY/ubuntu/installDocker.bash" | bash;
 
+# Install PowerShell
+curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
+
 #Deploy portainer stack
 wget -q "$REPOSITORY/utils/portainer-agent-stack.yml"
 hashedPassword=$(htpasswd -nbB admin $portainerPassword | cut -d ":" -f 2 | sed 's+\$+$$+g')
 pattern='s+ADMIN_PASSWORD+'$hashedPassword'+g'
 sed -i "$pattern" portainer-agent-stack.yml
 docker stack deploy -c portainer-agent-stack.yml portainer
-
-# Install PowerShell
-curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
 
 echo "############ PORTAINER ############"
 echo ""
@@ -57,6 +57,6 @@ echo "###################################"
 
 # Start PowerShell
 wget -q "$REPOSITORY/utils/createPortainerStack.ps1"
-pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml
+`pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml` 
 rm -f createPortainerStack.ps1
 rm -f portainer-agent-stack.yml

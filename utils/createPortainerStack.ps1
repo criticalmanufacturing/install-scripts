@@ -76,9 +76,9 @@ if ($response.StatusCode -eq 200)
         $response = Invoke-WebRequest -Uri "$PortainerUrl/api/stacks?endpointId=$($endpoint)&method=string&type=1" -Method POST -Headers $PortainerHeaders -ContentType "application/json" -Body $request
         if ($response.StatusCode -eq 200) 
         { 
-            #Write-Host Stack $StackName created!                 
+            Write-Host Stack $StackName created!                 
             #set stack permissions (only Administrators)
-            #Write-Host "Set stack permissions (only Administrators)"
+            Write-Host "Set stack permissions (only Administrators)"
             $stackId = (ConvertFrom-Json $response.Content).ResourceControl.Id
             $request = Invoke-WebRequest -Uri $PortainerUrl/api/resource_controls/$stackId -Method PUT -ContentType "application/json" -Headers $PortainerHeaders -Body "{`"AdministratorsOnly`":true,`"Public`":false,`"Users`":[],`"Teams`":[]}"       
         }
