@@ -1,5 +1,6 @@
 #!/bin/bash
-$portainerPassword = ""
+REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
+$portainerPassword=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -34,36 +35,33 @@ swapoff -a
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 
 #install docker
-curl -L https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/installDocker.bash | bash
+curl -L "$REPOSITORY/ubuntu/installDocker.bash" | bash
 
 #init docker swarm cluster
 docker swarm init
 docker swarm update --task-history-limit 3
- 
-wget -q https://downloads.portainer.io/portainer-agent-stack.yml
-hashedPassword=$(htpasswd -nbB admin $portainerPassword | cut -d ":" -f 2 | sed 's+\$+$$+g' )
-pattern='s+\-\-tlsskipverify+--admin-password '$hashedPassword' --tlsskipverify+g'
+
+#Deploy portainer stack
+wget -q "$REPOSITORY/utils/portainer-agent-stack.yml"
+hashedPassword=$(htpasswd -nbB admin $portainerPassword | cut -d ":" -f 2 | sed 's+\$+$$+g')
+pattern='s+ADMIN_PASSWORD+'$hashedPassword'+g'
 sed -i "$pattern" portainer-agent-stack.yml
 docker stack deploy -c portainer-agent-stack.yml portainer
- 
+portainer-agent-stack.yml
+
 # Install powershell
-wget -q https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
-dpkg -i packages-microsoft-prod.deb
-apt-get update -y
-add-apt-repository universe
-apt-get install -y powershell
-rm -f packages-microsoft-prod.deb
+curl -L "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash 
 
 # Start PowerShell
-wget -q https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/utils/createPortainerStack.ps1
+wget -q "$REPOSITORY/utils/createPortainerStack.ps1"
 pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml 
-rm -f createPortainerStack.ps1 portainer-agent-stack.yml
+rm -f createPortainerStack.ps1 
 
 #output
 echo "#####################################"
-echo " Portainer is running:             "
+echo " Portainer is running:"
 echo ""
-echo " Url:       http://localhost:9000  "
-echo " User:      admin                  "
+echo " Url:       http://localhost:9000"
+echo " User:      admin"
 echo " Password:  $portainerPassword"
 echo "#####################################"
