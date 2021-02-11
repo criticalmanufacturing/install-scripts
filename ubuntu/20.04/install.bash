@@ -28,6 +28,7 @@ fi
 
 echo "PortainerPassword: $portainerPassword"
 echo "SecurityToken: $securityToken"
+
 #disable swap
 swapoff -a
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
@@ -53,6 +54,11 @@ add-apt-repository universe
 apt-get install -y powershell
 rm -f packages-microsoft-prod.deb
 
+# Start PowerShell
+wget -q https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/utils/createPortainerStack.ps1
+pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml 
+rm -f createPortainerStack.ps1 portainer-agent-stack.yml
+
 #output
 echo "#####################################"
 echo " Portainer is running:             "
@@ -61,8 +67,3 @@ echo " Url:       http://localhost:9000  "
 echo " User:      admin                  "
 echo " Password:  $portainerPassword"
 echo "#####################################"
-
-# Start PowerShell
-wget -q https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/utils/createPortainerStack.ps1
-pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml | rm -f createPortainerStack.ps1 portainer-agent-stack.yml
-
