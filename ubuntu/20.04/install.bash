@@ -41,8 +41,9 @@ dpkg -i packages-microsoft-prod.deb
 apt-get update -y
 add-apt-repository universe
 apt-get install -y powershell
+rm -f packages-microsoft-prod.deb
 
 # Start PowerShell
 wget -q https://github.com/criticalmanufacturing/install-scripts/utils/createPortainerStack.ps1
 pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword qaz123WSX -StackFileName ./portainer-agent-stack.yml
-rm -f createPortainerStack.ps1 
+rm -f createPortainerStack.ps1 portainer-agent-stack.yml
