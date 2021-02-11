@@ -58,5 +58,5 @@ echo "###################################"
 # Start PowerShell
 wget -q "$REPOSITORY/utils/createPortainerStack.ps1"
 `pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml`
-#rm -f createPortainerStack.ps1
-#rm -f portainer-agent-stack.yml
+rm -f createPortainerStack.ps1
+rm -f portainer-agent-stack.yml
