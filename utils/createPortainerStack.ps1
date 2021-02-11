@@ -17,27 +17,28 @@ $loginMessage = ConvertTo-Json @{
 
 Write-Host "Try to login or wait until the endpoint is ready..."
 #wait until the endpoint is available - in case the portainer stack is still being deployed
-$msg = ""
+
 $count = 10;
 DO
 {
+    Start-Sleep -s 5
     try
     {
         $response = Invoke-WebRequest -Uri $PortainerUrl/api/auth -Method POST -ContentType "application/json" -Body $loginMessage
         $StatusCode = $response.StatusCode
-        if (-not($response.StatusCode -eq 200)) 
-        {
-            Start-Sleep -s 5
-        }
+        Write-Host = $response.StatusCode
     } catch {
         $StatusCode = $_.Exception.Response.StatusCode.value__
-        Write-Host $_.Exception.Message
-        Start-Sleep -s 5                             
+        Write-Host $_.Exception.Message             
     } 
     $count = $count - 1
 } While (-not($StatusCode -eq 200) -or $count > 0)
 
-#authentication succeeded      
+#authentication succeeded
+if (-not($response.StatusCode -eq 200))
+{
+    $response = Invoke-WebRequest -Uri $PortainerUrl/api/auth -Method POST -ContentType "application/json" -Body $loginMessage
+} 
 $token = (ConvertFrom-Json $response.Content).jwt
 
 $PortainerHeaders = @{
