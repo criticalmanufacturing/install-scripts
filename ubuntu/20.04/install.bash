@@ -1,4 +1,6 @@
 #!/bin/bash
+$portainerPassword = ""
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --password*l|-p*)
@@ -17,10 +19,11 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [ $portainerPassword -eq "" ]
+if [[ $portainerPassword = "" ]]
 then
   #password is empty -> let's generate a new one
-  $portainerPassword=$(curl -L https://passwordsgenerator.net/calc.php?Length=16&Symbols=1&Lowercase=1&Uppercase=1&Numbers=1&Nosimilar=1&Last=1317 | head -c16)
+  response=`curl 'https://passwordsgenerator.net/calc.php?Length=16&Symbols=1&Lowercase=1&Uppercase=1&Numbers=1&Nosimilar=1&Last=1317'`
+  portainerPassword=${response:0:16}
 fi
 
 echo "PortainerPassword: $portainerPassword"
@@ -56,8 +59,10 @@ pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -Porta
 rm -f createPortainerStack.ps1 portainer-agent-stack.yml
 
 #output
-clear
-echo "Portainer is running:"
-echo "Url:       http://localhost:9000"
-echo "User:      admin"
-echo "Password:  $portainerPassword"
+echo "#####################################"
+echo " Portainer is running:             "
+echo ""
+echo " Url:       http://localhost:9000  "
+echo " User:      admin                  "
+echo " Password:  $portainerPassword"
+echo "#####################################"
