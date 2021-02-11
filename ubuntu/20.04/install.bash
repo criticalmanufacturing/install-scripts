@@ -23,7 +23,7 @@ swapoff -a
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 
 #install docker
-curl -L https://github.com/criticalmanufacturing/install-scripts/ubuntu/installDocker.bash | bash
+curl -L https://github.com/criticalmanufacturing/install-scripts/blob/main/ubuntu/installDocker.bash | bash
 
 #init docker swarm cluster
 docker swarm init
@@ -44,6 +44,6 @@ apt-get install -y powershell
 rm -f packages-microsoft-prod.deb
 
 # Start PowerShell
-wget -q https://github.com/criticalmanufacturing/install-scripts/utils/createPortainerStack.ps1
+wget -q https://github.com/criticalmanufacturing/install-scripts/blob/main/utils/createPortainerStack.ps1
 pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword qaz123WSX -StackFileName ./portainer-agent-stack.yml
 rm -f createPortainerStack.ps1 portainer-agent-stack.yml
