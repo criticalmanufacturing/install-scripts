@@ -7,4 +7,8 @@ Critical Manufacturing Installation Scripts
 $ curl -L https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/20.04/install.bash | bash
 ```
 
+In case you want to pass your own Portainer admin password
 
+```
+$ curl -L https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/20.04/install.bash | bash -s -- -password <your password>
+```
