@@ -39,7 +39,7 @@ curl -L https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/
 docker swarm init
 docker swarm update --task-history-limit 3
  
-curl -L https://downloads.portainer.io/portainer-agent-stack.yml -o portainer-agent-stack.yml
+wget -q https://downloads.portainer.io/portainer-agent-stack.yml
 hashedPassword=$(htpasswd -nbB admin $portainerPassword | cut -d ":" -f 2 | sed 's+\$+$$+g' )
 pattern='s+\-\-tlsskipverify+--admin-password '$hashedPassword' --tlsskipverify+g'
 sed -i "$pattern" portainer-agent-stack.yml
@@ -55,7 +55,7 @@ rm -f packages-microsoft-prod.deb
 
 # Start PowerShell
 wget -q https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/utils/createPortainerStack.ps1
-pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword qaz123WSX -StackFileName ./portainer-agent-stack.yml
+pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml
 rm -f createPortainerStack.ps1 portainer-agent-stack.yml
 
 #output
