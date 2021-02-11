@@ -1,6 +1,6 @@
 #!/bin/bash
 REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
-$portainerPassword=""
+portainerPassword=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -43,7 +43,6 @@ hashedPassword=$(htpasswd -nbB admin $portainerPassword | cut -d ":" -f 2 | sed 
 pattern='s+ADMIN_PASSWORD+'$hashedPassword'+g'
 sed -i "$pattern" portainer-agent-stack.yml
 docker stack deploy -c portainer-agent-stack.yml portainer
-rm -f portainer-agent-stack.yml
 
 # Install PowerShell
 curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
@@ -52,3 +51,4 @@ curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
 wget -q "$REPOSITORY/utils/createPortainerStack.ps1"
 pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml
 rm -f createPortainerStack.ps1
+rm -f portainer-agent-stack.yml
