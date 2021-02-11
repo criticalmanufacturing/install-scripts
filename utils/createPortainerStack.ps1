@@ -15,7 +15,7 @@ $loginMessage = ConvertTo-Json @{
                                   password = $PortainerPassword    
                                 }
 
-Write-Host "Try to login or wait until the endpoint is ready..."
+#Write-Host "Try to login or wait until the endpoint is ready..."
 #wait until the endpoint is available - in case the portainer stack is still being deployed
 
 $count = 10;
@@ -26,10 +26,10 @@ DO
     {
         $response = Invoke-WebRequest -Uri $PortainerUrl/api/auth -Method POST -ContentType "application/json" -Body $loginMessage
         $StatusCode = $response.StatusCode
-        Write-Host = "Portainer Login:" $response.StatusCode
+        #Write-Host = "Portainer Login:" $response.StatusCode
     } catch {
         $StatusCode = $_.Exception.Response.StatusCode.value__
-        Write-Host $_.Exception.Message             
+        #Write-Host $_.Exception.Message             
     } 
     $count = $count - 1
 } While (-not($StatusCode -eq 200) -and $count > 0)
@@ -39,7 +39,7 @@ if (-not($response.StatusCode -eq 200))
 {
     $response = Invoke-WebRequest -Uri $PortainerUrl/api/auth -Method POST -ContentType "application/json" -Body $loginMessage
 } 
-Write-Host = "Portainer authentication succeeded"
+#Write-Host = "Portainer authentication succeeded"
 $token = (ConvertFrom-Json $response.Content).jwt
 
 $PortainerHeaders = @{
@@ -76,9 +76,9 @@ if ($response.StatusCode -eq 200)
         $response = Invoke-WebRequest -Uri "$PortainerUrl/api/stacks?endpointId=$($endpoint)&method=string&type=1" -Method POST -Headers $PortainerHeaders -ContentType "application/json" -Body $request
         if ($response.StatusCode -eq 200) 
         { 
-            Write-Host Stack $StackName created!                 
+            #Write-Host Stack $StackName created!                 
             #set stack permissions (only Administrators)
-            Write-Host "Set stack permissions (only Administrators)"
+            #Write-Host "Set stack permissions (only Administrators)"
             $stackId = (ConvertFrom-Json $response.Content).ResourceControl.Id
             $request = Invoke-WebRequest -Uri $PortainerUrl/api/resource_controls/$stackId -Method PUT -ContentType "application/json" -Headers $PortainerHeaders -Body "{`"AdministratorsOnly`":true,`"Public`":false,`"Users`":[],`"Teams`":[]}"       
         }
