@@ -26,5 +26,8 @@ echo "{
 }" > /etc/docker/daemon.json
 
 docker swarm update --task-history-limit=3
-
 systemctl reload docker
+
+#init docker swarm cluster
+docker swarm init
+docker swarm update --task-history-limit 3
