@@ -35,7 +35,7 @@ swapoff -a;
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab;
 
 #install docker
-curl -L "$REPOSITORY/ubuntu/installDocker.bash" | bash;
+curl -fsSL "$REPOSITORY/ubuntu/installDocker.bash" | bash;
 
 #Deploy portainer stack
 wget -q "$REPOSITORY/utils/portainer-agent-stack.yml";
@@ -46,7 +46,7 @@ docker stack deploy -c portainer-agent-stack.yml portainer;
 portainer-agent-stack.yml;
 
 # Install PowerShell
-curl -L "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
+curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
 
 # Start PowerShell
 wget -q "$REPOSITORY/utils/createPortainerStack.ps1";
