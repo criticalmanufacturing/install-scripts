@@ -54,7 +54,6 @@ pwsh ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -Porta
 rm -f createPortainerStack.ps1;
 
 #Output
-clear;
 echo "#####################################";
 echo " Portainer is running:";
 echo "";
