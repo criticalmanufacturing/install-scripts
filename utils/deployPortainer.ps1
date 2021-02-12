@@ -7,7 +7,7 @@ param (
 if ($PortainerPassword -eq "") 
 {
     #Generate a random secure password
-    $PortainerPassword = ("!@#$%^*0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".tochararray() | sort {Get-Random})[0..$PortainerPasswordLength] -join ''
+    $PortainerPassword = ("!@#$%^*0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".tochararray() | Sort-Object {Get-Random})[0..$PortainerPasswordLength] -join ''
 }
 Write-Host $RepositoryUrl
 #Download files
