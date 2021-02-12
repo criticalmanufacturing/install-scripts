@@ -21,7 +21,7 @@ Write-Host "Try to login or wait until the endpoint is ready..."
 $count = 10;
 DO
 {
-    Start-Sleep -s 3
+    Start-Sleep -s 5
     try
     {
         $response = Invoke-WebRequest -Uri $PortainerUrl/api/auth -Method POST -ContentType "application/json" -Body $loginMessage
