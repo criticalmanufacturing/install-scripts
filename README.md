@@ -14,7 +14,7 @@ $ curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scr
 ```
 ## Prepare Windows environment
 
-The installation assumes that docker is installed and running.
+The installation assumes that docker is installed and running
 
 ```powershell
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/install.ps1" -OutFile install.ps1

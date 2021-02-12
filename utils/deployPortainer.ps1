@@ -22,8 +22,11 @@ $hashedPassword = (docker run --rm httpd:2.4-alpine htpasswd -nbB admin $Portain
 $hashedPassword = $hashedPassword.Split(":")[1]
 Write-Host "Hashed password: $hashedPassword"
 ((Get-Content -Path portainer-agent-stack.yml -Raw) -replace "ADMIN_PASSWORD", $hashedPassword) -replace  '\$','$$$' | Set-Content -Path portainer-agent-stack.yml
+#make sure docker is running in swarm mode
+docker swarm init
+#deploy the portainer stack 
 docker stack deploy -c portainer-agent-stack.yml portainer
-#Deploy the portainer stack within portainer (avoid it to be marked as external)
+#Add portainer stack to portainer (avoid it to be marked as external)
 ./createStackInPortainer.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml
 
 #Clean up 
