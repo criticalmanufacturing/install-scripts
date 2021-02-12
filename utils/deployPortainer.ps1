@@ -12,7 +12,7 @@ if ($PortainerPassword -eq "")
 
 #Download files
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portainer-agent-stack.yml" -OutFile portainer-agent-stack.yml
-Invoke-WebRequest -Uri "$RepositoryUrl/utils/createStackInPortainer.ps1" -OutFile createPortainerStack.ps1
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/createStackInPortainer.ps1" -OutFile createStackInPortainer.ps1
 
 #Hash portainer password
 docker pull httpd:2.4-alpine
