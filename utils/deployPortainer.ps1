@@ -30,7 +30,12 @@ docker stack deploy -c portainer-agent-stack.yml portainer
 Remove-Item ./portainer-agent-stack.yml
 Remove-Item ./createStackInPortainer.ps1
 
-Write-Host "Portainer is Installed"
+Write-Host "Portainer has been deployed!"
+Write-Host ""
+Write-Host "***************************************"
+Write-Host ""
 Write-Host "Url:       http://localhost:9000"
 Write-Host "User:      admin"
 Write-Host "Password:  $PortainerPassword"
+Write-Host ""
+Write-Host "***************************************"
