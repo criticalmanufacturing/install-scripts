@@ -7,7 +7,7 @@ Critical Manufacturing Installation Scripts
 curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/20.04/install.bash | bash
 ```
 
-Using a custom admin password
+Using a custom admin password for Portainer
 
 ```
 curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/20.04/install.bash | bash -s -- -password <custom password>
