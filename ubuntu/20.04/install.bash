@@ -1,7 +1,7 @@
 #!/bin/bash
 REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
-portainerPassword=""
 
+#read arguments
 while [ $# -gt 0 ]; do
   case "$1" in
     --password*l|-p*)
@@ -20,13 +20,6 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [[ $portainerPassword = "" ]]
-then
-  #password is empty -> let's generate a new one
-  response=`curl -fsSL 'https://passwordsgenerator.net/calc.php?Length=16&Symbols=1&Lowercase=1&Uppercase=1&Numbers=1&Nosimilar=1&Last=1317'`
-  portainerPassword=${response:0:16}
-fi
-
 echo "PortainerPassword: $portainerPassword"
 echo "SecurityToken: $securityToken"
 
@@ -40,23 +33,6 @@ curl -fsSL "$REPOSITORY/ubuntu/installDocker.bash" | bash;
 # Install PowerShell
 curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
 
-#Deploy portainer stack
-wget -q "$REPOSITORY/utils/portainer-agent-stack.yml"
-hashedPassword=$(htpasswd -nbB admin $portainerPassword | cut -d ":" -f 2 | sed 's+\$+$$+g')
-pattern='s+ADMIN_PASSWORD+'$hashedPassword'+g'
-sed -i "$pattern" portainer-agent-stack.yml
-docker stack deploy -c portainer-agent-stack.yml portainer
-
-#Start PowerShell
-wget -q "$REPOSITORY/utils/createPortainerStack.ps1"
-pwsh -File ./createPortainerStack.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml
-rm -f createPortainerStack.ps1 portainer-agent-stack.yml
-
-#Print usefull information
-echo "############ PORTAINER ############"
-echo ""
-echo "Url:        http://localhost:9000"
-echo "User:       admin"
-echo "Password:   $portainerPassword"
-echo ""
-echo "###################################"
+#Deploy portainer
+wget -q "$REPOSITORY/utils/deployPortainer.ps1"
+pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY -PortainerPassword "$portainerPassword"
