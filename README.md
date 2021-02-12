@@ -3,7 +3,7 @@ Critical Manufacturing Installation Scripts
 
 ## Prepare single server Ubuntu 20.04 environment
 
-```console
+```
 $ curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/20.04/install.bash | bash
 ```
 
@@ -18,7 +18,7 @@ The installation assumes that docker is installed and running.
 
 Using Command Line
 
-```console
+```
 curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/install.ps1 | powershell -File -
 ```
 Using Powershell
