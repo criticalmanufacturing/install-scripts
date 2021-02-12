@@ -9,7 +9,7 @@ if ($PortainerPassword -eq "")
     #Generate a random secure password
     $PortainerPassword = ("!@#$%^*0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".tochararray() | sort {Get-Random})[0..$PortainerPasswordLength] -join ''
 }
-
+Write-Host $RepositoryUrl
 #Download files
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portainer-agent-stack.yml" -OutFile portainer-agent-stack.yml
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/createStackInPortainer.ps1" -OutFile createStackInPortainer.ps1
