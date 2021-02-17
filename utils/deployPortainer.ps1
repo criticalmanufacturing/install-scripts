@@ -1,6 +1,6 @@
 param (
        [String]$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main",
-       [String]$PortainerPassword = "",
+       #[String]$PortainerPassword = "",
        [Int]$PortainerPasswordLength = 18
       )
 
