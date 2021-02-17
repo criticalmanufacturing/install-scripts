@@ -30,7 +30,7 @@ docker swarm update --task-history-limit 3
 #deploy the portainer stack 
 docker stack deploy -c portainer-agent-stack.yml portainer
 #Add portainer stack to portainer (avoid it to be marked as external)
-pwsh -File ./createStackInPortainer.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml
+pwsh -File ./createStackInPortainer.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml >&1
 
 #Clean up 
 Remove-Item ./portainer-agent-stack.yml
