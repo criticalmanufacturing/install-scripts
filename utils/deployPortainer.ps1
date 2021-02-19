@@ -4,6 +4,8 @@ param (
        [Int]$PortainerPasswordLength = 18
       )
 
+$ProgressPreference = 'SilentlyContinue'
+
 if ($PortainerPassword -eq "") 
 {
     #Generate a random secure password
