@@ -1,6 +1,6 @@
 param (
        [String]$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main",
-       #[String]$PortainerPassword = "",
+       [String]$PortainerPassword = "",
        [Int]$PortainerPasswordLength = 18
       )
 
@@ -9,12 +9,12 @@ if ($PortainerPassword -eq "")
     #Generate a random secure password
     $PortainerPassword = ("!@#$%^*0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".tochararray() | Sort-Object {Get-Random})[0..$PortainerPasswordLength] -join ''
 }
-#Write-Debug "RepositoryUrl: $RepositoryUrl"
-#Write-Debug "PortainerPassword: $PortainerPassword"
+Write-Debug "RepositoryUrl: $RepositoryUrl"
+Write-Debug "PortainerPassword: $PortainerPassword"
 #Download files
-#Write-Debug "Downloading file $RepositoryUrl/utils/portainer-agent-stack.yml"
+Write-Debug "Downloading file $RepositoryUrl/utils/portainer-agent-stack.yml"
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portainer-agent-stack.yml" -OutFile portainer-agent-stack.yml
-#Write-Debug "Downloading file $RepositoryUrl/utils/createStackInPortainer.ps1"
+Write-Debug "Downloading file $RepositoryUrl/utils/createStackInPortainer.ps1"
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/createStackInPortainer.ps1" -OutFile createStackInPortainer.ps1
 
 #Hash portainer password
