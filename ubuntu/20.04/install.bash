@@ -35,5 +35,6 @@ curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
 
 #Deploy portainer
 wget -q "$REPOSITORY/utils/deployPortainer.ps1"
-pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY
+pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY > install.log 
+cat intall.log
 rm -f deployPortainer.ps1
