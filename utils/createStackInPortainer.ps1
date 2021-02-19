@@ -26,7 +26,7 @@ DO
     {
         $response = Invoke-WebRequest -Uri $PortainerUrl/api/auth -Method POST -ContentType "application/json" -Body $loginMessage
         $StatusCode = $response.StatusCode
-        Write-Host = "Portainer Login:" $response.StatusCode
+        Write-Host "Portainer Login:" $response.StatusCode
     } catch {
         $StatusCode = $_.Exception.Response.StatusCode.value__
         Write-Host $_.Exception.Message             
@@ -37,7 +37,6 @@ DO
 if ($response.StatusCode -eq 200)
 {
     #authentication succeeded
-    Write-Host = "Portainer authentication succeeded"
     $token = (ConvertFrom-Json $response.Content).jwt
 
     $PortainerHeaders = @{
