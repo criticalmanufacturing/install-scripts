@@ -21,3 +21,30 @@ Using Powershell
 ```powershell
 (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/install.ps1").Content | powershell -File -
 ```
+
+### Initialize Customer Infrastructure from a Template
+
+The initialization assumes that docker is installed and running.
+It also assumes that Windows Environment was already prepared.
+
+Powershell Core 7.1.3 or above is required.
+
+Using Powershell
+
+```powershell
+#--- Replace the mandatory parameter values below
+$params = @{
+    Agent = ""
+    License = ""
+    Site = ""
+    Infrastructure = ""
+    InfrastructureTemplate = ""
+    #--- Optional parameters
+    # EnvironmentType = "Development"
+    # parameters = "./parameters/agent_parameters.json"
+    # internetNetworkName = "internet"
+}
+
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
+pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
+```

@@ -10,7 +10,7 @@ param (
     [string] $parameters = $PSScriptRoot + "./parameters/agent_parameters.json",
     [string] $internetNetworkName
 )
-$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/portal" #TODO!!
+$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
 
 New-Item -ItemType directory -Path .\sdk -Force | Out-Null
 $progressPreference = 'silentlyContinue';
