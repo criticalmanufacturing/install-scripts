@@ -11,11 +11,11 @@ param (
     [string] $internetNetworkName
 )
 $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/portal" #TODO!!
-Clear-Host
 
 New-Item -ItemType directory -Path .\sdk -Force | Out-Null
-
+$progressPreference = 'silentlyContinue';
 Invoke-WebRequest -Uri "$RepositoryUrl/windows/portal/SDK.zip" -OutFile "./sdk/SDK.zip"
+Clear-Host
 
 Expand-Archive .\sdk\SDK.zip -Force
 Remove-Item .\sdk\SDK.zip
