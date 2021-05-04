@@ -11,6 +11,7 @@ param (
     [string] $internetNetworkName
 )
 $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/portal" #TODO!!
+Clear-Host
 
 New-Item -ItemType directory -Path .\sdk -Force | Out-Null
 
