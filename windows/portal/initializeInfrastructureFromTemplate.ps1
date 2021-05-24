@@ -12,13 +12,21 @@ param (
 )
 $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
 
+# Get Latest CustomerPortal SDK Release Tag
+$CustomerPortalSDKLatestReleaseAPI = "https://api.github.com/repos/criticalmanufacturing/portal-sdk/releases/latest"
+$CustomerPortalSDKLatestTag = Invoke-WebRequest -Uri $CustomerPortalSDKLatestReleaseAPI | % { $_.Content } | ConvertFrom-Json | % { $_.tag_name }
+
+# Download the latest release powershell asset
+$CustomerPortalSDKPowershellAssetName = "Cmf.CustomerPortal.Sdk.Powershell-$CustomerPortalSDKLatestTag.win-x64.zip"
+$CustomerPortalSDKReleaseUrl = "https://github.com/criticalmanufacturing/portal-sdk/releases/latest/download/$CustomerPortalSDKPowershellAssetName"
+
 New-Item -ItemType directory -Path .\sdk -Force | Out-Null
 $progressPreference = 'silentlyContinue';
-Invoke-WebRequest -Uri "$RepositoryUrl/windows/portal/SDK.zip" -OutFile "./sdk/SDK.zip"
+Invoke-WebRequest -Uri $CustomerPortalSDKReleaseUrl -OutFile "./sdk/"
 Clear-Host
 
-Expand-Archive .\sdk\SDK.zip -Force
-Remove-Item .\sdk\SDK.zip
+Expand-Archive .\sdk\$CustomerPortalSDKPowershellAssetName -DestinationPath "./sdk/" -Force
+Remove-Item .\sdk\$CustomerPortalSDKPowershellAssetName
 Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
 
 # Login
