@@ -34,6 +34,7 @@ $CustomerPortalSDKReleaseUrl = "https://github.com/criticalmanufacturing/portal-
 New-Item -ItemType directory -Path .\sdk -Force | Out-Null
 $progressPreference = 'silentlyContinue';
 Invoke-WebRequest -Uri $CustomerPortalSDKReleaseUrl -OutFile "./sdk/$CustomerPortalSDKPowershellAssetName"
+Clear-Host
 
 Expand-Archive .\sdk\$CustomerPortalSDKPowershellAssetName -DestinationPath "./sdk/" -Force
 Remove-Item .\sdk\$CustomerPortalSDKPowershellAssetName
