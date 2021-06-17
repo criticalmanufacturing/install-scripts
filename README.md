@@ -65,5 +65,5 @@ environmentType=""
 internetNetworkName=""
 portalToken=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --verbose --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" 
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" 
 ```

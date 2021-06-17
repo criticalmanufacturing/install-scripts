@@ -23,8 +23,21 @@ if ([string]::IsNullOrEmpty($internetNetworkName)) {
     $internetNetworkName = "internet"
 }
 
-Import-Module .\Cmf.CustomerPortal.Sdk.Powershell.dll
-#Import-Module  $PSScriptRoot\src\Powershell\bin\Debug\netstandard2.0\publish\Cmf.CustomerPortal.Sdk.Powershell.dll
+# Get Latest CustomerPortal SDK Release Tag
+$CustomerPortalSDKLatestReleaseAPI = "https://api.github.com/repos/criticalmanufacturing/portal-sdk/releases/latest"
+$CustomerPortalSDKLatestTag = Invoke-WebRequest -Uri $CustomerPortalSDKLatestReleaseAPI | % { $_.Content } | ConvertFrom-Json | % { $_.tag_name }
+
+# Download the latest release powershell asset
+$CustomerPortalSDKPowershellAssetName = "Cmf.CustomerPortal.Sdk.Powershell-$CustomerPortalSDKLatestTag.linux-x64.zip"
+$CustomerPortalSDKReleaseUrl = "https://github.com/criticalmanufacturing/portal-sdk/releases/latest/download/$CustomerPortalSDKPowershellAssetName"
+
+New-Item -ItemType directory -Path .\sdk -Force | Out-Null
+$progressPreference = 'silentlyContinue';
+Invoke-WebRequest -Uri $CustomerPortalSDKReleaseUrl -OutFile "./sdk/$CustomerPortalSDKPowershellAssetName"
+
+Expand-Archive .\sdk\$CustomerPortalSDKPowershellAssetName -DestinationPath "./sdk/" -Force
+Remove-Item .\sdk\$CustomerPortalSDKPowershellAssetName
+Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
 
 # Login
 Set-Login -PAT $portalToken
