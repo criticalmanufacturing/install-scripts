@@ -30,7 +30,7 @@ then
     echo "pat: $portalToken"
 fi
 
-wget -q "$REPOSITORY/utils/portal/initializeInfrastructure.ps1"
+curl -Os "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/utils/portal/initializeInfrastructure.ps1"
 pwsh -File ./initializeInfrastructure.ps1 -agent "$agent" -license "$license" -site "$site" -infrastructure "$infrastructure" -domain "$domain" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken"
 
 

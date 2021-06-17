@@ -55,15 +55,15 @@ pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
 
 
 ```bash
-$agent = ""
-$license = ""
-$site = ""
-$infrastructure = ""
-$domain = ""
+agent=""
+license=""
+site=""
+infrastructure=""
+domain=""
 #--- Optional parameters
-$portalToken = ""
-$environmentType = ""
-$internetNetworkName = ""
+environmentType=""
+internetNetworkName=""
+portalToken=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent $agent --license $license --site $site --infrastructure $infrastructure --domain $domain # --portalToken $portalToken --environmentType $environmentType --internetNetworkName $internetNetworkName 
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --verbose --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" 
 ```
