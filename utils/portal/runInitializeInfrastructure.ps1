@@ -5,10 +5,10 @@ param (
     [Parameter(Mandatory=$true)][string]$infrastructure,
     [Parameter(Mandatory=$true)][string]$domain,
     #optional parameters
-    [string] $environmentType = "Development",
-    [string] $agentVersion = "8.1.0",
-    [string] $parameters = $PSScriptRoot + "./parameters/agent_parameters.json",
-    [string] $internetNetworkName = "internet",
+    [string] $environmentType,
+    [string] $agentVersion,
+    [string] $parameters,
+    [string] $internetNetworkName,
     [string] $portalToken
 )
 
@@ -22,6 +22,10 @@ if ([string]::IsNullOrEmpty($agentVersion)) {
 
 if ([string]::IsNullOrEmpty($internetNetworkName)) {
     $internetNetworkName = "internet"
+}
+
+if ([string]::IsNullOrEmpty($parameters)) {
+    $parameters = $PSScriptRoot + "./parameters/agent_parameters.json"
 }
 
 $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture"
@@ -63,5 +67,4 @@ Remove-Item -Path ./deployAgent.ps1
 # inform the user to proceed with the environment installation
 Write-Host $url
 
-$global:ProgressPreference = 'Continue'
 Read-Host -Prompt "Press Enter to exit"
