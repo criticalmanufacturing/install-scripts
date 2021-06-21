@@ -54,6 +54,22 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/
 pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
 Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
 ```
+#### Linux
+
+```bash
+agent=""
+license=""
+site=""
+infrastructure=""
+infrastructureTemplate=""
+#--- Optional parameters
+environmentType=""
+internetNetworkName=""
+portalToken=""
+parameters=""
+
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+```
 
 ### Initialize Infrastructure
 
@@ -95,5 +111,5 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters="$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
