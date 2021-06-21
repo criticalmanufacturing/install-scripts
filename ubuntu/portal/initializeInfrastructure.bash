@@ -12,6 +12,7 @@ while [[ "$#" -gt 0 ]]; do
         -e|--environmentType) environmentType="$2"; shift ;;
         -n|--internetNetworkName) internetNetworkName="$2"; shift ;;
         -t|--portalToken) portalToken="$2"; shift ;;
+        -p|--parameters) parameters="$2"; shift ;;
         -v|--verbose) verbose=1 ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
@@ -28,10 +29,11 @@ then
     echo "environmentType: $environmentType"
     echo "internetNetworkName: $internetNetworkName"
     echo "pat: $portalToken"
+    echo "parameters: $parameters"
 fi
 
-curl -Os "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/utils/portal/initializeInfrastructure.ps1"
-pwsh -File ./initializeInfrastructure.ps1 -agent "$agent" -license "$license" -site "$site" -infrastructure "$infrastructure" -domain "$domain" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken"
+curl -Os "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/utils/portal/runInitializeInfrastructure.ps1"
+pwsh -File ./runInitializeInfrastructure.ps1 -agent "$agent" -license "$license" -site "$site" -infrastructure "$infrastructure" -domain "$domain" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken" -parameters "$parameters"
 
 
 
