@@ -52,6 +52,7 @@ $params = @{
 $global:ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
 pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
+Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
 ```
 
 ### Initialize Infrastructure
@@ -78,6 +79,7 @@ $params = @{
 $global:ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructure.ps1" -OutFile "./initializeInfrastructure.ps1"
 pwsh -File "initializeInfrastructure.ps1" @params
+Remove-Item -Path ./initializeInfrastructure.ps1
 ```
 #### Linux
 

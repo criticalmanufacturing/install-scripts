@@ -60,7 +60,7 @@ docker network create -d overlay --attachable traefik-network
 
 # Deploy Agent
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
-. ./deployAgent.ps1
+. ./deployAgent.ps1 -agent $agent
 Remove-Item -Path ./deployAgent.ps1
 
 
