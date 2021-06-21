@@ -29,48 +29,6 @@ It also assumes that Windows Environment was already prepared.
 
 Powershell Core 7.1.3 or above is required.
 
-### Initialize Customer Infrastructure from a Template
-#### Windows
-
-Using Powershell
-
-```powershell
-#--- Replace the mandatory parameter values below
-$params = @{
-    Agent = ""
-    License = ""
-    Site = ""
-    Infrastructure = ""
-    InfrastructureTemplate = ""
-    #--- Optional parameters
-    # EnvironmentType = "Development"
-    # parameters = "./parameters/agent_parameters.json"
-    # internetNetworkName = "internet"
-    # portalToken = ""
-}
-
-$global:ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
-pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
-Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
-```
-#### Linux
-
-```bash
-agent=""
-license=""
-site=""
-infrastructure=""
-infrastructureTemplate=""
-#--- Optional parameters
-environmentType=""
-internetNetworkName=""
-portalToken=""
-parameters=""
-
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
-```
-
 ### Initialize Infrastructure
 
 #### Windows
@@ -112,4 +70,46 @@ portalToken=""
 parameters=""
 
 curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+```
+
+### Initialize Customer Infrastructure from a Template
+#### Windows
+
+Using Powershell
+
+```powershell
+#--- Replace the mandatory parameter values below
+$params = @{
+    Agent = ""
+    License = ""
+    Site = ""
+    Infrastructure = ""
+    InfrastructureTemplate = ""
+    #--- Optional parameters
+    # EnvironmentType = "Development"
+    # parameters = "./parameters/agent_parameters.json"
+    # internetNetworkName = "internet"
+    # portalToken = ""
+}
+
+$global:ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
+pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
+Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
+```
+#### Linux
+
+```bash
+agent=""
+license=""
+site=""
+infrastructure=""
+infrastructureTemplate=""
+#--- Optional parameters
+environmentType=""
+internetNetworkName=""
+portalToken=""
+parameters=""
+
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
