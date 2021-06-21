@@ -25,7 +25,7 @@ Using Powershell
 ## Portal configurations
 
 The initialization assumes that docker is installed and running.
-It also assumes that Windows Environment was already prepared.
+It also assumes that the Environment was already prepared.
 
 Powershell Core 7.1.3 or above is required.
 
