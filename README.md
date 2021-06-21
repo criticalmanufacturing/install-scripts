@@ -48,8 +48,9 @@ $params = @{
     # portalToken = ""
 }
 
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
 pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
+Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
 ```
 
 ### (Linux) Initialize Infrastructure

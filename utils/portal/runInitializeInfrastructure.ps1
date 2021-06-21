@@ -27,7 +27,7 @@ if ([string]::IsNullOrEmpty($internetNetworkName)) {
 $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture"
 
 # Import SDK
-Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1"
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
 . ./importSDK.ps1
 Remove-Item -Path ./importSDK.ps1
 
@@ -54,7 +54,7 @@ if (![string]::IsNullOrEmpty($internetNetworkName)) {
 docker network create -d overlay --attachable traefik-network
 
 # Deploy Agent
-Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1"
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
 . ./deployAgent.ps1 -agent $agent
 Remove-Item -Path ./deployAgent.ps1
 

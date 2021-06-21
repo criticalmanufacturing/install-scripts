@@ -12,5 +12,6 @@ param (
     [string] $portalToken
 )
 
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/utils/portal/runInitializeInfrastructureFromTemplate.ps1"
-. ./runInitializeInfrastructureFromTemplate.ps1 $argumentList
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/utils/portal/runInitializeInfrastructureFromTemplate.ps1" -OutFile "./runInitializeInfrastructureFromTemplate.ps1"
+. .\runInitializeInfrastructureFromTemplate.ps1 -agent $agent -license $license -site $site -infrastructure $infrastructure -infrastructureTemplate $infrastructureTemplate -environmentType $environmentType -agentVersion $agentVersion -internetNetworkName $internetNetworkName -portalToken $portalToken
+Remove-Item -Path ./runInitializeInfrastructureFromTemplate.ps1
