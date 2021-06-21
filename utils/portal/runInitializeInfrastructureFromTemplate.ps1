@@ -25,6 +25,7 @@ if ([string]::IsNullOrEmpty($internetNetworkName)) {
 }
 
 $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture"
+$global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
@@ -63,4 +64,5 @@ Remove-Item -Path ./deployAgent.ps1
 # inform the user to proceed with the environment installation
 Write-Host $url
 
+$global:ProgressPreference = 'Continue'
 Read-Host -Prompt "Press Enter to exit"
