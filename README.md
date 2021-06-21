@@ -24,12 +24,13 @@ Using Powershell
 
 ## Portal configurations
 
-### (Windows) Initialize Customer Infrastructure from a Template
-
 The initialization assumes that docker is installed and running.
 It also assumes that Windows Environment was already prepared.
 
 Powershell Core 7.1.3 or above is required.
+
+### Initialize Customer Infrastructure from a Template
+#### Windows
 
 Using Powershell
 
@@ -53,8 +54,32 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/
 pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
 ```
 
-### (Linux) Initialize Infrastructure
+### Initialize Infrastructure
 
+#### Windows
+
+Using Powershell
+
+```powershell
+#--- Replace the mandatory parameter values below
+$params = @{
+    Agent = ""
+    License = ""
+    Site = ""
+    Infrastructure = ""
+    Domain = ""
+    #--- Optional parameters
+    # EnvironmentType = "Development"
+    # parameters = "./parameters/agent_parameters.json"
+    # internetNetworkName = "internet"
+    # portalToken = ""
+}
+
+$global:ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructure.ps1" -OutFile "./initializeInfrastructure.ps1"
+pwsh -File "initializeInfrastructure.ps1" @params
+```
+#### Linux
 
 ```bash
 agent=""
