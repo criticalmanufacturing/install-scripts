@@ -3,7 +3,7 @@ $CustomerPortalSDKLatestReleaseAPI = "https://api.github.com/repos/criticalmanuf
 $CustomerPortalSDKLatestTag = Invoke-WebRequest -Uri $CustomerPortalSDKLatestReleaseAPI | % { $_.Content } | ConvertFrom-Json | % { $_.tag_name }
 
 # Download the latest release powershell asset
-$CustomerPortalSDKPowershellAssetName = "Cmf.CustomerPortal.Sdk.Powershell-$CustomerPortalSDKLatestTag.win-x64.zip"
+$CustomerPortalSDKPowershellAssetName = "Cmf.CustomerPortal.Sdk.Powershell-$CustomerPortalSDKLatestTag.zip"
 $CustomerPortalSDKReleaseUrl = "https://github.com/criticalmanufacturing/portal-sdk/releases/latest/download/$CustomerPortalSDKPowershellAssetName"
 
 New-Item -ItemType directory -Path .\sdk -Force | Out-Null
