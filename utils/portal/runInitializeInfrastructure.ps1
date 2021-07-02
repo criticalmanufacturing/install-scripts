@@ -56,7 +56,7 @@ $url = New-Infrastructure -Name $infrastructure -AgentName $agent -SiteName $sit
 if (![string]::IsNullOrEmpty($internetNetworkName)) {
     docker network create -d overlay --attachable internet
 }
-docker network create -d overlay --attachable traefik-network
+docker network create -d overlay --attachable --internal traefik-network
 
 # Deploy Agent
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
