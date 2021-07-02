@@ -51,7 +51,7 @@ $params = @{
 }
 
 $global:ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructure.ps1" -OutFile "./initializeInfrastructure.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/portal/initializeInfrastructure.ps1" -OutFile "./initializeInfrastructure.ps1"
 pwsh -File "initializeInfrastructure.ps1" @params
 Remove-Item -Path ./initializeInfrastructure.ps1
 ```
@@ -69,7 +69,7 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
 
 ### Initialize Customer Infrastructure from a Template
@@ -93,7 +93,7 @@ $params = @{
 }
 
 $global:ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
 pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
 Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
 ```
@@ -111,5 +111,5 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```

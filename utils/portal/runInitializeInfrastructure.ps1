@@ -28,7 +28,7 @@ if ([string]::IsNullOrEmpty($parameters)) {
     $parameters = $PSScriptRoot + "./parameters/agent_parameters.json"
 }
 
-$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/linux-infrasctucture"
+$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
 $global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
