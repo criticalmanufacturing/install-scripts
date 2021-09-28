@@ -13,7 +13,7 @@ services:
         constraints: [node.platform.os == linux]
 
   portainer:
-    image: portainer/portainer-ce:2.1.1
+    image: portainer/portainer-ce:2.6.3
     command: -H tcp://tasks.agent:9001 --admin-password ADMIN_PASSWORD --tlsskipverify
     ports:
       - 9000:9000
