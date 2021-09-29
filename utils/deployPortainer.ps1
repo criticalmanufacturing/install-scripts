@@ -35,7 +35,7 @@ docker stack deploy -c portainer-agent-stack.yml portainer
 ./createStackInPortainer.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml 
 
 #Clean up 
-Remove-Item ./portainer-agent-stack.yml
+#Remove-Item ./portainer-agent-stack.yml
 Remove-Item ./createStackInPortainer.ps1
 
 Write-Host "Portainer has been deployed!"
