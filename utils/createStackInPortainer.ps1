@@ -69,7 +69,7 @@ if ($response.StatusCode -eq 200)
                                         }
             #in case 1 of the values contains a &
             $request = $request -replace '\\u0026', '&'
-            $response = Invoke-WebRequest -Uri "$PortainerUrl/api/stacks?endpointId=$($endpoint)&method=string&type=1" -Method PUT -Headers $PortainerHeaders -ContentType "application/json" -Body $request
+            $response = Invoke-WebRequest -Uri "$PortainerUrl/api/stacks?endpointId=$($endpoint)&method=string&type=1" -Method POST -Headers $PortainerHeaders -ContentType "application/json" -Body $request
             if ($response.StatusCode -eq 200) 
             { 
                 Write-Host Stack $StackName created!                 
