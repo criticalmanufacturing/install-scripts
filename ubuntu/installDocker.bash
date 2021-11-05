@@ -20,10 +20,9 @@ echo "{
         \"max-file\": \"5\"
     }
 }" > /etc/docker/daemon.json
-#reload docker config
-systemctl reload docker
 
-if [[ $(grep Microsoft /proc/version) ]]; then
+if [[ $(grep Microsoft /proc/version) ]]; 
+then
 	echo "Bash is running on WSL"
 	# Start Docker daemon automatically when logging in if not running.
 	RUNNING=`ps aux | grep dockerd | grep -v grep`
@@ -31,4 +30,9 @@ if [[ $(grep Microsoft /proc/version) ]]; then
 		sudo dockerd > /dev/null 2>&1 &
 		disown
 	fi
+else
+	#reload docker config
+	systemctl reload docker
 fi
+
+
