@@ -21,14 +21,15 @@ echo "{
     }
 }" > /etc/docker/daemon.json
 
-if [[ $(grep Microsoft /proc/version) ]]; 
+if [[ $(grep WSL /proc/version) ]]; 
 then
 	echo "Bash is running on WSL"
 	# Start Docker daemon automatically when logging in if not running.
 	RUNNING=`ps aux | grep dockerd | grep -v grep`
-	if [ -z "$RUNNING" ]; then
-		sudo dockerd > /dev/null 2>&1 &
-		disown
+	if [ -z "$RUNNING" ]; 
+	then
+		echo "Staring dockerd"
+		sudo dockerd > /dev/null 2>&1 && disown
 	fi
 else
 	#reload docker config
