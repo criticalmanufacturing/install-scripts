@@ -29,7 +29,7 @@ then
 	if [ -z "$RUNNING" ]; 
 	then
 		echo "Staring dockerd"
-		sudo dockerd > /dev/null 2>&1 && disown
+		sudo dockerd > /dev/null 2>&1 & disown
 	fi
 else
 	#reload docker config
