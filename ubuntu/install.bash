@@ -31,7 +31,7 @@ sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 curl -fsSL "$REPOSITORY/ubuntu/installDocker.bash" | bash;
 
 # Install PowerShell
-curl -fsSL "$REPOSITORY/ubuntu/20.04/installPowershell.bash" | bash;
+curl -fsSL "$REPOSITORY/ubuntu/installPowershell.bash" | bash;
 
 #Deploy portainer
 wget -q "$REPOSITORY/utils/deployPortainer.ps1"
