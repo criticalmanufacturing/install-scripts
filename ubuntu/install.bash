@@ -37,4 +37,3 @@ curl -fsSL "$REPOSITORY/ubuntu/installPowershell.bash" | bash;
 wget -q "$REPOSITORY/utils/deployPortainer.ps1"
 pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY
 rm -f deployPortainer.ps1
-
