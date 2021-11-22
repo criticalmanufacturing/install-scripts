@@ -28,10 +28,10 @@ swapoff -a
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 
 #install docker
-curl -fsSL "$REPOSITORY/ubuntu/installDocker.bash" | sudo bash;
+curl -fsSL "$REPOSITORY/ubuntu/installDocker.bash" | bash;
 
 # Install PowerShell
-curl -fsSL "$REPOSITORY/ubuntu/installPowershell.bash" | sudo bash;
+curl -fsSL "$REPOSITORY/ubuntu/installPowershell.bash" | bash;
 
 #Deploy portainer
 wget -q "$REPOSITORY/utils/deployPortainer.ps1"
