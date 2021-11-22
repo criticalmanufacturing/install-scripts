@@ -1,5 +1,5 @@
 #!/bin/bash
-REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/install-scripts-70300"
+REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
 
 #read arguments
 #while [ $# -gt 0 ]; do
@@ -37,3 +37,4 @@ curl -fsSL "$REPOSITORY/ubuntu/installPowershell.bash" | bash;
 wget -q "$REPOSITORY/utils/deployPortainer.ps1"
 pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY
 rm -f deployPortainer.ps1
+

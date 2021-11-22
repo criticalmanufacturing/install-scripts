@@ -4,7 +4,7 @@ Critical Manufacturing Installation Scripts
 ## Prepare single server Ubuntu environment
 
 ```
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/install.bash | bash
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/install.bash | sudo bash
 ```
 
 ## Prepare Windows environment
@@ -69,7 +69,7 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
 
 ### Initialize Customer Infrastructure from a Template
@@ -100,9 +100,6 @@ Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
 #### Linux
 
 
-**sudo su** must be run before any other command. 
-
-
 ```bash
 agent=""
 license=""
@@ -115,5 +112,5 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --license "$license" --site "$site" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
