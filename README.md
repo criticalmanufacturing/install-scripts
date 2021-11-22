@@ -1,10 +1,10 @@
 # install-scripts
 Critical Manufacturing Installation Scripts
 
-## Prepare single server Ubuntu 20.04 environment
+## Prepare single server Ubuntu environment
 
 ```
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main-fm/ubuntu/20.04/install.bash | bash
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main-fm/ubuntu/install.bash | bash
 ```
 
 ## Prepare Windows environment
@@ -98,6 +98,10 @@ pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
 Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
 ```
 #### Linux
+
+
+**sudo su** must be run before any other command. 
+
 
 ```bash
 agent=""
