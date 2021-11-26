@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/install-scripts-70367-InfrastructureAgentCommand"
+REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in

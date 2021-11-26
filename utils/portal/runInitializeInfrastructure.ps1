@@ -27,9 +27,9 @@ $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/instal
 $global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
-#Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
-#. ./importSDK.ps1
-#Remove-Item -Path ./importSDK.ps1
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
+. ./importSDK.ps1
+Remove-Item -Path ./importSDK.ps1
 
 # Login
 Set-Login -PAT $portalToken
@@ -37,14 +37,13 @@ Set-Login -PAT $portalToken
 $target = "dockerswarm"
 $outputDir = $PSScriptRoot + "/agent"
 
-
 $url = New-Infrastructure -Name $infrastructure -SiteName $site -Domain $Domain
 
 # Create agent
 if(Test-Path $parameters) {
-    New-InfrastructureAgent -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -SiteName $site -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
+    New-InfrastructureAgent -CustomerInfrastructureName $infrastructure -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
 } else {
-    New-InfrastructureAgent -Name $agent -Interactive -EnvironmentType $environmentType -SiteName $site -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
+    New-InfrastructureAgent -Interactive -CustomerInfrastructureName $infrastructure -Name $agent -EnvironmentType $environmentType -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
 }
 
 
