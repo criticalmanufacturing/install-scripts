@@ -6,9 +6,9 @@ $CustomerPortalSDKLatestTag = Invoke-WebRequest -Uri $CustomerPortalSDKLatestRel
 $CustomerPortalSDKPowershellAssetName = "Cmf.CustomerPortal.Sdk.Powershell-$CustomerPortalSDKLatestTag.zip"
 $CustomerPortalSDKReleaseUrl = "https://github.com/criticalmanufacturing/portal-sdk/releases/latest/download/$CustomerPortalSDKPowershellAssetName"
 
-New-Item -ItemType directory -Path .\sdk -Force | Out-Null
-Invoke-WebRequest -Uri $CustomerPortalSDKReleaseUrl -OutFile "./sdk/$CustomerPortalSDKPowershellAssetName"
+#New-Item -ItemType directory -Path .\sdk -Force | Out-Null
+#Invoke-WebRequest -Uri $CustomerPortalSDKReleaseUrl -OutFile "./sdk/$CustomerPortalSDKPowershellAssetName"
 
-Expand-Archive .\sdk\$CustomerPortalSDKPowershellAssetName -DestinationPath "./sdk/" -Force
-Remove-Item .\sdk\$CustomerPortalSDKPowershellAssetName
+#Expand-Archive .\sdk\$CustomerPortalSDKPowershellAssetName -DestinationPath "./sdk/" -Force
+#Remove-Item .\sdk\$CustomerPortalSDKPowershellAssetName
 Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll

@@ -1,5 +1,5 @@
 param (
-       [String]$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main",
+       [String]$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/install-scripts-70367-InfrastructureAgentCommand",
        [String]$PortainerPassword = "",
        [Int]$PortainerPasswordLength = 18
       )
