@@ -43,14 +43,16 @@ $package = "@criticalmanufacturing\infrastructureagent:$agentVersion"
 $target = "dockerswarm"
 $outputDir = $PSScriptRoot + "/agent"
 
+
+$url = New-Infrastructure -Name $infrastructure -SiteName $site -Domain $Domain
+
 # Create agent
-if (Test-Path $parameters) {
-	New-Environment -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -SiteName $site -LicenseName $license -DeploymentPackageName $package -DeploymentTargetName $target -OutputDir $outputDir
+if(Test-Path $parameters) {
+    New-InfrastructureAgent -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -SiteName $site -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
 } else {
-	New-Environment -Name $agent -Interactive -EnvironmentType $environmentType -SiteName $site -LicenseName $license -DeploymentPackageName $package -DeploymentTargetName $target -OutputDir $outputDir
+    New-InfrastructureAgent -Name $agent -Interactive -EnvironmentType $environmentType -SiteName $site -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
 }
 
-$url = New-Infrastructure -Name $infrastructure -AgentName $agent -SiteName $site -Domain $domain
 
 # Create docker dependencies
 if (![string]::IsNullOrEmpty($internetNetworkName)) {
