@@ -6,7 +6,6 @@ param (
     [Parameter(Mandatory=$true)][string]$domain,
     #optional parameters
     [string] $environmentType,
-    [string] $agentVersion,
     [string] $parameters,
     [string] $internetNetworkName,
     [string] $portalToken
@@ -14,10 +13,6 @@ param (
 
 if ([string]::IsNullOrEmpty($environmentType)) {
     $environmentType = "Development"
-}
-
-if ([string]::IsNullOrEmpty($agentVersion)) {
-    $agentVersion = "8.1.0"
 }
 
 if ([string]::IsNullOrEmpty($internetNetworkName)) {
@@ -39,7 +34,6 @@ Remove-Item -Path ./importSDK.ps1
 # Login
 Set-Login -PAT $portalToken
 
-$package = "@criticalmanufacturing\infrastructureagent:$agentVersion"
 $target = "dockerswarm"
 $outputDir = $PSScriptRoot + "/agent"
 
