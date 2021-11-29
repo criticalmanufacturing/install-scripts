@@ -10,5 +10,5 @@ New-Item -ItemType directory -Path .\sdk -Force | Out-Null
 Invoke-WebRequest -Uri $CustomerPortalSDKReleaseUrl -OutFile "./sdk/$CustomerPortalSDKPowershellAssetName"
 
 Expand-Archive .\sdk\$CustomerPortalSDKPowershellAssetName -DestinationPath "./sdk/" -Force
-Remove-Item .\sdk\$CustomerPortalSDKPowershellAssetName
+#Remove-Item .\sdk\$CustomerPortalSDKPowershellAssetName
 Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
