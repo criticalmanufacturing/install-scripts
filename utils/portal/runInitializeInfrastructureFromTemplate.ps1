@@ -23,7 +23,7 @@ if ([string]::IsNullOrEmpty($parameters)) {
     $parameters = $PSScriptRoot + "./parameters/agent_parameters.json"
 }
 
-$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/install-scripts-70367-InfrastructureAgentCommand "
+$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
 $global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
