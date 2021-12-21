@@ -6,7 +6,6 @@ param (
     [Parameter(Mandatory=$true)][string]$infrastructureTemplate,
     #optional parameters
     [string] $environmentType,
-    [string] $agentVersion,
     [string] $parameters,
     [string] $internetNetworkName,
     [string] $portalToken
@@ -14,5 +13,5 @@ param (
 
 $global:ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/utils/portal/runInitializeInfrastructureFromTemplate.ps1" -OutFile "./runInitializeInfrastructureFromTemplate.ps1"
-.\runInitializeInfrastructureFromTemplate.ps1 -agent "$agent" -license "$license" -site "$site" -infrastructure "$infrastructure" -infrastructureTemplate "$infrastructureTemplate" -environmentType "$environmentType" -agentVersion "$agentVersion" -parameters "$parameters" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken"
+.\runInitializeInfrastructureFromTemplate.ps1 -agent "$agent" -license "$license" -site "$site" -infrastructure "$infrastructure" -infrastructureTemplate "$infrastructureTemplate" -environmentType "$environmentType" -parameters "$parameters" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken"
 Remove-Item -Path ./runInitializeInfrastructureFromTemplate.ps1
