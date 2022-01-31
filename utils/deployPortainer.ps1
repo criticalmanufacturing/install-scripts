@@ -29,6 +29,8 @@ $hashedPassword = $hashedPassword.Split(":")[1]
 docker swarm init
 #limit task history
 docker swarm update --task-history-limit 3
+#pull portainer stack images
+docker compose --file portainer-agent-stack.yml pull
 #deploy the portainer stack 
 docker stack deploy -c portainer-agent-stack.yml portainer
 #Add portainer stack to portainer (avoid it to be marked as external)
