@@ -38,7 +38,11 @@ $target = "dockerswarm"
 $outputDir = $PSScriptRoot + "./agent"
 
 # Create infrastructure from template with the infrastructure agent
-$url = New-InfrastructureFromTemplate -Name $infrastructure -TemplateName $infrastructureTemplate
+$url = New-InfrastructureFromTemplate -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)"
+
+# HACK: Wait for as valid infrastructure so that we are able to create an agent for it
+Write-host "Waiting for infrastructure to be created..."
+Start-Sleep -Seconds 15
 
 # Create agent
 if(Test-Path $parameters) {

@@ -35,7 +35,7 @@ then
 fi
 
 curl -Os "$REPOSITORY/utils/portal/runInitializeInfrastructure.ps1"
-pwsh -File ./runInitializeInfrastructure.ps1 -agent "$agent" -license "$license" -site "$site" -customer "$site" -infrastructure "$infrastructure" -domain "$domain" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken" -parameters "$parameters"
+pwsh -File ./runInitializeInfrastructure.ps1 -agent "$agent" -license "$license" -site "$site" -customer "$customer" -infrastructure "$infrastructure" -domain "$domain" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken" -parameters "$parameters"
 
 
 
