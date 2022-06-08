@@ -1,7 +1,6 @@
 param (
     [Parameter(Mandatory=$true)][string]$agent,
     [Parameter(Mandatory=$true)][string]$license,
-    [Parameter(Mandatory=$true)][string]$site,
     [Parameter(Mandatory=$true)][string]$infrastructure,
     [Parameter(Mandatory=$true)][string]$infrastructureTemplate,
     #optional parameters

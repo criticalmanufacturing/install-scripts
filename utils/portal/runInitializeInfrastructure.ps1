@@ -1,14 +1,16 @@
 param (
     [Parameter(Mandatory=$true)][string]$agent,
     [Parameter(Mandatory=$true)][string]$license,
-    [Parameter(Mandatory=$true)][string]$site,
     [Parameter(Mandatory=$true)][string]$infrastructure,
     [Parameter(Mandatory=$true)][string]$domain,
+    [string]$customer,
     #optional parameters
     [string] $environmentType,
     [string] $parameters,
     [string] $internetNetworkName,
-    [string] $portalToken
+    [string] $portalToken,
+    #deprecated parameters
+    [string]$site
 )
 
 if ([string]::IsNullOrEmpty($environmentType)) {
@@ -37,7 +39,7 @@ Set-Login -PAT $portalToken
 $target = "dockerswarm"
 $outputDir = $PSScriptRoot + "/agent"
 
-$url = New-Infrastructure -Name $infrastructure -SiteName $site -Domain $Domain
+$url = New-Infrastructure -Name $infrastructure -SiteName $site -CustomerName $customer -Domain $Domain
 
 # Create agent
 if(Test-Path $parameters) {
