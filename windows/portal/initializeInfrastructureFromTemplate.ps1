@@ -9,7 +9,8 @@ param (
     [string] $internetNetworkName,
     [string] $portalToken,
     #deprecated parameters
-    [string]$site # unused, but kept for compatibility
+    [Obsolete("There is no need to supply it anymore")]
+    [string]$site
 )
 
 $global:ProgressPreference = 'SilentlyContinue'

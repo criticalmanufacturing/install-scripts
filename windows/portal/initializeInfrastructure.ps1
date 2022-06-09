@@ -10,7 +10,8 @@ param (
     [string] $internetNetworkName,
     [string] $portalToken,
     #deprecated parameters
-    [string]$site #changed to customer
+    [Obsolete("'customer' parameter should be used instead")]
+    [string]$site
 )
 
 $global:ProgressPreference = 'SilentlyContinue'
