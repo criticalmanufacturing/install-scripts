@@ -10,7 +10,7 @@ param (
     [string] $internetNetworkName,
     [string] $portalToken,
     #deprecated parameters
-    [Obsolete("'customer' parameter should be used instead")]
+    [Obsolete("The 'customer' parameter should be used instead")]
     [string]$site
 )
 
