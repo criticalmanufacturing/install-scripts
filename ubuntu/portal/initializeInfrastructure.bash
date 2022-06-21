@@ -6,7 +6,8 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         -a|--agent) agent="$2"; shift ;;
         -l|--license) license="$2"; shift ;;
-        -s|--site) site="$2"; shift ;;
+        -s|--site) site="$2"; shift ;; # deprecated, but can still be in use
+        -c|--customer) customer="$2"; shift ;;
         -i|--infrastructure) infrastructure="$2"; shift ;;
         -s|--domain) domain="$2"; shift ;;
         -e|--environmentType) environmentType="$2"; shift ;;
@@ -24,6 +25,7 @@ then
     echo "agent: $agent"
     echo "license: $license"
     echo "site: $site"
+    echo "customer: $customer"
     echo "infrastructure: $infrastructure"
     echo "domain: $domain"
     echo "environmentType: $environmentType"
@@ -33,7 +35,7 @@ then
 fi
 
 curl -Os "$REPOSITORY/utils/portal/runInitializeInfrastructure.ps1"
-pwsh -File ./runInitializeInfrastructure.ps1 -agent "$agent" -license "$license" -site "$site" -infrastructure "$infrastructure" -domain "$domain" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken" -parameters "$parameters"
+pwsh -File ./runInitializeInfrastructure.ps1 -agent "$agent" -license "$license" -site "$site" -customer "$customer" -infrastructure "$infrastructure" -domain "$domain" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken" -parameters "$parameters"
 
 
 
