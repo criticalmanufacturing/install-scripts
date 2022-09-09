@@ -1,6 +1,6 @@
 param (
     [Parameter(Mandatory=$true)][string]$agent,
-    [Parameter(Mandatory=$true)][string]$license,
+    [Obsolete("No longer needed. Value ignored.")][string]$license,
     [Parameter(Mandatory=$true)][string]$infrastructure,
     [Parameter(Mandatory=$true)][string]$domain,
     [string]$customer,
@@ -48,9 +48,9 @@ Start-Sleep -Seconds 90
 
 # Create agent
 if(Test-Path $parameters) {
-    New-InfrastructureAgent -CustomerInfrastructureName $infrastructure -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
+    New-InfrastructureAgent -CustomerInfrastructureName $infrastructure -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -DeploymentTargetName $target -OutputDir $outputDir
 } else {
-    New-InfrastructureAgent -Interactive -CustomerInfrastructureName $infrastructure -Name $agent -EnvironmentType $environmentType -LicenseName $license -DeploymentTargetName $target -OutputDir $outputDir
+    New-InfrastructureAgent -Interactive -CustomerInfrastructureName $infrastructure -Name $agent -EnvironmentType $environmentType -DeploymentTargetName $target -OutputDir $outputDir
 }
 
 
