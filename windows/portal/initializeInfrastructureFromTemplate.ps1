@@ -1,6 +1,6 @@
 param (
     [Parameter(Mandatory=$true)][string]$agent,
-    [Parameter(Mandatory=$true)][string]$license,
+    [Obsolete("No longer needed. Value ignored.")][string]$license,
     [Parameter(Mandatory=$true)][string]$infrastructure,
     [Parameter(Mandatory=$true)][string]$infrastructureTemplate,
     #optional parameters
@@ -15,5 +15,5 @@ param (
 
 $global:ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/utils/portal/runInitializeInfrastructureFromTemplate.ps1" -OutFile "./runInitializeInfrastructureFromTemplate.ps1"
-.\runInitializeInfrastructureFromTemplate.ps1 -agent "$agent" -license "$license" -infrastructure "$infrastructure" -infrastructureTemplate "$infrastructureTemplate" -environmentType "$environmentType" -parameters "$parameters" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken"
+.\runInitializeInfrastructureFromTemplate.ps1 -agent "$agent" -infrastructure "$infrastructure" -infrastructureTemplate "$infrastructureTemplate" -environmentType "$environmentType" -parameters "$parameters" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken"
 Remove-Item -Path ./runInitializeInfrastructureFromTemplate.ps1

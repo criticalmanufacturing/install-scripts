@@ -39,7 +39,6 @@ Using Powershell
 #--- Replace the mandatory parameter values below
 $params = @{
     Agent = ""
-    License = ""
     Customer = ""
     Infrastructure = ""
     Domain = ""
@@ -59,7 +58,6 @@ Remove-Item -Path ./initializeInfrastructure.ps1
 
 ```bash
 agent=""
-license=""
 customer=""
 infrastructure=""
 domain=""
@@ -69,7 +67,7 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --license "$license" --customer "$customer" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
 
 ### Initialize Customer Infrastructure from a Template
@@ -81,7 +79,6 @@ Using Powershell
 #--- Replace the mandatory parameter values below
 $params = @{
     Agent = ""
-    License = ""
     Infrastructure = ""
     InfrastructureTemplate = ""
     #--- Optional parameters
@@ -101,7 +98,6 @@ Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
 
 ```bash
 agent=""
-license=""
 infrastructure=""
 infrastructureTemplate=""
 #--- Optional parameters
@@ -110,5 +106,5 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --license "$license" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
