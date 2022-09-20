@@ -1,5 +1,5 @@
 #!/bin/bash
-REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
+REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"}
 
 #read arguments
 #while [ $# -gt 0 ]; do
