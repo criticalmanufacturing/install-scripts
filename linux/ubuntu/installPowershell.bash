@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e
+
 # Install powershell
 . /etc/os-release
 wget -q https://packages.microsoft.com/config/$ID/$VERSION_ID/packages-microsoft-prod.deb
