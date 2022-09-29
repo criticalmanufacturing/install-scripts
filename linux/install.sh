@@ -32,11 +32,11 @@ swapoff -a
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 
 if ! command_exists docker; then
-    curl -fsSL $REPOSITORY/"$lsb_dist"/installDocker.bash | bash
+    curl -fsSL $REPOSITORY/linux/"$lsb_dist"/installDocker.bash | bash
 fi
 
 if ! command_exists pwsh; then
-    curl -fsSL $REPOSITORY/"$lsb_dist"/installPowershell.bash | bash
+    curl -fsSL $REPOSITORY/linux/"$lsb_dist"/installPowershell.bash | bash
 fi
 
 
