@@ -1,10 +1,19 @@
 #!/bin/bash
 set -e
 
-REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
+# REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
+REPOSITORY="https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"
 
 command_exists() {
 	command -v "$@" > /dev/null 2>&1
+}
+
+is_wsl() {
+	case "$(uname -r)" in
+	*microsoft* ) true ;; # WSL 2
+	*Microsoft* ) true ;; # WSL 1
+	* ) false;;
+	esac
 }
 
 if [ ! -f "/etc/os-release" ]; then
@@ -49,7 +58,7 @@ echo "{
     }
 }" > /etc/docker/daemon.json
 
-if [[ $(grep WSL /proc/version) ]];
+if is_wsl;
 then
         echo "Bash is running on WSL"
         # Start Docker daemon automatically when logging in if not running.
