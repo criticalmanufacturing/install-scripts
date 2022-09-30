@@ -40,6 +40,8 @@ esac
 swapoff -a
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 
+# TODO: this doesnt work for debian
+
 if ! command_exists docker; then
     curl -fsSL $REPOSITORY/linux/"$lsb_dist"/installDocker.bash | bash
 fi
@@ -49,7 +51,17 @@ if ! command_exists pwsh; then
 fi
 
 
-#change docker default log policy
+
+
+echo "# Changing docker default log policy"
+
+# mkdir -p /etc/docker
+# touch /etc/docker/daemon.json
+
+# jq '."log-driver" = "json-file"' <<< cat /etc/docker/daemon.json
+
+# jq '."log-opts" = { "max-size": "10m", "max-file": "5" }' <<< cat /etc/docker/daemon.json 
+
 echo "{
     \"log-driver\": \"json-file\",
     \"log-opts\": {
@@ -73,8 +85,15 @@ else
         systemctl reload docker
 fi
 
+
 #Deploy portainer
-wget -q "$REPOSITORY/utils/deployPortainer.ps1"
-pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY
-rm -f deployPortainer.ps1
+
+if ! docker ps -a | grep -q portainer; then
+    wget -q "$REPOSITORY/utils/deployPortainer.ps1"
+    pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY
+    rm -f deployPortainer.ps1
+fi
+
+
+
 
