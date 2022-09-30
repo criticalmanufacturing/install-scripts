@@ -26,7 +26,7 @@ $hashedPassword = $hashedPassword.Split(":")[1]
 #Write-Debug "Hashed password: $hashedPassword"
 ((Get-Content -Path portainer-agent-stack.yml -Raw) -replace "ADMIN_PASSWORD", $hashedPassword) -replace  '\$','$$$' | Set-Content -Path portainer-agent-stack.yml
 #make sure docker is running in swarm mode
-docker swarm init
+docker swarm init --advertise-addr 127.0.0.1
 #limit task history
 docker swarm update --task-history-limit 3
 #pull portainer stack images
