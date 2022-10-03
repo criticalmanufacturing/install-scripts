@@ -1,8 +1,4 @@
 #!/bin/bash
 set -e
 
-# Register the Microsoft RedHat repository
-curl https://packages.microsoft.com/config/rhel/8/prod.repo | sudo tee /etc/yum.repos.d/microsoft.repo
-
-# Install PowerShell
-dnf install --assumeyes powershell
+dnf install https://github.com/PowerShell/PowerShell/releases/download/v7.2.6/powershell-lts-7.2.6-1.rh.x86_64.rpm
