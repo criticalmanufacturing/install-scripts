@@ -83,7 +83,7 @@ then
 else
         echo "# Enabling and starting docker service"
         systemctl enable docker
-        systemctl restart docker
+        systemctl start docker
 
         #reload docker config
         systemctl reload docker
