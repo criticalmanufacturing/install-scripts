@@ -54,7 +54,7 @@ fi
 
 echo "# Changing docker default log policy"
 
-if [[ ! -f "/etc/docker/daemon.json" ]]; then
+if [[ ! -f "/etc/docker/daemon.json" &&  -s "/etc/docker/daemon.json" ]]; then
     # ensure file and folder exists
     mkdir -p /etc/docker
     touch -a /etc/docker/daemon.json
