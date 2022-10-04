@@ -52,23 +52,23 @@ fi
 
 
 
-
 echo "# Changing docker default log policy"
 
-# mkdir -p /etc/docker
-# touch /etc/docker/daemon.json
+# ensure file exists
+mkdir -p /etc/docker
+touch -a /etc/docker/daemon.json
 
-# jq '."log-driver" = "json-file"' <<< cat /etc/docker/daemon.json
+tmp=$(mktemp)
+jq '."log-driver" = "json-file"' /etc/docker/daemon.json > "$tmp" && mv "$tmp" /etc/docker/daemon.json
+jq '."log-opts" = { "max-size": "10m", "max-file": "5" }' /etc/docker/daemon.json > "$tmp" && mv "$tmp" /etc/docker/daemon.json
 
-# jq '."log-opts" = { "max-size": "10m", "max-file": "5" }' <<< cat /etc/docker/daemon.json 
-
-echo "{
-    \"log-driver\": \"json-file\",
-    \"log-opts\": {
-        \"max-size\": \"10m\",
-        \"max-file\": \"5\"
-    }
-}" > /etc/docker/daemon.json
+# echo "{
+#     \"log-driver\": \"json-file\",
+#     \"log-opts\": {
+#         \"max-size\": \"10m\",
+#         \"max-file\": \"5\"
+#     }
+# }" > /etc/docker/daemon.json
 
 if is_wsl;
 then
@@ -81,6 +81,10 @@ then
                 sudo dockerd > /dev/null 2>&1 & disown
         fi
 else
+        echo "# Enabling and starting docker service"
+        systemctl enable docker
+        systemctl restart docker
+
         #reload docker config
         systemctl reload docker
 fi
