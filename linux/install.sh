@@ -54,21 +54,21 @@ fi
 
 echo "# Changing docker default log policy"
 
-# ensure file exists
-mkdir -p /etc/docker
-touch -a /etc/docker/daemon.json
+if [[ ! -f "/etc/docker/daemon.json" ]]; then
+    # ensure file and folder exists
+    mkdir -p /etc/docker
+    touch -a /etc/docker/daemon.json
 
-tmp=$(mktemp)
-jq '."log-driver" = "json-file"' /etc/docker/daemon.json > "$tmp" && mv "$tmp" /etc/docker/daemon.json
-jq '."log-opts" = { "max-size": "10m", "max-file": "5" }' /etc/docker/daemon.json > "$tmp" && mv "$tmp" /etc/docker/daemon.json
+    echo "{
+        \"log-driver\": \"json-file\",
+        \"log-opts\": {
+            \"max-size\": \"10m\",
+            \"max-file\": \"5\"
+        }
+    }" > /etc/docker/daemon.json
 
-# echo "{
-#     \"log-driver\": \"json-file\",
-#     \"log-opts\": {
-#         \"max-size\": \"10m\",
-#         \"max-file\": \"5\"
-#     }
-# }" > /etc/docker/daemon.json
+fi
+
 
 if is_wsl;
 then
