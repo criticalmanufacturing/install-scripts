@@ -31,26 +31,59 @@ Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFil
 Remove-Item -Path ./importSDK.ps1
 
 # Login
-Set-Login -PAT $portalToken
+try
+{
+    Write-Host "Login..."
+    Set-Login -PAT $portalToken
+}
+catch 
+{
+    Write-Host $_.Exception.Message
+    exit 1
+}
 
 # Agent properties
 $target = "dockerswarm"
 $outputDir = $PSScriptRoot + "./agent"
 
-# Create infrastructure from template with the infrastructure agent
-$url = New-InfrastructureFromTemplate -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)"
+try
+{
+    Write-Host "Creating infrastructure..."
+    # Create infrastructure from template with the infrastructure agent
+    $url = New-InfrastructureFromTemplate -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)"
 
-# HACK: Wait for as valid infrastructure so that we are able to create an agent for it
-Write-host "Waiting for infrastructure to be created..."
-Start-Sleep -Seconds 90
-
-# Create agent
-if(Test-Path $parameters) {
-    New-InfrastructureAgent -CustomerInfrastructureName $infrastructure -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -DeploymentTargetName $target -OutputDir $outputDir
-} else {
-    New-InfrastructureAgent -Interactive -CustomerInfrastructureName $infrastructure -Name $agent -EnvironmentType $environmentType -DeploymentTargetName $target -OutputDir $outputDir
+    # HACK: Wait for as valid infrastructure so that we are able to create an agent for it
+    Write-Host "Waiting for infrastructure to be created..."
+    Start-Sleep -Seconds 90
+} 
+catch 
+{
+    Write-Host $_.Exception.Message
+    if ($_.Exception.Message.EndsWith('of type CustomerInfrastructure already exists.'))
+    {
+        Write-Host "The installation will continue..."
+    } 
+    else{
+        exit 1
+    }       
 }
 
+
+try
+{
+    Write-Host "Creating agent..."
+    # Create agent
+    if(Test-Path $parameters) {
+        New-InfrastructureAgent -CustomerInfrastructureName $infrastructure -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -DeploymentTargetName $target -OutputDir $outputDir
+    } else {
+        New-InfrastructureAgent -Interactive -CustomerInfrastructureName $infrastructure -Name $agent -EnvironmentType $environmentType -DeploymentTargetName $target -OutputDir $outputDir
+    }
+}
+catch 
+{
+    Write-Host $_.Exception.Message
+    exit 1 
+}
 
 # Create docker dependencies
 if (![string]::IsNullOrEmpty($internetNetworkName)) {
