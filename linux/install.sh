@@ -40,7 +40,10 @@ esac
 swapoff -a
 sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
 
-# TODO: this doesnt work for debian
+# for debian use the ubuntu scripts
+if [ "$lsb_dist" = "debian" ]; then
+    lsb_dist=ubuntu
+fi
 
 if ! command_exists docker; then
     curl -fsSL $REPOSITORY/linux/"$lsb_dist"/installDocker.bash | bash
@@ -54,7 +57,7 @@ fi
 
 echo "# Changing docker default log policy"
 
-if [[ ! -f "/etc/docker/daemon.json" &&  -s "/etc/docker/daemon.json" ]]; then
+if [[ ! -f "/etc/docker/daemon.json" ||  -s "/etc/docker/daemon.json" ]]; then
     # ensure file and folder exists
     mkdir -p /etc/docker
     touch -a /etc/docker/daemon.json
