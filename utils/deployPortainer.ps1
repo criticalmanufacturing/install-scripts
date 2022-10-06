@@ -16,8 +16,6 @@ Write-Host "PortainerPassword: $PortainerPassword"
 #Download files
 Write-Host "Downloading file $RepositoryUrl/utils/portainer-agent-stack.yml"
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portainer-agent-stack.yml" -OutFile portainer-agent-stack.yml
-Write-Host "Downloading file $RepositoryUrl/utils/createStackInPortainer.ps1"
-Invoke-WebRequest -Uri "$RepositoryUrl/utils/createStackInPortainer.ps1" -OutFile createStackInPortainer.ps1
 
 #Hash portainer password
 docker pull httpd:2.4-alpine
@@ -33,12 +31,6 @@ docker swarm update --task-history-limit 3
 docker compose --file portainer-agent-stack.yml pull
 #deploy the portainer stack 
 docker stack deploy -c portainer-agent-stack.yml portainer
-#Add portainer stack to portainer (avoid it to be marked as external)
-#./createStackInPortainer.ps1 -StackName portainer -PortainerUser admin -PortainerPassword "$portainerPassword" -StackFileName ./portainer-agent-stack.yml 
-
-#Clean up 
-#Remove-Item ./portainer-agent-stack.yml
-Remove-Item ./createStackInPortainer.ps1
 
 Write-Host "Portainer has been deployed!"
 Write-Host ""

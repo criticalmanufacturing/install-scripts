@@ -2,7 +2,7 @@
 set -e
 
 # REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
-REPOSITORY="https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"
+REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"}
 
 command_exists() {
 	command -v "$@" > /dev/null 2>&1
@@ -26,7 +26,7 @@ lsb_dist="$(echo "$lsb_dist" | tr '[:upper:]' '[:lower:]')"
 
 case "$lsb_dist" in
 
-    ubuntu|debian|rhel|sles)
+    ubuntu|debian|rhel)
         echo "Starting environment preparation - $lsb_dist"
     ;;
 
