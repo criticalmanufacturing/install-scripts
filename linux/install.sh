@@ -46,14 +46,12 @@ if [ "$lsb_dist" = "debian" ]; then
 fi
 
 if ! command_exists docker; then
-    curl -fsSL $REPOSITORY/linux/"$lsb_dist"/installDocker.bash | bash
+    curl -fsSL "$REPOSITORY"/linux/"$lsb_dist"/installDocker.bash | bash
 fi
 
 if ! command_exists pwsh; then
-    curl -fsSL $REPOSITORY/linux/"$lsb_dist"/installPowershell.bash | bash
+    curl -fsSL "$REPOSITORY"/linux/"$lsb_dist"/installPowershell.bash | bash
 fi
-
-
 
 echo "# Changing docker default log policy"
 
@@ -77,7 +75,7 @@ if is_wsl;
 then
         echo "Bash is running on WSL"
         # Start Docker daemon automatically when logging in if not running.
-        RUNNING=$(ps aux | grep dockerd | grep -v grep)
+        RUNNING=$(pgrep dockerd)
         if [ -z "$RUNNING" ];
         then
                 echo "Staring dockerd"
@@ -97,7 +95,7 @@ fi
 
 if ! docker ps -a | grep -q portainer; then
     wget -q "$REPOSITORY/utils/deployPortainer.ps1"
-    pwsh -File ./deployPortainer.ps1 -RepositoryUrl $REPOSITORY
+    pwsh -File ./deployPortainer.ps1 -RepositoryUrl "$REPOSITORY"
     rm -f deployPortainer.ps1
 fi
 

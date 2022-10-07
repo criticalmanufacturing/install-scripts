@@ -4,7 +4,7 @@ Critical Manufacturing Installation Scripts
 ## Prepare Linux environment
 
 ```
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/linux/install.bash | sudo bash
+REPOSITORY=https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main curl -fsSL $REPOSITORY/linux/install.sh | sudo bash
 ```
 
 ## Prepare Windows environment
@@ -67,7 +67,7 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/linux/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+REPOSITORY=https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main curl -fsSL $REPOSITORY/linux/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
 
 ### Initialize Customer Infrastructure from a Template
@@ -106,5 +106,5 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/linux/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+REPOSITORY=https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main curl -fsSL $REPOSITORY/linux/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```

@@ -8,7 +8,7 @@ while [[ "$#" -gt 0 ]]; do
         -s|--site) site="$2"; shift ;; # deprecated, but can still be in use
         -c|--customer) customer="$2"; shift ;;
         -i|--infrastructure) infrastructure="$2"; shift ;;
-        -s|--domain) domain="$2"; shift ;;
+        -d|--domain) domain="$2"; shift ;;
         -e|--environmentType) environmentType="$2"; shift ;;
         -n|--internetNetworkName) internetNetworkName="$2"; shift ;;
         -t|--portalToken) portalToken="$2"; shift ;;
