@@ -26,9 +26,10 @@ $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/instal
 $global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
-Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
-. ./importSDK.ps1
-Remove-Item -Path ./importSDK.ps1
+Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
+# Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
+# . ./importSDK.ps1
+# Remove-Item -Path ./importSDK.ps1
 
 # Login
 try
@@ -38,7 +39,7 @@ try
 }
 catch 
 {
-    Write-Host $_.Exception.Message
+    Write-Error $_.Exception.Message
     exit 1
 }
 
@@ -50,22 +51,12 @@ try
 {
     Write-Host "Creating infrastructure..."
     # Create infrastructure from template with the infrastructure agent
-    $url = New-InfrastructureFromTemplate -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)"
-
-    # HACK: Wait for as valid infrastructure so that we are able to create an agent for it
-    Write-Host "Waiting for infrastructure to be created..."
-    Start-Sleep -Seconds 90
+    $url = New-InfrastructureFromTemplate -Force -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)" -SecondsTimeout 180
 } 
 catch 
 {
-    Write-Host $_.Exception.Message
-    if ($_.Exception.Message.EndsWith('of type CustomerInfrastructure already exists.'))
-    {
-        Write-Host "The installation will continue..."
-    } 
-    else{
-        exit 1
-    }       
+    Write-Error $_.Exception.Message
+    exit 1
 }
 
 
@@ -81,7 +72,7 @@ try
 }
 catch 
 {
-    Write-Host $_.Exception.Message
+    Write-Error $_.Exception.Message
     exit 1 
 }
 

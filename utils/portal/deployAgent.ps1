@@ -33,7 +33,7 @@ Do
     }
 
     # log state
-    if ($isConnected -eq $true)
+    if ($isConnected)
     {
         Write-Host "Infrastructure Agent $agent connected!"
     }
@@ -41,4 +41,10 @@ Do
     {
         Write-Host "Infrastructure Agent $agent not connected. Retrying in $waitTime seconds."
     }
-} While (($isConnected -eq $false) -and ($totalWaitedTime -le $timeout))
+} While ((!$isConnected) -and ($totalWaitedTime -le $timeout))
+
+
+if (!$isConnected)
+{
+    Write-Error "Probably was not possible to connect the Infrastructure Agent $agent!"
+}
