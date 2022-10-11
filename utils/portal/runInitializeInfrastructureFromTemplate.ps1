@@ -26,10 +26,9 @@ $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/instal
 $global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
-Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
-# Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
-# . ./importSDK.ps1
-# Remove-Item -Path ./importSDK.ps1
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
+. ./importSDK.ps1
+Remove-Item -Path ./importSDK.ps1
 
 # Login
 try

@@ -2,7 +2,7 @@ param (
     [Parameter(Mandatory=$true)][string]$agent,
     [Obsolete("No longer needed. Value ignored.")][string]$license,
     [Parameter(Mandatory=$true)][string]$infrastructure,
-    [Parameter(Mandatory=$true)][string]$domain,
+    [Obsolete("No longer needed. Value ignored.")][string]$domain,
     [string]$customer,
     #optional parameters
     [string] $environmentType,
@@ -10,8 +10,7 @@ param (
     [string] $internetNetworkName,
     [string] $portalToken,
     #deprecated parameters
-    [Obsolete("The 'customer' parameter should be used instead")]
-    [string]$site
+    [Obsolete("The 'customer' parameter should be used instead")][string]$site
 )
 
 if ([string]::IsNullOrEmpty($environmentType)) {
@@ -30,10 +29,9 @@ $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/instal
 $global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
-Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
-# Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
-# . ./importSDK.ps1
-# Remove-Item -Path ./importSDK.ps1
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
+. ./importSDK.ps1
+Remove-Item -Path ./importSDK.ps1
 
 # Login
 try
@@ -53,7 +51,7 @@ $outputDir = $PSScriptRoot + "/agent"
 try
 {
     Write-Host "Creating infrastructure..."
-    $url = New-Infrastructure -Force -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)" -Domain $Domain -SecondsTimeout 180
+    $url = New-Infrastructure -Force -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)" -SecondsTimeout 180
 } 
 catch 
 {

@@ -41,7 +41,6 @@ $params = @{
     Agent = ""
     Customer = ""
     Infrastructure = ""
-    Domain = ""
     #--- Optional parameters
     # EnvironmentType = "Development"
     # parameters = "./parameters/agent_parameters.json"
@@ -60,14 +59,13 @@ Remove-Item -Path ./initializeInfrastructure.ps1
 agent=""
 customer=""
 infrastructure=""
-domain=""
 #--- Optional parameters
 environmentType=""
 internetNetworkName=""
 portalToken=""
 parameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
 
 ### Initialize Customer Infrastructure from a Template

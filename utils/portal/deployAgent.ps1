@@ -46,5 +46,5 @@ Do
 
 if (!$isConnected)
 {
-    Write-Error "Probably was not possible to connect the Infrastructure Agent $agent!"
+    Write-Error "Probably was not possible to connect the Infrastructure Agent $agent! You must check and if necessary fix the connection."
 }
