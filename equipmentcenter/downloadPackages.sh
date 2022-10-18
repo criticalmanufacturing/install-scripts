@@ -19,6 +19,10 @@ echo "${partialToken//?/*}${portaltoken: -4}"
 read -p 'FEC Packages version: ' version </dev/tty
 version=$(echo "$version" | sed 's/\./\\\./g')
 
+read -p 'Packages destination folder [/opt/fec/packages]: ' BASE_FOLDER </dev/tty
+BASE_FOLDER=${BASE_FOLDER:-/opt/fec/packages}
+mkdir -p $BASE_FOLDER
+
 filters=("/$version/.*\\.zip\\(\\.[0-9]\\+\\)\\?$" "/$version/.*\\.xlsx$") #*.zip or *.zip.xxx or *.xlsx
 
 logfile=$sourceRepo-backup.log
@@ -55,7 +59,7 @@ IFS=$'\n' urls=($(sort <<<"${urls[*]}")); unset IFS
 #echo "Sorted: "${urls[@]}
 
 for url in "${urls[@]}"; do
-    dir=$sourceRepo"/"
+    dir=$BASE_FOLDER"/"
     mkdir -p $dir
     cd $dir
 
