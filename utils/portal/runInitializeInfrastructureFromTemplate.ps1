@@ -50,7 +50,7 @@ try
 {
     Write-Host "Creating infrastructure..."
     # Create infrastructure from template with the infrastructure agent
-    $url = New-InfrastructureFromTemplate -Force -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)" -SecondsTimeout 180
+    $url = New-InfrastructureFromTemplate -IgnoreIfExists -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)"
 } 
 catch 
 {
