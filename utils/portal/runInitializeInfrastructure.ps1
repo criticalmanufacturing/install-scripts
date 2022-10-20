@@ -2,7 +2,6 @@ param (
     [Parameter(Mandatory=$true)][string]$agent,
     [Obsolete("No longer needed. Value ignored.")][string]$license,
     [Parameter(Mandatory=$true)][string]$infrastructure,
-    [Parameter(Mandatory=$true)][string]$domain,
     [string]$customer,
     #optional parameters
     [string] $environmentType,
@@ -40,7 +39,7 @@ Set-Login -PAT $portalToken
 $target = "dockerswarm"
 $outputDir = $PSScriptRoot + "/agent"
 
-$url = New-Infrastructure -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)" -Domain $Domain
+$url = New-Infrastructure -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)"
 
 # HACK: Wait for as valid infrastructure so that we are able to create an agent for it
 Write-host "Waiting for infrastructure to be created..."
