@@ -2,7 +2,6 @@ param (
     [Parameter(Mandatory=$true)][string]$agent,
     [Obsolete("No longer needed. Value ignored.")][string]$license,
     [Parameter(Mandatory=$true)][string]$infrastructure,
-    [Obsolete("No longer needed. Value ignored.")][string]$domain,
     [string]$customer,
     #optional parameters
     [string] $environmentType,
