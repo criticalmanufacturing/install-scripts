@@ -63,14 +63,14 @@ for url in "${urls[@]}"; do
     mkdir -p $dir
     cd $dir
 
-    echo -n Downloading $url | tee -a $logfile 2>&1
-    curl -vks -u "$portalUser:$portaltoken" -D response.header -X GET "$url" -O >> /dev/null 2>&1
+    echo Downloading $url
+    curl -k --progress-bar -u "$portalUser:$portaltoken" -D response.header -X GET "$url" -O
     responseCode=$(cat response.header | sed -n '1p' | cut -d' ' -f2)
     if [ "$responseCode" == "200" ]; then
-        echo " - DONE" | tee -a $logfile 2>&1
+        echo " - DONE"
     else
-        echo " - ERROR" | tee -a $logfile 2>&1
-        echo ERROR: Failed to download artifact: $url with error code: $responseCode  | tee -a $logfile 2>&1
+        echo " - ERROR"
+        echo ERROR: Failed to download artifact: $url with error code: $responseCode 
     fi
     rm response.header > /dev/null 2>&1
     
