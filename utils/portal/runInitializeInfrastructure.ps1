@@ -35,7 +35,7 @@ Remove-Item -Path ./importSDK.ps1
 # Login
 try
 {
-    Write-Host "Login..."
+    Write-Host "Using the specified Customer Portal PAT to login..."
     Set-Login -PAT $portalToken
 }
 catch 
