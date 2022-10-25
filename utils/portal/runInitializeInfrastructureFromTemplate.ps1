@@ -48,7 +48,7 @@ $outputDir = $PSScriptRoot + "./agent"
 
 try
 {
-    Write-Host "Creating infrastructure..."
+    Write-Host "Creating Customer Infrastructure..."
     # Create infrastructure from template with the infrastructure agent
     $url = New-InfrastructureFromTemplate -IgnoreIfExists -Name "$($infrastructure)" -TemplateName "$($infrastructureTemplate)"
 } 
