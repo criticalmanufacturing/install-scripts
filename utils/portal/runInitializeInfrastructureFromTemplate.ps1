@@ -61,7 +61,7 @@ catch
 
 try
 {
-    Write-Host "Creating agent..."
+    Write-Host "Creating Infrastructure Agent..."
     # Create agent
     if(Test-Path $parameters) {
         New-InfrastructureAgent -CustomerInfrastructureName $infrastructure -Name $agent -ParametersPath $parameters -EnvironmentType $environmentType -DeploymentTargetName $target -OutputDir $outputDir
