@@ -49,7 +49,7 @@ $outputDir = $PSScriptRoot + "/agent"
 
 try
 {
-    Write-Host "Creating infrastructure..."
+    Write-Host "Creating Customer Infrastructure..."
     $url = New-Infrastructure -IgnoreIfExists -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)"
 } 
 catch 
