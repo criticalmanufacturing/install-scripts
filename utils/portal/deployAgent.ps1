@@ -1,5 +1,6 @@
 param (
-    [Parameter(Mandatory=$true)][string]$agent
+    [Parameter(Mandatory=$true)][string]$agent,
+    [string]$url
 )
 
 
@@ -47,5 +48,6 @@ Do
 if (!$isConnected)
 {
     Write-Error "Was not possible to connect the Infrastructure Agent $agent! You must check and if necessary fix the connection."
+    Write-Host $url
     exit 1
 }

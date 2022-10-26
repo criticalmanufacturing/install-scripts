@@ -35,7 +35,7 @@ Remove-Item -Path ./importSDK.ps1
 # Login
 try
 {
-    Write-Host "Login..."
+    Write-Host "Using the specified Customer Portal PAT to login..."
     Set-Login -PAT $portalToken
 }
 catch 
@@ -81,12 +81,12 @@ if (![string]::IsNullOrEmpty($internetNetworkName)) {
 }
 docker network create -d overlay --attachable --internal traefik-network
 
-# inform the user to proceed with the environment installation
-Write-Host $url
-
 # Deploy Agent
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
-. ./deployAgent.ps1 -agent $agent
+. ./deployAgent.ps1 -agent $agent -url $url
 Remove-Item -Path ./deployAgent.ps1
+
+# Inform the user to proceed with the environment installation
+Write-Host $url
 
 Read-Host -Prompt "Press Enter to exit"
