@@ -22,16 +22,30 @@ Do
     Start-Sleep -Seconds $waitTime
     $totalWaitedTime = $totalWaitedTime + $waitTime
 
-    # check if agent is connected
-    $isConnected = Get-AgentConnection -Name $agent
+    try
+    {
+        # check if agent is connected
+        $isConnected = Get-AgentConnection -Name $agent
+    }
+    catch 
+    {
+        Write-Host $_.Exception.Message
+    }
 
     # log state
-    if ($isConnected -eq $true)
+    if ($isConnected)
     {
-        Write-Debug "Infrastructure Agent $agent not connected. Retrying in $waitTime seconds."
+        Write-Host "Infrastructure Agent $agent connected!"
     }
     else
     {
-        Write-Debug "Infrastructure Agent $agent not connected. Retrying in $waitTime seconds."
+        Write-Host "Infrastructure Agent $agent not connected. Retrying in $waitTime seconds."
     }
-} While (($isConnected -eq $false) -and ($totalWaitedTime -le $timeout))
+} While ((!$isConnected) -and ($totalWaitedTime -le $timeout))
+
+
+if (!$isConnected)
+{
+    Write-Error "Was not possible to connect the Infrastructure Agent $agent! You must check and if necessary fix the connection."
+    exit 1
+}
