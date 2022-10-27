@@ -10,7 +10,9 @@ param (
     [string] $portalToken,
     #deprecated parameters
     [Obsolete("The 'customer' parameter should be used instead")]
-    [string]$site
+    [string]$site,
+    [Obsolete("The 'domain' parameter is no longer needed")]
+    [Parameter(Mandatory=$true)][string]$domain
 )
 
 $global:ProgressPreference = 'SilentlyContinue'
