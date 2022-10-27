@@ -83,10 +83,7 @@ docker network create -d overlay --attachable --internal traefik-network
 
 # Deploy Agent
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
-$deployAgent = ". ./deployAgent.ps1 -agent $agent"
-
-#call expression and save exit code
-Invoke-Expression $deployAgent 
+./deployAgent.ps1 -agent $agent
 $exitCodeFromDeployAgent = $LASTEXITCODE #save on variable the current lastExitCode because we want to apply RemoveItem() before compare the exit code value.
 
 Remove-Item -Path ./deployAgent.ps1
