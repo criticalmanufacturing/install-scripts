@@ -1,12 +1,16 @@
 param (
-    [string]$DatabaseServerInstance = $null
+    [Parameter(Mandatory=$false)][string]$DatabaseServerInstance = ""
 )
 
-Install-Package Hardware.Info -RequiredVersion 10.1.0 -Destination packages -Force -source https://www.nuget.org/api/v2 -SkipDependencies
-Install-Package ByteSize -RequiredVersion 2.1.1 -Destination packages -Force -source https://www.nuget.org/api/v2 -SkipDependencies
+# Install-Package Hardware.Info -RequiredVersion 10.1.0 -Destination packages -source https://www.nuget.org/api/v2 -SkipDependencies
+# Install-Package ByteSize -RequiredVersion 2.1.1 -Destination packages -source https://www.nuget.org/api/v2 -SkipDependencies
 
-Add-Type -Path './packages/ByteSize.2.1.1/lib/netstandard2.0/ByteSize.dll'
-Add-Type -Path './packages/Hardware.Info.10.1.0/lib/netstandard2.0/Hardware.Info.dll'
+$ErrorActionPreference = "Stop"
+
+Add-Type -Path './packages/ByteSize.dll'
+Add-Type -Path './packages/Hardware.Info.dll'
+
+$ErrorActionPreference = "Continue"
 
 $memoryByteSize = [ByteSizeLib.ByteSize]::Parse("16GB")
 $diskByteSize = [ByteSizeLib.ByteSize]::Parse("250GB")
@@ -15,7 +19,7 @@ $logicalProcessors = 16
 $collation = "Latin1_General_CI_AS"
 
 if (![string]::IsNullOrEmpty($DatabaseServerInstance)) {
-    Install-Module SqlServer -Force
+    Install-Module SqlServer
 
     $cred = Get-Credential -Message "Credential are required for access to $DatabaseServerInstance"
     $pw = ConvertFrom-SecureString -SecureString $cred.Password -AsPlainText
