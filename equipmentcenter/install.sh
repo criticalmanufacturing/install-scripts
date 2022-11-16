@@ -56,8 +56,7 @@ echo "Creating Infrastructure and Deploying Agent"
 parameters=agent_params.json
 
 echo "{
-    \"INTERNET_NETWORK\": \"$internetNetworkName\",
-    \"TRAEFIK_DOMAIN\": \"$domain\"
+    \"INTERNET_NETWORK\": \"$internetNetworkName\"
 }" > $parameters
 
 curl -fsSL -u $REPOSITORY_USER:$REPOSITORY_PASSWORD $REPOSITORY/linux/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
