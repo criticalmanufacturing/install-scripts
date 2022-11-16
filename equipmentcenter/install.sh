@@ -24,9 +24,6 @@ environmentType=${environmentType:-Production}
 read -p 'Internet Network Name [internet]:' internetNetworkName </dev/tty
 internetNetworkName=${internetNetworkName:-internet}
 
-read -p 'Domain [localhost]:' domain </dev/tty
-domain=${domain:-localhost}
-
 # read -p 'Agent Parameters: ' parameters </dev/tty
 
 read -p 'Volumes base folder [/opt/fec]: ' BASE_FOLDER </dev/tty
@@ -63,7 +60,7 @@ echo "{
     \"TRAEFIK_DOMAIN\": \"$domain\"
 }" > $parameters
 
-curl -fsSL -u $REPOSITORY_USER:$REPOSITORY_PASSWORD $REPOSITORY/linux/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --domain "$domain" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL -u $REPOSITORY_USER:$REPOSITORY_PASSWORD $REPOSITORY/linux/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 
 ## ======== CREATE VOLUMES FOLDERS ========
 echo; echo "Creating volume folders"
