@@ -7,15 +7,13 @@ set -e
 sourceServer=https://criticalmanufacturing.io
 sourceRepo=packages
 
-read -p 'Customer Portal Username: ' portalUser </dev/tty
-read -sp 'Customer Portal Token: ' portaltoken </dev/tty
-if [[ ${#portaltoken} -lt 300 ]]
-then
-    echo "Error: Token is to short"
-    exit
-fi
-partialToken="${portaltoken:0: -4}"
-echo "${partialToken//?/*}${portaltoken: -4}"
+read -rp 'Nexus Repository [https://criticalmanufacturing.io]: ' sourceServer </dev/tty
+export sourceServer=${sourceServer:-"https://criticalmanufacturing.io"}
+
+read -p 'Nexus Username: ' portalUser </dev/tty
+
+read -sp 'Nexus Password: ' portaltoken </dev/tty
+echo "${portaltoken//?/*}"
 read -p 'FEC Packages version: ' version </dev/tty
 version=$(echo "$version" | sed 's/\./\\\./g')
 
