@@ -24,7 +24,7 @@ environmentType=${environmentType:-Production}
 read -p 'Internet Network Name [internet]:' internetNetworkName </dev/tty
 internetNetworkName=${internetNetworkName:-internet}
 
-# read -p 'Agent Parameters: ' parameters </dev/tty
+read -p 'Agent Parameters: ' parameters </dev/tty
 
 read -p 'Volumes base folder [/opt/fec]: ' BASE_FOLDER </dev/tty
 BASE_FOLDER=${BASE_FOLDER:-/opt/fec}
@@ -53,11 +53,11 @@ curl -fsSL -u $REPOSITORY_USER:$REPOSITORY_PASSWORD $REPOSITORY/linux/install.sh
 echo
 echo "Creating Infrastructure and Deploying Agent"
 
-parameters=agent_params.json
+# parameters=agent_params.json
 
-echo "{
-    \"INTERNET_NETWORK\": \"$internetNetworkName\"
-}" > $parameters
+# echo "{
+#     \"INTERNET_NETWORK\": \"$internetNetworkName\"
+# }" > $parameters
 
 curl -fsSL -u $REPOSITORY_USER:$REPOSITORY_PASSWORD $REPOSITORY/linux/portal/initializeInfrastructure.bash | bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 
