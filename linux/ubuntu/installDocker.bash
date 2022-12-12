@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+#update system
+apt update -y -qq
+
 . /etc/os-release
 
 #install utils

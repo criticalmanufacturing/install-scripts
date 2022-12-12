@@ -37,12 +37,13 @@ case "$lsb_dist" in
 
 esac
 
+swapoff -a
+sed -i 's/\/swap.img/#\/swap.img/g' /etc/fstab
+
 # for debian use the ubuntu scripts
 if [ "$lsb_dist" = "debian" ]; then
     lsb_dist=ubuntu
 fi
-
-curl -fsSL "$REPOSITORY"/linux/"$lsb_dist"/installOthers.bash | bash
 
 if ! command_exists docker; then
     curl -fsSL "$REPOSITORY"/linux/"$lsb_dist"/installDocker.bash | bash
@@ -91,6 +92,7 @@ fi
 
 
 #Deploy portainer
+
 if ! docker ps -a | grep -q portainer; then
     wget -q "$REPOSITORY/utils/deployPortainer.ps1"
     pwsh -File ./deployPortainer.ps1 -RepositoryUrl "$REPOSITORY"
