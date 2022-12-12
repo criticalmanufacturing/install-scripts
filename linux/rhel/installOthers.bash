@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
 
-dnf install p7zip-full
+dnf install -y p7zip-full
