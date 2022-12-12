@@ -2,7 +2,10 @@
 
 set -e
 
-source ./configure.sh
+## ======== PARAMETERS ========
+REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"}
+source <( curl -fsSL $REPOSITORY/equipmentcenter/configure.sh )
+# source ./configure.sh
 
 sourceServer=https://criticalmanufacturing.io
 sourceRepo=packages
@@ -37,11 +40,12 @@ download_artifacts () {
     mkdir -p "$3"
     for url in "${urls[@]}"; do
         echo Downloading "$url"
-        wget --no-verbose --no-clobber -P "$3" --user "" --password "$CMF_PORTAL_TOKEN" "$url"
+        wget --no-clobber -P "$3" --user "" --password "$CMF_PORTAL_TOKEN" "$url"
     done
 }
 
 download_artifacts "$tempFile" "$packages_filter" "$CMF_VOLUMES_BASE_FOLDER/packages"
-download_artifacts "$tempFile" "$multimedia_filter" "$CMF_VOLUMES_BASE_FOLDER/multimedia"
+download_artifacts "$tempFile" "$multimedia_filter" .
 download_artifacts "$tempFile" "$masterdata_filter" .
 
+7z x "./Multimedia.zip.001" -o"$CMF_VOLUMES_BASE_FOLDER/multimedia"

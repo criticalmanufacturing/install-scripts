@@ -40,50 +40,17 @@ configure_variable_with_default "Environment Type (Testing/Production/Staging/De
 configure_variable_with_default "Internet Network Name" internet CMF_INTERNET_NETWORK_NAME
 configure_variable_with_default "Volumes base folder"  /opt/fec CMF_VOLUMES_BASE_FOLDER
 
+read -rp "Continue? (yes/no) " yn
 
+case $yn in 
+	yes ) echo "Continuing";;
+	no ) echo "Exiting ...";
+		exit;;
+	* ) echo "Please answer yes or no";
+		exit 1;;
+esac
 
-echo "##################################################################"
-echo "Configuration saved to $file. To configure again, delete the file."
-echo "##################################################################"
-
-
-# read -rp "Advanced mode? () (yes/no) " yn
-
-# case $yn in 
-# 	yes ) echo "Continuing";;
-# 	no ) echo "Exiting ...";
-# 		exit;;
-# 	* ) echo "Please answer yes or no";
-# 		exit 1;;
-# esac
-
-
-# read -rp "Do you want to proceed? (yes/no) " yn
-
-# case $yn in 
-# 	yes ) echo "Continuing";;
-# 	no ) echo "Exiting ...";
-# 		exit;;
-# 	* ) echo "Please answer yes or no";
-# 		exit 1;;
-# esac
-
-
-# # Script Repository
-# read -p 'Scripts repository [https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support]: ' REPOSITORY </dev/tty
-# export REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"}
-# read -p 'Scripts repository user: ' REPOSITORY_USER </dev/tty
-# export REPOSITORY_USER=${REPOSITORY_USER:-""}
-# read -sp 'Scripts repository password: ' REPOSITORY_PASSWORD </dev/tty
-# export REPOSITORY_PASSWORD=${REPOSITORY_PASSWORD:-""}
-# echo
-
-# # Portal SDK
-# read -p 'Portal SDK Base URL (empty if not to override): ' SDK_BASE_URL </dev/tty
-# export SDK_BASE_URL=${SDK_BASE_URL:-""}
-# read -p 'Portal SDK TAG (empty if not to override/latest): ' SDK_TAG </dev/tty
-# export SDK_TAG=${SDK_TAG:-""}
-
+echo; echo "Configuration saved to $file. To configure again, delete the file."; echo;
 
 echo "CMF_ENVIRONMENT_TYPE=\"$CMF_ENVIRONMENT_TYPE\"
 CMF_INTERNET_NETWORK_NAME=\"$CMF_INTERNET_NETWORK_NAME\"
