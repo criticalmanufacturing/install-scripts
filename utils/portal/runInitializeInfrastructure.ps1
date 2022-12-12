@@ -77,7 +77,7 @@ catch
 
 # Create docker dependencies
 if (![string]::IsNullOrEmpty($internetNetworkName)) {
-    docker network create -d overlay --attachable internet
+    docker network create -d overlay --attachable $internetNetworkName
 }
 docker network create -d overlay --attachable --internal traefik-network
 
