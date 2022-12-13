@@ -40,15 +40,15 @@ configure_variable_with_default "Environment Type (Testing/Production/Staging/De
 configure_variable_with_default "Internet Network Name" internet CMF_INTERNET_NETWORK_NAME
 configure_variable_with_default "Volumes base folder"  /opt/fec CMF_VOLUMES_BASE_FOLDER
 
-# read -rp "Continue? (yes/no) " yn
+read -rp "Continue? (yes/no) " yn </dev/tty
 
-# case $yn in 
-# 	yes ) echo "Continuing";;
-# 	no ) echo "Exiting ...";
-# 		exit;;
-# 	* ) echo "Please answer yes or no";
-# 		exit 1;;
-# esac
+case $yn in 
+	yes ) echo "Continuing";;
+	no ) echo "Exiting ...";
+		exit;;
+	* ) echo "Please answer yes or no";
+		exit 1;;
+esac
 
 echo; echo "Configuration saved to $file. To configure again, delete the file."; echo;
 
