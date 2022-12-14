@@ -55,7 +55,7 @@ testcon https://github.com
 testcon https://raw.githubusercontent.com
 
 
-read -rp "Check DB Collation? (y/n) " yn </dev/tty
+read -rp "Check DB Collation (will install sqlcmd)? (y/n) " yn </dev/tty
 
 case $yn in 
 	y|yes ) echo "Continuing";;
@@ -69,7 +69,7 @@ if [ ! -f "/etc/os-release" ]; then
     exit 1
 fi
 
-
+source /etc/os-release
 lsb_dist="$(. /etc/os-release && echo "$ID")"
 lsb_dist="$(echo "$lsb_dist" | tr '[:upper:]' '[:lower:]')"
 sqlcmd=/opt/mssql-tools/bin/sqlcmd
@@ -102,6 +102,8 @@ requiredCollation="Latin1_General_CI_AS"
 read -rp 'MSSQL Server Instance: ' instance </dev/tty
 read -rp 'MSSQL Server Username: ' username </dev/tty
 read -rsp 'MSSQL Server Password: ' password </dev/tty
+
+echo;
 
 result=$( "$sqlcmd" -S "$instance" -U "$username" -P "$password" -Q "SELECT CONVERT (varchar, SERVERPROPERTY('collation')) as Collation")
 echo "$result"
