@@ -58,7 +58,7 @@ testcon https://raw.githubusercontent.com
 read -rp "Check DB Collation? (y/n) " yn </dev/tty
 
 case $yn in 
-	y ) echo "Continuing";;
+	y|yes ) echo "Continuing";;
 	* ) echo "Skipping DB Collation check. Exiting...";
 		exit 0;;
 esac
@@ -69,38 +69,43 @@ if [ ! -f "/etc/os-release" ]; then
     exit 1
 fi
 
-requiredCollation="Latin1_General_CI_AS"
 
 lsb_dist="$(. /etc/os-release && echo "$ID")"
 lsb_dist="$(echo "$lsb_dist" | tr '[:upper:]' '[:lower:]')"
+sqlcmd=/opt/mssql-tools/bin/sqlcmd
 
-case "$lsb_dist" in
+if [[ ! -f "$sqlcmd" ]]; then 
+    case "$lsb_dist" in
 
-    ubuntu)
-        sqlcmd=/opt/mssql-tools/bin/sqlcmd
-
-        if [[ ! -f "$sqlcmd" ]]; then   
+        ubuntu|debian)
             echo "Starting environment preparation - $lsb_dist"
             curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-            curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | tee /etc/apt/sources.list.d/msprod.list
+            curl "https://packages.microsoft.com/config/$lsb_dist/$VERSION_ID/prod.list" | tee /etc/apt/sources.list.d/msprod.list
             apt-get update 
             apt-get install mssql-tools unixodbc-dev
-        fi
-        read -rp 'MSSQL Server Instance: ' instance </dev/tty
-        read -rp 'MSSQL Server Username: ' username </dev/tty
-        read -rsp 'MSSQL Server Password: ' password </dev/tty
+        ;;
+        rhel)
+            curl "https://packages.microsoft.com/config/rhel/$ID/prod.repo" > /etc/yum.repos.d/msprod.repo
+            yum install mssql-tools unixODBC-devel
+        ;;
+        *)
+            echo "Checking DB collation is currently unsupported in distro $lsb_dist"
+            exit 1
+        ;;
 
-        result=$( "$sqlcmd" -S "$instance" -U "$username" -P "$password" -Q "SELECT CONVERT (varchar, SERVERPROPERTY('collation')) as Collation")
-        echo "$result"
-        echo "$result" | awk -v val=$requiredCollation 'FNR==3{if($1 != val) print "Invalid collation: REQUIRED=" val "; AVAILABLE=" $1;}'
+    esac
 
-    ;;
-    *)
-        echo "Checking DB collation is currently unsupported in distro $lsb_dist"
-        exit 1
-    ;;
+fi
 
-esac
+requiredCollation="Latin1_General_CI_AS"
+
+read -rp 'MSSQL Server Instance: ' instance </dev/tty
+read -rp 'MSSQL Server Username: ' username </dev/tty
+read -rsp 'MSSQL Server Password: ' password </dev/tty
+
+result=$( "$sqlcmd" -S "$instance" -U "$username" -P "$password" -Q "SELECT CONVERT (varchar, SERVERPROPERTY('collation')) as Collation")
+echo "$result"
+echo "$result" | awk -v val=$requiredCollation 'FNR==3{if($1 != val) print "Invalid collation: REQUIRED=" val "; AVAILABLE=" $1;}'
 
 
 
