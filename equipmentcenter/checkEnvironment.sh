@@ -25,8 +25,8 @@ requiredDiskSpace=244140625
 # free -h
 grep MemTotal /proc/meminfo | awk -v val=$requiredMemory '{if($2+0 < val+0) print "Memory under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
 
-lscpu | grep "Core(s) per socket:" | awk -v val=$requiredCores -F ':' '{gsub(/ /,"",$2); if($2+0 < val+0) print "CPUs under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
-lscpu | grep "CPU(s):" | awk -v val=$requiredLogicalProcessors -F ':' '{gsub(/ /,"",$2); if($2+0 < val+0) print "Logical Processors under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
+lscpu | grep "^Core(s) per socket:" | awk -v val=$requiredCores -F ':' '{gsub(/ /,"",$2); if($2+0 < val+0) print "CPUs under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
+lscpu | grep "^CPU(s):" | awk -v val=$requiredLogicalProcessors -F ':' '{gsub(/ /,"",$2); if($2+0 < val+0) print "Logical Processors under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
 
 
 df -P /var/lib/docker | awk -v val=$requiredDiskSpace 'FNR==2{if($2+0 < val+0) print "Disk space under required: REQUIRED=" val "; AVAILABLE=" $2;}'
