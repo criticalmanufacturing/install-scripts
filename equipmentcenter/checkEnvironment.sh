@@ -2,23 +2,105 @@
 
 set -e
 
-# read -rp 'Scripts repository [https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support]: ' REPOSITORY </dev/tty
-# wget -q "$REPOSITORY/equipmentcenter/configure.sh"
+mkdir -p /opt/fec
+mkdir -p /var/lib/docker
 
-source ./configure.sh
+# free -h
+grep MemTotal /proc/meminfo
 
-# export REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"}
+lscpu | grep "Core(s) per socket:"
+lscpu | grep "CPU(s):"
+
+df -PB G /var/lib/docker | awk 'FNR==2{print "/var/lib/docker: " $2}'
+df -PB G /opt/fec | awk 'FNR==2{print "/opt/fec: " $2}'
+
+echo; echo "#####################################"; echo;
 
 
-# DATABASE_ADDRESS=""
-# read -rp 'Database Server Instance Name (leave empty if not required): ' DATABASE_ADDRESS </dev/tty
-# [[ -n "$DATABASE_ADDRESS" ]] && DATABASE_ARG="-DatabaseServerInstance $DATABASE_ADDRESS"
+requiredMemory=15728640
+requiredCores=2
+requiredLogicalProcessors=8
+requiredDiskSpace=244140625
 
-# if command -v pwsh > /dev/null 2>&1; then
-#     wget -q "$REPOSITORY/equipmentcenter/SystemRequirementsChecker.ps1"
-#     wget -q "$REPOSITORY/equipmentcenter/packages/ByteSize.dll" -P ./packages
-#     wget -q "$REPOSITORY/equipmentcenter/packages/Hardware.Info.dll" -P ./packages
-#     pwsh -File ./SystemRequirementsChecker.ps1 "$DATABASE_ARG"
-# else
-#     echo "Powershell is not installed"
-# fi
+# free -h
+grep MemTotal /proc/meminfo | awk -v val=$requiredMemory '{if($2+0 < val+0) print "Memory under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
+
+lscpu | grep "Core(s) per socket:" | awk -v val=$requiredCores -F ':' '{gsub(/ /,"",$2); if($2+0 < val+0) print "CPUs under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
+lscpu | grep "CPU(s):" | awk -v val=$requiredLogicalProcessors -F ':' '{gsub(/ /,"",$2); if($2+0 < val+0) print "Logical Processors under required value: REQUIRED=" val "; AVAILABLE=" $2;}'
+
+
+df -P /var/lib/docker | awk -v val=$requiredDiskSpace 'FNR==2{if($2+0 < val+0) print "Disk space under required: REQUIRED=" val "; AVAILABLE=" $2;}'
+df -P /opt/fec | awk -v val=$requiredDiskSpace 'FNR==2{if($2+0 < val+0) print "Disk space under required: REQUIRED=" val "; AVAILABLE=" $2;}'
+
+
+testcon () {
+    echo -n "$1 "
+    status_code=$(curl --write-out %{http_code} --silent --output /dev/null "$1" || echo "")
+    if [[ ("$status_code" == 2*) || ("$status_code" == 3*) ]]
+    then
+        echo "- OK ($status_code)"
+    else
+		echo "- Failed ($status_code)"
+        #exit
+    fi
+}
+
+echo "Testing connectivity"
+testcon https://portal.criticalmanufacturing.com
+testcon https://security.criticalmanufacturing.com
+testcon https://criticalmanufacturing.io
+testcon https://docker.io
+testcon https://mcr.microsoft.com
+testcon https://github.com
+testcon https://raw.githubusercontent.com
+
+
+read -rp "Check DB Collation? (y/n) " yn </dev/tty
+
+case $yn in 
+	y ) echo "Continuing";;
+	* ) echo "Skipping DB Collation check. Exiting...";
+		exit 0;;
+esac
+
+
+if [ ! -f "/etc/os-release" ]; then
+    echo "/etc/os-release doesn't exist, unable to detect distro"
+    exit 1
+fi
+
+requiredCollation="Latin1_General_CI_AS"
+
+lsb_dist="$(. /etc/os-release && echo "$ID")"
+lsb_dist="$(echo "$lsb_dist" | tr '[:upper:]' '[:lower:]')"
+
+case "$lsb_dist" in
+
+    ubuntu)
+        sqlcmd=/opt/mssql-tools/bin/sqlcmd
+
+        if [[ ! -f "$sqlcmd" ]]; then   
+            echo "Starting environment preparation - $lsb_dist"
+            curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+            curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | tee /etc/apt/sources.list.d/msprod.list
+            apt-get update 
+            apt-get install mssql-tools unixodbc-dev
+        fi
+        read -rp 'MSSQL Server Instance: ' instance </dev/tty
+        read -rp 'MSSQL Server Username: ' username </dev/tty
+        read -rsp 'MSSQL Server Password: ' password </dev/tty
+
+        result=$( "$sqlcmd" -S "$instance" -U "$username" -P "$password" -Q "SELECT CONVERT (varchar, SERVERPROPERTY('collation')) as Collation")
+        echo "$result"
+        echo "$result" | awk -v val=$requiredCollation 'FNR==3{if($1 != val) print "Invalid collation: REQUIRED=" val "; AVAILABLE=" $1;}'
+
+    ;;
+    *)
+        echo "Checking DB collation is currently unsupported in distro $lsb_dist"
+        exit 1
+    ;;
+
+esac
+
+
+
