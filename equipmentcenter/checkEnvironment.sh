@@ -53,6 +53,10 @@ testcon https://docker.io
 testcon https://mcr.microsoft.com
 testcon https://github.com
 testcon https://raw.githubusercontent.com
+testcon https://download.docker.com/
+testcon https://packages.microsoft.com/
+
+echo;
 
 
 read -rp "Check DB Collation (will install sqlcmd)? (y/n) " yn </dev/tty
@@ -78,7 +82,6 @@ if [[ ! -f "$sqlcmd" ]]; then
     case "$lsb_dist" in
 
         ubuntu|debian)
-            echo "Starting environment preparation - $lsb_dist"
             curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
             curl "https://packages.microsoft.com/config/$lsb_dist/$VERSION_ID/prod.list" | tee /etc/apt/sources.list.d/msprod.list
             apt-get update 
@@ -103,7 +106,7 @@ read -rp 'MSSQL Server Instance: ' instance </dev/tty
 read -rp 'MSSQL Server Username: ' username </dev/tty
 read -rsp 'MSSQL Server Password: ' password </dev/tty
 
-echo;
+echo; echo;
 
 result=$( "$sqlcmd" -S "$instance" -U "$username" -P "$password" -Q "SELECT CONVERT (varchar, SERVERPROPERTY('collation')) as Collation")
 echo "$result"

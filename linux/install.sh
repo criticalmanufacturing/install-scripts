@@ -1,8 +1,7 @@
 #!/bin/bash
 set -e
 
-# REPOSITORY="https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
-REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"}
+REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"}
 
 command_exists() {
 	command -v "$@" > /dev/null 2>&1

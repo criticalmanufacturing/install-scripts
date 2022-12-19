@@ -3,7 +3,7 @@
 set -e
 
 ## ======== PARAMETERS ========
-REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/migafgarcia/install-scripts/main-rhel-support"}
+REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"}
 source <( curl -fsSL $REPOSITORY/equipmentcenter/configure.sh )
 # source ./configure.sh
 
