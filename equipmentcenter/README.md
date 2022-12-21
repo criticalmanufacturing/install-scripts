@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scrip
 This script installs the necessary dependencies (Docker, Powershell, Portainer), creates a Customer Infrastructure and deploys the Infrastructure Agent.
 
 ```
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/equipmentcenter/install.sh | sudo bash
 ```
 
 
