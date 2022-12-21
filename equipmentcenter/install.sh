@@ -7,8 +7,12 @@ REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/criticalmanufacturin
 source <( curl -fsSL "$REPOSITORY/equipmentcenter/configure.sh" )
 
 ## ======== INSTALL DOCKER AND PORTAINER ========
-echo; echo "Installing Container Dependencies (Docker, Portainer, etc)"
+echo; echo "Installing Container Dependencies (Docker, Powershell, Portainer)"
 curl -fsSL "$REPOSITORY/linux/install.sh" | bash
+
+## ======== INSTALL DOCKER AND PORTAINER ========
+echo; echo "Installing Additional Packages (7z)"
+curl -fsSL "$REPOSITORY/equipmentcenter/installAdditionalPackages.sh" | bash
 
 ## ======== CREATE INFRASTRUCTURE AND AGENT ========
 echo; echo "Creating Infrastructure and Deploying Agent"

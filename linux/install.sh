@@ -41,14 +41,12 @@ if [ "$lsb_dist" = "debian" ]; then
     lsb_dist=ubuntu
 fi
 
-curl -fsSL "$REPOSITORY"/linux/"$lsb_dist"/installOthers.bash | bash
-
 if ! command_exists docker; then
-    curl -fsSL "$REPOSITORY"/linux/"$lsb_dist"/installDocker.bash | bash
+    curl -fsSL "$REPOSITORY/linux/$lsb_dist/installDocker.bash" | bash
 fi
 
 if ! command_exists pwsh; then
-    curl -fsSL "$REPOSITORY"/linux/"$lsb_dist"/installPowershell.bash | bash
+    curl -fsSL "$REPOSITORY/linux/$lsb_dist/installPowershell.bash" | bash
 fi
 
 echo "# Changing docker default log policy"
@@ -76,7 +74,7 @@ then
         RUNNING=$(pgrep dockerd)
         if [ -z "$RUNNING" ];
         then
-                echo "Staring dockerd"
+                echo "Starting dockerd"
                 sudo dockerd > /dev/null 2>&1 & disown
         fi
 else

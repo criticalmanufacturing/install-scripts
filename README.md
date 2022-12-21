@@ -4,8 +4,18 @@ Critical Manufacturing Installation Scripts
 ## Prepare Linux environment
 
 ```
-REPOSITORY=https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main curl -fsSL $REPOSITORY/linux/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/linux/install.sh | sudo bash
 ```
+
+Installs Docker, Powershell and deploys a Portainer stack.
+
+To install 
+
+### Compatibility:
+ - Ubuntu 20.04
+ - Ubuntu 22.04
+ - Debian 11
+ - RHEL 8 (using CentOS packages for Docker)
 
 ## Prepare Windows environment
 
@@ -104,5 +114,5 @@ internetNetworkName=""
 portalToken=""
 parameters=""
 
-REPOSITORY=https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main curl -fsSL $REPOSITORY/linux/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/linux/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
 ```
