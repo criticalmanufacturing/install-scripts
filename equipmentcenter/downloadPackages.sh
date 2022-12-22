@@ -7,6 +7,10 @@ REPOSITORY=${REPOSITORY:-"https://raw.githubusercontent.com/criticalmanufacturin
 source <( curl -fsSL $REPOSITORY/equipmentcenter/configure.sh )
 # source ./configure.sh
 
+## ======== INSTALL 7z ========
+echo; echo "Installing Additional Packages (7z)"
+curl -fsSL "$REPOSITORY/equipmentcenter/installAdditionalPackages.sh" | bash
+
 sourceServer=https://criticalmanufacturing.io
 sourceRepo=packages
 
