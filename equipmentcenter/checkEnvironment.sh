@@ -88,7 +88,7 @@ if [[ ! -f "$sqlcmd" ]]; then
             apt-get install -y mssql-tools unixodbc-dev
         ;;
         rhel)
-            curl "https://packages.microsoft.com/config/rhel/$ID/prod.repo" > /etc/yum.repos.d/msprod.repo
+            curl "https://packages.microsoft.com/config/rhel/8/prod.repo" > /etc/yum.repos.d/msprod.repo
             yum install -y mssql-tools unixODBC-devel
         ;;
         *)
