@@ -85,11 +85,11 @@ if [[ ! -f "$sqlcmd" ]]; then
             curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
             curl "https://packages.microsoft.com/config/$lsb_dist/$VERSION_ID/prod.list" | tee /etc/apt/sources.list.d/msprod.list
             apt-get update 
-            apt-get install mssql-tools unixodbc-dev
+            apt-get install -y mssql-tools unixodbc-dev
         ;;
         rhel)
             curl "https://packages.microsoft.com/config/rhel/$ID/prod.repo" > /etc/yum.repos.d/msprod.repo
-            yum install mssql-tools unixODBC-devel
+            yum install -y mssql-tools unixODBC-devel
         ;;
         *)
             echo "Checking DB collation is currently unsupported in distro $lsb_dist"
