@@ -131,8 +131,8 @@ Depending on the software or system, can be necessary you add the same environme
 To define this variables to all your system, you can define on the file */etc/apt/apt.conf* (in some system on another place like */etc/apt/apt.conf.d/{something-proxy}*) the following code:
 
 ```bash
-Acquire::http:proxy http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>/";
-Acquire::https:proxy http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>/";
+Acquire::http:proxy "http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>/";
+Acquire::https:proxy "http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>/";
 ```
 
 After this, your system must be able to update the current packages and get new ones, this is, all the necessary packages to deploy a customer infrastructure on your machine (the sections and scripts discussed above), in this case for example docker, portainer and powershell. 
