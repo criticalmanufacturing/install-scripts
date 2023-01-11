@@ -112,14 +112,28 @@ curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scrip
 
 When you want to use a Proxy and configure a infrastructure/machine to pass all the connections through a proxy, some troubles can appear to be possible to communicate with the external network and get the necessary packages and images from the registry. You must set some environment variables on your system, to permit your machine to communicate through your proxy and access the external network to download the essencial packages and others.
 
-Assuming you are using a linux machine (for windows you must try achive the same goal, creating environemnt variables and configuring the docker daemon), you must run something like the next command lines to add the necessary environment variables (with values replaced) to your system.
+Assuming you are using a linux machine (for windows you must try achive the same goal, creating environemnt variables and configuring the docker daemon), you can add this next export commands lines on your */etc/bash.bashrc* (for your bash start with this environment variables) or do you just run. The idea is to add the necessary environment variables to your system.
 
 ```bash
 export "HTTP_PROXY=http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>"
 export "HTTPS_PROXY=http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>"
 ```
 
-Depending on the software or system, can be necessary you add the same environment variables in lower case to, like http_proxy and https_proxy.
+Or to set in your environment variables file (*/etc/environment*) below the PATH environment:
+
+```bash
+HTTP_PROXY=http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>
+HTTPS_PROXY=http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>
+```
+
+Depending on the software or system, can be necessary you add the same environment variables in lower case to, this is 'http_proxy' and 'https_proxy'.
+
+To define this variables to all your system, you can define on the file */etc/apt/apt.conf* (in some system on another place like */etc/apt/apt.conf.d/{something-proxy}*) the following code:
+
+```bash
+Acquire::http:proxy http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>/";
+Acquire::https:proxy http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>/";
+```
 
 After this, your system must be able to update the current packages and get new ones, this is, all the necessary packages to deploy a customer infrastructure on your machine (the sections and scripts discussed above), in this case for example docker, portainer and powershell. 
 
