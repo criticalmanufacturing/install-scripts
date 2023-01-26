@@ -110,9 +110,9 @@ curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scrip
 
 ## Configure customer infrastructure to use a Proxy
 
-When you want to use a Proxy and configure a infrastructure/machine to pass all the connections through a proxy, some troubles can appear to be possible to communicate with the external network and get the necessary packages and images from the registry. You must set some environment variables on your system, to permit your machine to communicate through your proxy and access the external network to download the essencial packages and others.
+When you want to use a Proxy and configure a infrastructure/machine to pass all the connections through a proxy, there are additional configurations that need to be performed to be able to communicate with the external network and get the necessary packages and images from the registry. You must set some environment variables on your system, to permit your machine to communicate through your proxy and access the external network to download the essencial packages and others.
 
-Assuming you are using a linux machine (for windows you must try achive the same goal, creating environemnt variables and configuring the docker daemon), you can add this next export commands lines on your */etc/bash.bashrc* (for your bash start with this environment variables) or do you just run. The idea is to add the necessary environment variables to your system.
+For Linux machines, add the following export commands lines on your /etc/bash.bashrc, ensuring that bash will start with additional environment variables. The goal is to add the necessary environment variables to your system. For Windows machines you can try achive the same goal by creating environemnt variables and configuring the docker daemon.
 
 ```bash
 export "HTTP_PROXY=http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>"
@@ -126,9 +126,9 @@ HTTP_PROXY=http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>
 HTTPS_PROXY=http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>
 ```
 
-Depending on the software or system, can be necessary you add the same environment variables in lower case to, this is 'http_proxy' and 'https_proxy'.
+Depending on the software or system, it can be necessary you add the same environment variables in lower case to, this is 'http_proxy' and 'https_proxy'.
 
-To define this variables to all your system, you can define on the file */etc/apt/apt.conf* (in some system on another place like */etc/apt/apt.conf.d/{something-proxy}*) the following code:
+To define this variables to all your system, you can define on the file */etc/apt/apt.conf* (in some system on location such as */etc/apt/apt.conf.d/{something-proxy}*) the following code:
 
 ```bash
 Acquire::http:proxy "http://<<proxyuser:proxypassword>@><proxy.example.com>:<proxyport>/";
