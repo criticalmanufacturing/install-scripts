@@ -19,6 +19,9 @@ Invoke-WebRequest -Uri "$RepositoryUrl/utils/portainer-agent-stack.yml" -OutFile
 Write-Host "Downloading file $RepositoryUrl/utils/createStackInPortainer.ps1"
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/createStackInPortainer.ps1" -OutFile createStackInPortainer.ps1
 
+#Delete old portainer volume, in case it exists
+docker volume remove portainer_data
+
 #Hash portainer password
 docker pull httpd:2.4-alpine
 $hashedPassword = (docker run --rm httpd:2.4-alpine htpasswd -nbB admin $PortainerPassword)
