@@ -44,6 +44,7 @@ $params = @{
     #--- Optional parameters
     # EnvironmentType = "Development"
     # parameters = "./parameters/agent_parameters.json"
+    # infrastructureParameters = "./parameters/infrastructure_parameters.json"
     # internetNetworkName = "internet"
     # portalToken = ""
 }
@@ -64,49 +65,10 @@ environmentType=""
 internetNetworkName=""
 portalToken=""
 parameters=""
+infrastructureParameters=""
 
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --customer "$customer" --infrastructure "$infrastructure" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters" --infrastructureParameters "$infrastructureParameters"
 ```
-
-### Initialize Customer Infrastructure from a Template
-#### Windows
-
-Using Powershell
-
-```powershell
-#--- Replace the mandatory parameter values below
-$params = @{
-    Agent = ""
-    Infrastructure = ""
-    InfrastructureTemplate = ""
-    #--- Optional parameters
-    # EnvironmentType = "Development"
-    # parameters = "./parameters/agent_parameters.json"
-    # internetNetworkName = "internet"
-    # portalToken = ""
-}
-
-$global:ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/windows/portal/initializeInfrastructureFromTemplate.ps1" -OutFile "./initializeInfrastructureFromTemplate.ps1"
-pwsh -File "initializeInfrastructureFromTemplate.ps1" @params
-Remove-Item -Path ./initializeInfrastructureFromTemplate.ps1
-```
-#### Linux
-
-
-```bash
-agent=""
-infrastructure=""
-infrastructureTemplate=""
-#--- Optional parameters
-environmentType=""
-internetNetworkName=""
-portalToken=""
-parameters=""
-
-curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/portal/initializeInfrastructure.bash | sudo bash -s -- --agent "$agent" --infrastructure "$infrastructure" --infrastructureTemplate "$infrastructureTemplate" --environmentType "$environmentType" --internetNetworkName "$internetNetworkName" --portalToken "$portalToken" --parameters "$parameters"
-```
-
 
 ## Configure customer infrastructure to use a Proxy
 
