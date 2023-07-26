@@ -12,6 +12,7 @@ while [[ "$#" -gt 0 ]]; do
         -n|--internetNetworkName) internetNetworkName="$2"; shift ;;
         -t|--portalToken) portalToken="$2"; shift ;;
         -p|--parameters) parameters="$2"; shift ;;
+        -d|--infrastructureParameters) infrastructureParameters="$2"; shift ;;
         -v|--verbose) verbose=1 ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
@@ -28,7 +29,8 @@ then
     echo "internetNetworkName: $internetNetworkName"
     echo "pat: $portalToken"
     echo "parameters: $parameters"
+    echo "infrastructureParameters: $infrastructureParameters"
 fi
 
 curl -Os "$REPOSITORY/utils/portal/runInitializeInfrastructure.ps1"
-pwsh -File ./runInitializeInfrastructure.ps1 -agent "$agent" -site "$site" -customer "$customer" -infrastructure "$infrastructure" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken" -parameters "$parameters"
+pwsh -File ./runInitializeInfrastructure.ps1 -agent "$agent" -site "$site" -customer "$customer" -infrastructure "$infrastructure" -environmentType "$environmentType" -internetNetworkName "$internetNetworkName" -portalToken "$portalToken" -parameters "$parameters" -infrastructureParameters "$infrastructureParameters"

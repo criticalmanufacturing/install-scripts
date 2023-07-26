@@ -1,14 +1,15 @@
 param (
     [Parameter(Mandatory=$true)][string]$agent,
-    [Obsolete("No longer needed. Value ignored.")][string]$license,
     [Parameter(Mandatory=$true)][string]$infrastructure,
     [string]$customer,
     #optional parameters
     [string] $environmentType,
     [string] $parameters,
+    [string] $infrastructureParameters,
     [string] $internetNetworkName,
     [string] $portalToken,
     #deprecated parameters
+    [Obsolete("No longer needed. Value ignored.")][string]$license,
     [Obsolete("The 'customer' parameter should be used instead")][string]$site
 )
 
@@ -50,7 +51,12 @@ $outputDir = $PSScriptRoot + "/agent"
 try
 {
     Write-Host "Creating Customer Infrastructure..."
-    $url = New-Infrastructure -IgnoreIfExists -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)"
+
+    if(Test-Path $infrastructureParameters) {
+        $url = New-Infrastructure -IgnoreIfExists -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)" -ParametersPath $infrastructureParameters
+    } else {
+        $url = New-Infrastructure -IgnoreIfExists -Name $infrastructure -SiteName "$($site)" -CustomerName "$($customer)"
+    }
 } 
 catch 
 {
