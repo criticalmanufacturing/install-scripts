@@ -148,15 +148,16 @@ if ( -Not (Test-Path -LiteralPath $deployStackToKubernetesPath)) {
 
 Write-Host "Start running deployStackToKubernetes.ps1..."
 
-# Download PortalSDK and import it
+# Deploy Agent
 try {
-    Write-Host "Importing PortalSDK..."
-    # Import SDK
+    Write-Host "Deploying agent..."
+   
+    # deploy agent
     . ./deployAgent.ps1 -AgentName $AgentName -DeploymentScriptPath $deployStackToKubernetesPath
 }
 catch {
     Write-Error $_.Exception.Message
-    exit 1 
+    exit 1
 }
 
 if($error)
