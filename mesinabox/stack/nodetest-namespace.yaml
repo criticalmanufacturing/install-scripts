@@ -4,7 +4,4 @@ metadata:
   labels:
     app.kubernetes.io/name: nodetest
     app.kubernetes.io/instance: nodetest
-    # app.kubernetes.io/version: 11.0.0
-    app.kubernetes.io/managed-by: devopscenter.criticalmanufacturing
-    devopscenter.criticalmanufacturing/version: "1"
   name: nodetest

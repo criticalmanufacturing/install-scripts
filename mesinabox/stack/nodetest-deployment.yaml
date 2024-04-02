@@ -5,8 +5,6 @@ metadata:
     app.kubernetes.io/name: nodetest
     app.kubernetes.io/instance: nodetest
     #app.kubernetes.io/version: 11.0.0
-    app.kubernetes.io/managed-by: devopscenter.criticalmanufacturing
-    devopscenter.criticalmanufacturing/version: "1"
   name: nodetest
   namespace: nodetest
 spec:
@@ -27,13 +25,6 @@ spec:
       - name: nodetest
         image: dev.criticalmanufacturing.io/rita/kioskapp:1.0.1
         imagePullPolicy: Always
-        resources:
-          limits:
-            cpu: 2
-            memory: 3Gi
-          requests:
-            cpu: 0
-            memory: 0Gi
         ports:
         - containerPort: 8081  
       restartPolicy: Always

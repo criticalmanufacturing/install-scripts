@@ -50,7 +50,6 @@ param (
 )
 
 Write-Host " --------- Received parameters --------- "
-Write-Host "PAT: $PAT"
 Write-Host "Customer Infrastructure Name: $CustomerInfrastructureName"
 Write-Host "Agent Name: $AgentName"
 Write-Host "Agent Parameters path: $AgentParametersPath"

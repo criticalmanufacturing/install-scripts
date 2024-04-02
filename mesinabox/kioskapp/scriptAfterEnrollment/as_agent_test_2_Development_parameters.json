@@ -1,12 +1,6 @@
 {
-  "Portainer_Config_Portainer_Url": "http://test.test",
-  "Portainer_Config_Portainer_User": "test",
-  "Portainer_Config_Portainer_Password": "test",
   "PROXYHTTPSERVER_AUTHENTICATION_USER": "proxy_user",
-  "PROXYHTTPSERVER_AUTHENTICATION_PASSWORD": {
-    "Value": "E5Zlati6Imz5jN4DJXPAVw==",
-    "IsEncrypted": true
-  },
+  "PROXYHTTPSERVER_AUTHENTICATION_PASSWORD": "",
   "EXTERNAL_PROXY_ENABLED": "false",
   "EXTERNAL_PROXY_HTTP_ADDRESS": "",
   "EXTERNAL_PROXY_HTTP_PORT": "",
@@ -14,32 +8,8 @@
   "EXTERNAL_PROXY_USERNAME": "",
   "EXTERNAL_PROXY_PASSWORD": "",
   "INTERNET_NETWORK": "test",
-  "TRAEFIK_WILDCARD_SSL_CERT_SECRET": {
-    "Value": "",
-    "IsPrivate": true
-  },
-  "TRAEFIK_WILDCARD_SSL_KEY_SECRET": {
-    "Value": "",
-    "IsPrivate": true
-  },
-  "DockerSwarm_edgeforwardproxy_Replicas": "1",
-  "DockerSwarm_edgeforwardproxy_MinMemory": "0.2GB",
-  "DockerSwarm_edgeforwardproxy_MaxMemory": "0.5GB",
-  "DockerSwarm_edgeforwardproxy_MinCPU": "0",
-  "DockerSwarm_edgeforwardproxy_MaxCPU": "1",
-  "DockerSwarm_edgeforwardproxy_NodeType": null,
-  "DockerSwarm_edgesquidproxy_Replicas": "1",
-  "DockerSwarm_edgesquidproxy_MinMemory": "0.2GB",
-  "DockerSwarm_edgesquidproxy_MaxMemory": "0.5GB",
-  "DockerSwarm_edgesquidproxy_MinCPU": "0",
-  "DockerSwarm_edgesquidproxy_MaxCPU": "1",
-  "DockerSwarm_edgesquidproxy_NodeType": null,
-  "DockerSwarm_traefik_Replicas": "1",
-  "DockerSwarm_traefik_MinMemory": "0.05GB",
-  "DockerSwarm_traefik_MaxMemory": "0.2GB",
-  "DockerSwarm_traefik_MinCPU": "0",
-  "DockerSwarm_traefik_MaxCPU": "0.5",
-  "DockerSwarm_Services_Global_DNS": null,
+  "TRAEFIK_WILDCARD_SSL_CERT_SECRET": "",
+  "TRAEFIK_WILDCARD_SSL_KEY_SECRET": "",
   "Container_Image_Registry_Username": null,
   "Container_Image_Registry_Password": null,
   "Container_Image_Registry_Address": null,

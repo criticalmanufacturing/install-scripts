@@ -44,6 +44,7 @@ app.get('/', (req, res) => {
 });
 
 // Start server
-const server = app.listen(8081, () => {
+const port = process.env.port || 8081;
+const server = app.listen(port, () => {
     console.log('Server running on port 8081');
 });

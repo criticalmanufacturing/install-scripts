@@ -4,9 +4,6 @@ metadata:
   labels:
     app.kubernetes.io/name: nodetest
     app.kubernetes.io/instance: nodetest
-    # app.kubernetes.io/version: 11.0.0
-    app.kubernetes.io/managed-by: devopscenter.criticalmanufacturing
-    devopscenter.criticalmanufacturing/version: "1"
   name: nodetest
   namespace: nodetest
 spec:
@@ -16,5 +13,5 @@ spec:
   ports:
     - name: "8081"
       protocol: TCP
-      port: 8081  # port to expose the service. 80?
-      targetPort: 8081  # Forward traffic to port 3000 on your pods
+      port: 8081 
+      targetPort: 8081 
