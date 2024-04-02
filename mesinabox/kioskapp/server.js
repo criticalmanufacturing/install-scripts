@@ -23,7 +23,7 @@ app.get('/enroll/:param1/:param2', (req, res) => {
     // Handle stdout data
     powershell.stdout.on('data', (data) => {
         // Send data to the client
-        res.write(`data: ${data}\n\n`);
+        res.write(`data: ${data}\n`);
     });
 
     // Handle errors
