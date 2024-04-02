@@ -8,17 +8,16 @@ const app = express();
 app.use(express.static('public'));
 
 // Route to handle running the PowerShell script
-app.get('/enroll/:param1/:param2', (req, res) => {
+app.get('/enroll', (req, res) => {
 
-    const param1 = req.params.param1;
-    const param2 = req.params.param2;
+    const pat = req.query.pat || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRJZCI6Ik1FUyIsInRlbmFudE5hbWUiOiJDdXN0b21lclBvcnRhbERFViIsInN1YiI6IlN5c3RlbSIsInNjb3BlIjpudWxsLCJleHRyYVZhbHVlcyI6bnVsbCwidHlwZSI6IlBBVCIsImlhdCI6MTY4MDA5NjY0MSwiZXhwIjoxODk4NTUzNTM5LCJhdWQiOiJBdXRoUG9ydGFsIiwiaXNzIjoiQXV0aFBvcnRhbCJ9.b5iWHJnqB90OsZxqbUX3IAFoPCa-uaUTrkGj4h1OMfw';
     // Set response headers for Server-Sent Events
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
     // Spawn PowerShell script
-    const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRJZCI6Ik1FUyIsInRlbmFudE5hbWUiOiJDdXN0b21lclBvcnRhbERFViIsInN1YiI6IlN5c3RlbSIsInNjb3BlIjpudWxsLCJleHRyYVZhbHVlcyI6bnVsbCwidHlwZSI6IlBBVCIsImlhdCI6MTY4MDA5NjY0MSwiZXhwIjoxODk4NTUzNTM5LCJhdWQiOiJBdXRoUG9ydGFsIiwiaXNzIjoiQXV0aFBvcnRhbCJ9.b5iWHJnqB90OsZxqbUX3IAFoPCa-uaUTrkGj4h1OMfw', 'as_test_new_infra', "as_agent_test_2", "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
+    const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
 
     // Handle stdout data
     powershell.stdout.on('data', (data) => {
