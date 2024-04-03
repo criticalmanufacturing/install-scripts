@@ -49,8 +49,10 @@ ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/
 #ADD https://dev.criticalmanufacturing.io/repository/http/product/dev.criticalmanufacturing.io.repo etc/yum.repos.d/  #-> if is to add the repository
 #COPY ./dev.criticalmanufacturing.io.repo /etc/yum.repos.d/  #-> if is to add the repository, with this way, we need to get the dev.criticalmanufacturing.io.repo file in source control
 
-### Install other packages that we need/can need
+RUN useradd -u 1001 -g root 1001
 USER 1001
+
+### Install other packages that we need/can need
 RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip && \
         yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm &&\
         curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
