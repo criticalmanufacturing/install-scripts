@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 30s
+    route.openshift.io/termination: edge
+  labels:
+    app.kubernetes.io/name: nodetest
+    app.kubernetes.io/instance: nodetest    
+    app: nodetest
+  name: nodetest
+  namespace: nodetest
+spec:
+  rules:
+  - host: kioskapp.apps.172.19.73.158.nip.io #our domain
+    http:
+      paths:
+      - backend:
+          service:
+            name: nodetest
+            port:
+              number: 8081 #80?
+        path: /
+        pathType: Prefix
+

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: nodetest
+    app.kubernetes.io/instance: nodetest
+    #app.kubernetes.io/version: 11.0.0
+  name: nodetest
+  namespace: nodetest
+spec:
+  replicas: 1 # to be checked
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nodetest
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nodetest
+        app.kubernetes.io/instance: nodetest
+        #app.kubernetes.io/version: 11.0.0
+        app.kubernetes.io/managed-by: devopscenter.criticalmanufacturing
+        devopscenter.criticalmanufacturing/version: "1"
+    spec:
+      containers:
+      - name: nodetest
+        image: dev.criticalmanufacturing.io/rita/kioskapp:1.0.1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8081  
+      restartPolicy: Always
+      

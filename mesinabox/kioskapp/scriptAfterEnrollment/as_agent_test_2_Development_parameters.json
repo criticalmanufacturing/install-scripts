@@ -1,0 +1,17 @@
+{
+  "PROXYHTTPSERVER_AUTHENTICATION_USER": "proxy_user",
+  "PROXYHTTPSERVER_AUTHENTICATION_PASSWORD": "",
+  "EXTERNAL_PROXY_ENABLED": "false",
+  "EXTERNAL_PROXY_HTTP_ADDRESS": "",
+  "EXTERNAL_PROXY_HTTP_PORT": "",
+  "EXTERNAL_PROXY_LOGIN_ENABLED": "false",
+  "EXTERNAL_PROXY_USERNAME": "",
+  "EXTERNAL_PROXY_PASSWORD": "",
+  "INTERNET_NETWORK": "test",
+  "TRAEFIK_WILDCARD_SSL_CERT_SECRET": "",
+  "TRAEFIK_WILDCARD_SSL_KEY_SECRET": "",
+  "Container_Image_Registry_Username": null,
+  "Container_Image_Registry_Password": null,
+  "Container_Image_Registry_Address": null,
+  "Services_Global_CACertificate": null
+}
