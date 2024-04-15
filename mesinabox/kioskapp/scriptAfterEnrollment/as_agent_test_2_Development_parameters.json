@@ -13,5 +13,6 @@
   "Container_Image_Registry_Username": null,
   "Container_Image_Registry_Password": null,
   "Container_Image_Registry_Address": null,
-  "Services_Global_CACertificate": null
+  "Services_Global_CACertificate": null, 
+  "APPLICATION_PUBLIC_HTTP_ADDRESS": "x"
 }
