@@ -10,7 +10,7 @@ app.use(express.static('public'));
 // Route to handle running the PowerShell script
 app.get('/enroll', (req, res) => {
 
-    const pat = req.query.pat || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRJZCI6Ik1FUyIsInRlbmFudE5hbWUiOiJDdXN0b21lclBvcnRhbERFViIsInN1YiI6IlN5c3RlbSIsInNjb3BlIjpudWxsLCJleHRyYVZhbHVlcyI6bnVsbCwidHlwZSI6IlBBVCIsImlhdCI6MTY4MDA5NjY0MSwiZXhwIjoxODk4NTUzNTM5LCJhdWQiOiJBdXRoUG9ydGFsIiwiaXNzIjoiQXV0aFBvcnRhbCJ9.b5iWHJnqB90OsZxqbUX3IAFoPCa-uaUTrkGj4h1OMfw';
+    const pat = req.query.pat;
     // Set response headers for Server-Sent Events
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
