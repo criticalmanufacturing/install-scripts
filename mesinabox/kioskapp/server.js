@@ -50,24 +50,6 @@ const appsApi = kubeConfig.makeApiClient(AppsV1Api);
 const coreApi = kubeConfig.makeApiClient(CoreV1Api);
 const networkingApi = kubeConfig.makeApiClient(NetworkingV1Api);
 
-// Function to list pods from all namespaces
-async function listPods() {
-  try {
-      const response = await coreApi.listPodForAllNamespaces();
-      console.log('Pods:');
-      const podName = "edgesquidproxy";
-      const pods = response.body.items.filter(pod => pod.metadata.name.startsWith(podName));
-
-      if (pods.length > 0) {
-          return pods[0].metadata.namespace;
-      } else {
-          return null;
-      }
-  } catch (err) {
-      console.error('Error:', err);
-      return null;
-  }
-}
 
 // Fetch the Deployment
 const fetchDeployment = async (deploymentNamespace, deploymentName) => {
@@ -236,14 +218,7 @@ app.get('/enroll', (req, res) => {
 
 // Serve index.html for root URL
 app.get('/', async (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
-  /*await listPods().then(namespace => {
-      if (namespace) {
-          res.sendFile(path.join(__dirname, 'views','agentAlreadyExists.html'), {"namespace" : namespace});
-      } else {
-          res.sendFile(path.join(__dirname, 'views', 'index.html'));
-      }});*/
-  
+  res.sendFile(path.join(__dirname, 'views', 'index.html')); 
 });
 
 
@@ -312,4 +287,3 @@ const port = process.env.port || 8081;
 const server = app.listen(port, () => {
     console.log('Server running on port 8081');
 });
-
