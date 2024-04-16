@@ -7,7 +7,7 @@ function createButton() {
   const button = document.createElement('button');
   button.textContent = 'Button Text';
   button.addEventListener('click', () => {
-    window.location.replace(`https://portaldev.criticalmanufacturing.dev/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
+    window.location.replace(`https://portalqa.criticalmanufacturing.dev/DevOpsCenter/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
     console.log('button was clicked');
   });
   return button;
@@ -26,14 +26,14 @@ fetch('/api/content')
       const buttonContainer = document.getElementById('enrollButtonDiv');
       console.log(data);
 
-      if (!data) {
+      if (data === "false") {
           // File does not exist, show button
           const button = createButton();
           button.textContent = 'Go to Portal';
           buttonContainer.appendChild(button);
       } else {
           // File exists, display content
-          contentDiv.innerText = JSON.stringify(data, null, 2);
+          contentDiv.textContent = `The infrastructure named ${JSON.stringify(data, null, 2)} has already an agent installed in this cluster.`;
       }
   })
   .catch(error => {
