@@ -78,21 +78,29 @@ async function listPods() {
 // Route to handle running the PowerShell script
 app.get('/enroll', (req, res) => {
 
-    const pat = req.query.pat;
-    console.log("pat "+pat);
     // Set response headers for Server-Sent Events
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
     // Spawn PowerShell script
-    const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
+    const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
 
     // Handle stdout data
     powershell.stdout.on('data', (data) => {
         // Send data to the client
         res.write(`data: ${data}\n`); 
-        if (data.includes("Stack deployed with Success")) {
+    });
+
+    // Handle errors
+    powershell.stderr.on('data', (data) => {
+        console.error(`Error: ${data}`);
+    });
+
+    // Handle script exit
+    powershell.on('exit', (code) => {
+        console.log(`Script exited with code ${code}`);
+        if (code === 0) {
             const dataToWrite = {
                 infra: req.query.infra
               };
@@ -107,16 +115,6 @@ app.get('/enroll', (req, res) => {
                 }
             })
         }
-    });
-
-    // Handle errors
-    powershell.stderr.on('data', (data) => {
-        console.error(`Error: ${data}`);
-    });
-
-    // Handle script exit
-    powershell.on('exit', (code) => {
-        console.log(`Script exited with code ${code}`);
         res.end(); // End the response when the script exits
     });
 });
