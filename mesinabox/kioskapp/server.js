@@ -86,7 +86,7 @@ const waitForDeploymentReady = async (namespace, deploymentName) => {
 
       if (availableReplicas === desiredReplicas) {
         console.log(`Deployment ${deploymentName} is ready`);
-        deploymentReady = true;
+        deploymentReady = true;    
       } else {
         console.log(`Waiting for deployment ${deploymentName} to be ready...`);
         await new Promise(resolve => setTimeout(resolve, 5000)); // Wait for 5 seconds before checking again
@@ -228,7 +228,7 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
       const subdomain = req.get('host').split('.')[0];
 
       const filePath = req.file.path;
-      const fileContent = fs.readFileSync(filePath, 'utf8');
+      const fileContent = fs.readFileAsync(filePath, 'utf8');
 
       // Parse the certificate
       const cert = forge.pki.certificateFromPem(fileContent);
@@ -246,9 +246,6 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
       if (domainNames.length > 0) {
           domain = removeFirstPartOfDomain(domainNames[0]);
       }
-      // Initialize Kubernetes configuration
-      const kubeConfig = new KubeConfig();
-      kubeConfig.loadFromDefault();
 
       const secretName = 'ssl-certificate-secret';
       const namespace = 'openshift-ingress';

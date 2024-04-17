@@ -138,13 +138,17 @@ Write-Host "Checking for deployStackToKubernetes.ps1 on the Output folder..."
 
 $deployStackToKubernetesPath = "$Output/deployStackToKubernetes.ps1"
 
-$lineToRemove = 'oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f traefik-lb-service.yaml'
+$substringsToRemove = @(
+    "traefik-deployment",
+    "traefik-service",
+    "traefik-lb-service"
+)
 
 # Read all lines from the script
 $scriptContent = Get-Content -Path $deployStackToKubernetesPath
 
-# Remove the line that creates the traefik-lb-service
-$scriptContent = $scriptContent | Where-Object { $_ -ne $lineToRemove }
+# Remove lines containing the traefik resources
+$scriptContent = $scriptContent | Where-Object { $line = $_; -not ($substringsToRemove | Where-Object { $line -like "*$_*" }) }
 
 Write-Output "Modified script content:"
 $scriptContent
