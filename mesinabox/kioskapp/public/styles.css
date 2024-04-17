@@ -1,0 +1,146 @@
+body {
+    background-color: rgba(0, 0, 0, .02);
+    font-family: "Open Sans", sans-serif;
+}
+
+/* Logo styles */
+.logo-container {
+    margin-top: 40px;
+    margin-left: 40px;
+}
+.logo-container img {
+    max-height: 36px;
+    height: auto; /* Maintain aspect ratio */
+    margin-right: 10px; /* spacing between logos */
+}
+
+/* Main/Central White Box */
+#lightbox {
+    background-color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+
+    width: 340px;
+    min-height: 200px;
+    padding: 44px;
+
+    /* Center Div */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+#lightbox-big {
+    background-color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+
+    margin-left: 40px;
+    margin-right: 40px;
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 44px;
+
+    max-width: calc(100vw - 80px);
+    min-height: 200px;
+    max-height: calc(100vh - 260px);
+}
+#logs-output {
+    max-height: calc(100vh - 320px); /* Whole screen - (header + margins/paddings) */
+    margin-top: 30px;
+    overflow-y: scroll;
+}
+
+/* Page titles */
+.title-center {
+    font-weight: 600;
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+.subtitle-center {
+    font-weight: 500;
+    text-align: center;
+    margin-top: 50px;
+}
+.subtitle-left {
+    font-weight: 500;
+    text-align: left;
+    margin-left: 20px;
+    margin-top: 0;
+}
+
+/* immitations of Cmf button - White version */
+.cmf-btn, input::file-selector-button {
+    border: 1px solid rgba(0, 102, 161, .95);
+    color: #0066a1;
+    border-radius: 4px;
+    padding: 0 8px;
+    background: none;
+    font-size: 16px;
+
+    min-width: 96px;
+    height: 36px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cmf-btn:hover, input::file-selector-button:hover {
+    background-color: rgba(0, 102, 161, .1);
+}
+
+/* immitations of Cmf button - Blue or Main action version */
+.cmf-btn-primary {
+    background: rgba(0, 102, 161, .95);
+    color: #fff;
+    border: 1px solid rgba(0, 102, 161, .95);
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 16px;
+
+    min-width: 96px;
+    height: 36px;
+}
+.cmf-btn-primary:hover {
+    background-color: rgba(0, 102, 161, 1); /* Green */
+    color: white;
+}
+
+#ButtonsDiv {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-top: 55px;
+    margin-bottom: 14px;
+}
+#ButtonsDiv button:not(:first-child) {
+    margin-top: 26px; 
+}
+
+/* Upload Certificate specific css */
+#UploadCertificateDiv {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-top: 30px;
+    margin-bottom: 14px;
+}
+#UploadCertificateDiv button:not(:first-child) {
+    margin-top: 26px; 
+}
+
+/* Back "button" immitation */
+a, a:visited {
+    color: #0066a1;
+    text-decoration: none;
+    padding: 0 8px;
+}
+a:hover, a:active {
+    color: #0066a1;
+    border: 1px solid rgba(0, 102, 161, .95);
+    border-radius: 4px;
+    padding: 0 8px;
+}
