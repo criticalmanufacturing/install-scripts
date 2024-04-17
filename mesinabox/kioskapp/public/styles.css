@@ -47,6 +47,13 @@ body {
     max-height: calc(100vh - 320px); /* Whole screen - (header + margins/paddings) */
     margin-top: 30px;
     overflow-y: scroll;
+    font-size: 13px;
+    font-family: 'Courier New', Courier, monospace;
+    line-height: 11px;
+}
+#logs-output p {
+    margin: 0;
+    margin-bottom: 2px;
 }
 
 /* Page titles */
@@ -59,12 +66,11 @@ body {
 .subtitle-center {
     font-weight: 500;
     text-align: center;
-    margin-top: 50px;
+    margin-top: 40px;
 }
 .subtitle-left {
     font-weight: 500;
     text-align: left;
-    margin-left: 20px;
     margin-top: 0;
 }
 
@@ -103,6 +109,19 @@ body {
 .cmf-btn-primary:hover {
     background-color: rgba(0, 102, 161, 1); /* Green */
     color: white;
+}
+
+#GoToPortalBtn {
+    width: 188px;
+}
+#ManageSslCertBtn {
+    width: 188px;
+}
+#SelectCertBtn {
+    width: 96px;
+}
+#UploadCertBtn {
+    width: 112px;
 }
 
 #ButtonsDiv {

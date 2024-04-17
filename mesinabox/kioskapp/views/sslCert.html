@@ -20,11 +20,11 @@
       <h3 class="subtitle-center">Upload SSL Certificate</h3>
       <form action="/upload" method="POST" enctype="multipart/form-data" id="UploadCertificateDiv">
         <input type="file" name="sslCertificate" id="sslCertPicker" style="display:none;">
-        <label class="cmf-btn" for="sslCertPicker">Select File</label>
+        <label class="cmf-btn" for="sslCertPicker" id="SelectCertBtn">Select File</label>
         <div class="preview">
           <p>No files currently selected for upload</p>
         </div>
-        <button class="cmf-btn-primary" type="submit">Upload</button>
+        <button class="cmf-btn-primary" type="submit" id="UploadCertBtn">Upload</button>
       </form>
     </div>
   </body>
