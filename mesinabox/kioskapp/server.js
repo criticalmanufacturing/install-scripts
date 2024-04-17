@@ -1,11 +1,17 @@
 const express = require('express');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 
 const app = express();
 
 // Serve static files from the public directory
 app.use(express.static('public'));
+
+
+// Serve index.html for root URL
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+});
 
 // Route to handle running the PowerShell script
 app.get('/enroll', (req, res) => {
@@ -37,9 +43,20 @@ app.get('/enroll', (req, res) => {
     });
 });
 
-// Serve index.html for root URL
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+
+
+// API endpoint to execute script to expand disk space
+app.post('/expandDisk', (req, res) => {
+    // Execute PowerShell script directly
+    exec('pwsh ./scripts/expandDiskScript.ps1', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error executing script: ${error}`);
+            res.status(500).send('Error executing script');
+            return;
+        }
+        console.log(`Script output: ${stdout}`);
+        res.send('Script executed successfully');
+    });
 });
 
 // Start server

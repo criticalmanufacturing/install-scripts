@@ -14,7 +14,6 @@ COPY package*.json ./
 
 ### Install app dependencies
 RUN npm install --production
-
 ### Copy the dependencies into a minimal Node.js image
 FROM registry.access.redhat.com/ubi8/nodejs-14-minimal:latest 
 
@@ -51,8 +50,9 @@ ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/
 
 ### Install other packages that we need/can need
 USER root
-RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip && \
-        yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm &&\
+RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip lvm2 readline && \
+        yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm && \
+        yum -y install http://mirror.centos.org/centos/7/os/x86_64/Packages/xfsprogs-4.5.0-22.el7.x86_64.rpm &&\
         curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
         tar -xzf oc.tar.gz && \
         mv oc /usr/local/bin/oc && \
