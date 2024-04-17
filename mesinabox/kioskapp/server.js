@@ -182,6 +182,9 @@ async function updateIngresses(newRouterDomain) {
   }
 }
 
+function sendEvent(res, type, data) {
+  res.write(`data: ${JSON.stringify({ type, data })}\n\n`)
+}
 
 app.get('/enroll', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'enroll.html'));
@@ -189,14 +192,25 @@ app.get('/enroll', (req, res) => {
 
 // Route to handle running the PowerShell script
 app.get('/enrollstart', (req, res) => {
-  const pat = req.query.pat;
   // Set response headers for Server-Sent Events
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  let closeConnectionTimer;
+
+  // Close the connection when the client disconnects
+  req.on('close', () => {
+    console.log('client disconnected.')
+
+    // prevent shutting down the connection twice
+    if (closeConnectionTimer != null) {
+      clearTimeout(closeConnectionTimer)
+    }
+  });
+
   // Spawn PowerShell script
-  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
+  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
 
   // Handle stdout data
   powershell.stdout.on('data', (data) => {
@@ -211,10 +225,15 @@ app.get('/enrollstart', (req, res) => {
     console.error(`Error: ${data}`);
   });
 
-  // Handle script exit
+  // Handle script exit - End the response when the script exits
   powershell.on('exit', (code) => {
     console.log(`Script exited with code ${code}`);
-    res.end(); // End the response when the script exits
+    
+    // give it a safe buffer of time before we shut it down manually
+    setTimeout(() => {
+      sendEvent(res, 'close', code);
+      closeConnectionTimer = setTimeout(() => res.end(), clientShutdownTimeout);
+    }, 10000)
   });
 });
 

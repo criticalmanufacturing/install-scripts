@@ -15,7 +15,7 @@ body {
 }
 
 /* Main/Central White Box */
-#lightbox {
+.lightbox {
     background-color: white;
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 
@@ -28,32 +28,6 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-}
-#lightbox-big {
-    background-color: white;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-
-    margin-left: 40px;
-    margin-right: 40px;
-    margin-top: 40px;
-    margin-bottom: 40px;
-    padding: 44px;
-
-    max-width: calc(100vw - 80px);
-    min-height: 200px;
-    max-height: calc(100vh - 260px);
-}
-#logs-output {
-    max-height: calc(100vh - 320px); /* Whole screen - (header + margins/paddings) */
-    margin-top: 30px;
-    overflow-y: scroll;
-    font-size: 13px;
-    font-family: 'Courier New', Courier, monospace;
-    line-height: 11px;
-}
-#logs-output p {
-    margin: 0;
-    margin-bottom: 2px;
 }
 
 /* Page titles */
@@ -90,7 +64,10 @@ body {
     align-items: center;
     justify-content: center;
 }
-.cmf-btn:hover, input::file-selector-button:hover {
+.cmf-btn:hover:not(:disabled), input::file-selector-button:hover {
+    background-color: rgba(0, 102, 161, .1);
+}
+.cmf-btn:disabled {
     background-color: rgba(0, 102, 161, .1);
 }
 
@@ -106,7 +83,7 @@ body {
     min-width: 96px;
     height: 36px;
 }
-.cmf-btn-primary:hover {
+.cmf-btn-primary:hover:not(:disabled) {
     background-color: rgba(0, 102, 161, 1); /* Green */
     color: white;
 }
@@ -162,4 +139,38 @@ a:hover, a:active {
     border: 1px solid rgba(0, 102, 161, .95);
     border-radius: 4px;
     padding: 0 8px;
+}
+
+
+/* Installation Logs specific */
+.lightbox-big {
+    background-color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+
+    margin-left: 40px;
+    margin-right: 40px;
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 44px;
+
+    max-width: calc(100vw - 80px);
+    min-height: 200px;
+    max-height: calc(100vh - 260px);
+}
+#logs-output {
+    max-height: calc(100vh - 320px); /* Whole screen - (header + margins/paddings) */
+    margin-top: 30px;
+    overflow-y: scroll;
+    font-size: 13px;
+    font-family: 'Courier New', Courier, monospace;
+    line-height: 11px;
+}
+#logs-output p {
+    margin: 0;
+    margin-bottom: 2px;
+}
+
+#enroll-logs-header {
+    display: flex;
+    justify-content: space-between;
 }

@@ -1,5 +1,3 @@
-console.log('Client-side code running');
-
 const button = document.getElementById('GoToPortalBtn');
 const clusterAddress = `${window.location.origin}/enroll`
 button.addEventListener('click', function (e) {
