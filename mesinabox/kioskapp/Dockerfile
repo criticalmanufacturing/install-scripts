@@ -8,10 +8,6 @@ FROM registry.access.redhat.com/ubi8/nodejs-14:latest as builder
 COPY package*.json ./
 #COPY ./nodejs-rest-http/package*.json ./
 
-# COPY ./scriptAfterEnrollment/afterEnrollment.ps1 /opt/app
-# COPY ./scriptAfterEnrollment/deployAgent.ps1 /opt/app
-# COPY ./scriptAfterEnrollment/importSDK.ps1 /opt/app
-
 ### Install app dependencies
 RUN npm install --production
 
@@ -34,14 +30,11 @@ COPY --from=builder /opt/app-root/src/node_modules /opt/app-root/src/node_module
 
 ### Copy project content
 COPY . /opt/app-root/src
-#COPY ./nodejs-rest-http/ /opt/app-root/src
 
 # Copy necessary scripts
 COPY ./scriptAfterEnrollment/afterEnrollment.ps1 /opt/app-root
 COPY ./scriptAfterEnrollment/deployAgent.ps1 /opt/app-root
 COPY ./scriptAfterEnrollment/importSDK.ps1 /opt/app-root
-
-
 
 ### Add licenses to this directory
 ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/license.txt
