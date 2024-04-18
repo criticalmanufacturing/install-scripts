@@ -5,8 +5,8 @@ const queryParams = new Proxy(new URLSearchParams(window.location.search), {
 let infraName = queryParams.infra;
 
 // Open Infra In Portal Button
-const btnManageSslCert = document.getElementById('OpenInfraPortalBtn');
-btnManageSslCert.addEventListener('click', function (e) {
+const openInPortalButton = document.getElementById('OpenInfraPortalBtn');
+openInPortalButton.addEventListener('click', function (e) {
     console.log("'Open Infra In Portal' Button was clicked");
     window.location.replace(`https://portalqa.criticalmanufacturing.dev/Entity/CustomerInfrastructure/${encodeURIComponent(infraName)}/View/Details`);
 });
@@ -14,7 +14,6 @@ btnManageSslCert.addEventListener('click', function (e) {
 //handle Server-Sent Events
 function handleSSE() {
     const outputDiv = document.getElementById('logs-output');
-    const openInPortalButton = document.getElementById('OpenInfraPortalBtn');
     const eventSource = new EventSource(`/enrollstart${window.location.search}`);
 
     eventSource.onopen = () => {
@@ -27,7 +26,6 @@ function handleSSE() {
         if (type === 'close') {
             console.log(`Close Message received - Code = ${data}`);
             eventSource.close();
-            //TODO: show "OpenInPortal" Button
             if (data == 0) {
                 // Script finished successfully
                 openInPortalButton.className = 'cmf-btn-primary';

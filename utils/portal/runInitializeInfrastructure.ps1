@@ -26,12 +26,12 @@ if ([string]::IsNullOrEmpty($parameters)) {
 }
 
 $RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main"
-#$global:ProgressPreference = 'SilentlyContinue'
+$global:ProgressPreference = 'SilentlyContinue'
 
 # Import SDK
-#Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
-#. ./importSDK.ps1
-#Remove-Item -Path ./importSDK.ps1
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
+. ./importSDK.ps1
+Remove-Item -Path ./importSDK.ps1
 Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
 # Login
 try
@@ -82,17 +82,17 @@ catch
 
 
 # Create docker dependencies
-#if (![string]::IsNullOrEmpty($internetNetworkName)) {
-#    docker network create -d overlay --attachable internet
-#}
-#docker network create -d overlay --attachable --internal traefik-network
+if (![string]::IsNullOrEmpty($internetNetworkName)) {
+   docker network create -d overlay --attachable internet
+}
+docker network create -d overlay --attachable --internal traefik-network
 
 # Deploy Agent
-#Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
-#. ./deployAgent.ps1 -agent $agent
+Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
+. ./deployAgent.ps1 -agent $agent
 $exitCodeFromDeployAgent = $LASTEXITCODE #save on variable the current lastExitCode because we want to apply RemoveItem() before compare the exit code value.
 
-#Remove-Item -Path ./deployAgent.ps1
+Remove-Item -Path ./deployAgent.ps1
 
 # Inform the user to proceed with the environment installation
 Write-Host $url

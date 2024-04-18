@@ -1,11 +1,5 @@
 const clusterAddress = window.location.origin;
 
-// const button = document.getElementById('GoToPortalBtn');
-// button.addEventListener('click', function (e) {
-//   window.location.replace(`http://wsl:8080/DevOpsCenter/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
-//   console.log("'Go To Portal' Button was clicked");
-// });
-
 // Function to create a button
 function createButton() {
   const button = document.createElement('button');
@@ -31,7 +25,7 @@ fetch('/api/content')
       const contentDiv = document.getElementById('content');
       const buttonContainer = document.getElementById('enrollButtonDiv');
       console.log(data);
-      data = "testInfraName";
+      
       if (data === "false") {
           // File does not exist, show button
           const button = createButton();
