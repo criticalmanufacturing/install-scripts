@@ -137,6 +137,25 @@ Write-Host "The output folder (location of the stack generated) is expected to b
 Write-Host "Checking for deployStackToKubernetes.ps1 on the Output folder..."
 
 $deployStackToKubernetesPath = "$Output/deployStackToKubernetes.ps1"
+
+$substringsToRemove = @(
+    "traefik-deployment",
+    "traefik-service",
+    "traefik-lb-service"
+)
+
+# Read all lines from the script
+$scriptContent = Get-Content -Path $deployStackToKubernetesPath
+
+# Remove lines containing the traefik resources
+$scriptContent = $scriptContent | Where-Object { $line = $_; -not ($substringsToRemove | Where-Object { $line -like "*$_*" }) }
+
+Write-Output "Modified script content:"
+$scriptContent
+
+# Write back modified content to the script file
+$scriptContent | Set-Content -Path $deployStackToKubernetesPath
+
 #$deployStackToKubernetesPath = Join-Path -Path $PSScriptRoot -ChildPath $deployStackToKubernetesPath
 if ( -Not (Test-Path -LiteralPath $deployStackToKubernetesPath)) {
     Write-Error "deployStackToKubernetes.ps1 file was not found on the Output directory $deployStackToKubernetesPath."
