@@ -26,6 +26,15 @@ spec:
         image: dev.criticalmanufacturing.io/rita/kioskapp:1.0.1
         imagePullPolicy: Always
         ports:
-        - containerPort: 8081  
+        - containerPort: 8081 
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: "/opt/app-root/src/data"
+          name: nodetest-volume
+      volumes:
+        - name: nodetest-volume
+          persistentVolumeClaim:
+           claimName: nodetest-pvc
       restartPolicy: Always
       
