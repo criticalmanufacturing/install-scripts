@@ -279,7 +279,7 @@ app.get('/enrollstart', (req, res) => {
     // Send data to the client
     const currentDate = new Date();
     const formattedDate = `${currentDate.toLocaleDateString()} ${currentDate.toLocaleTimeString()}`;
-    res.write(`${formattedDate}: ${data}\n`);
+    sendEvent(res, 'message', `${formattedDate}: ${data}\n`);
   });
 
   // Handle errors
@@ -307,10 +307,8 @@ app.get('/enrollstart', (req, res) => {
     }
     
     // give it a safe buffer of time before we shut it down manually
-    setTimeout(() => {
-      sendEvent(res, 'close', code);
-      closeConnectionTimer = setTimeout(() => res.end(), clientShutdownTimeout);
-    }, 10000)
+    sendEvent(res, 'close', code);
+    closeConnectionTimer = setTimeout(() => res.end(), 2000);
   });
 });
 
@@ -341,7 +339,7 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
     const subdomain = req.get('host').split('.')[0];
 
     const filePath = req.file.path;
-    const fileContent = fs.readFileAsync(filePath, 'utf8');
+    const fileContent = fs.readFileSync(filePath, 'utf8');
 
     // Parse the certificate
     const cert = forge.pki.certificateFromPem(fileContent);

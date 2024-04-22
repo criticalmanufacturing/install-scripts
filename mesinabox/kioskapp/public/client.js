@@ -13,6 +13,15 @@ function createButton() {
   return button;
 }
 
+function infraAlreadyCreated(contentDiv, data) {
+  const checkmark = document.createElement('img');
+  checkmark.src = 'checked-checkbox-64.png';
+  contentDiv.appendChild(checkmark);
+  const text = document.createElement('p');
+  text.textContent = `The ${JSON.stringify(data, null, 2)} infrastructure already has an agent installed in this cluster.`
+  contentDiv.appendChild(text);
+}
+
 // Fetch dynamic content from the server
 fetch('/api/content')
   .then(response => {
@@ -25,7 +34,7 @@ fetch('/api/content')
       const contentDiv = document.getElementById('content');
       const buttonContainer = document.getElementById('enrollButtonDiv');
       console.log(data);
-      
+
       if (data === "false") {
           // File does not exist, show button
           const button = createButton();
@@ -33,7 +42,7 @@ fetch('/api/content')
           buttonContainer.appendChild(button);
       } else {
           // File exists, display content
-          contentDiv.textContent = `The infrastructure named ${JSON.stringify(data, null, 2)} has already an agent installed in this cluster.`;
+          infraAlreadyCreated(contentDiv, data);
       }
   })
   .catch(error => {
