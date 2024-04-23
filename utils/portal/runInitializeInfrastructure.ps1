@@ -32,7 +32,7 @@ $global:ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/importSDK.ps1" -OutFile "./importSDK.ps1"
 . ./importSDK.ps1
 Remove-Item -Path ./importSDK.ps1
-Import-Module .\sdk\Cmf.CustomerPortal.Sdk.Powershell.dll
+
 # Login
 try
 {
@@ -83,13 +83,13 @@ catch
 
 # Create docker dependencies
 if (![string]::IsNullOrEmpty($internetNetworkName)) {
-   docker network create -d overlay --attachable internet
+    docker network create -d overlay --attachable internet
 }
 docker network create -d overlay --attachable --internal traefik-network
 
 # Deploy Agent
 Invoke-WebRequest -Uri "$RepositoryUrl/utils/portal/utils/deployAgent.ps1" -OutFile "./deployAgent.ps1"
-. ./deployAgent.ps1 -agent $agent
+./deployAgent.ps1 -agent $agent
 $exitCodeFromDeployAgent = $LASTEXITCODE #save on variable the current lastExitCode because we want to apply RemoveItem() before compare the exit code value.
 
 Remove-Item -Path ./deployAgent.ps1
