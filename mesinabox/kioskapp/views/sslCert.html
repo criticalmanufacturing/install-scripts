@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>CMOS</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div class="logo-container">
+      <img src="cmLogo.png" alt="CM Logo">
+      <img src="asmptLogo.png" alt="ASMPT Logo">
+    </div>
+    <div class="lightbox">
+      <div id="returnBtn">
+        <a href="/" class="return-btn">&lt; Back</a>
+      </div>
+      <h3 class="subtitle-center">Upload SSL Certificate</h3>
+      <form action="/upload" method="POST" enctype="multipart/form-data" id="UploadCertificateDiv">
+        <input type="file" name="sslCertificate" id="sslCertPicker" style="display:none;">
+        <label class="cmf-btn" for="sslCertPicker" id="SelectCertBtn">Select File</label>
+        <div class="preview">
+          <p>No files currently selected for upload</p>
+        </div>
+        <button class="cmf-btn-primary" type="submit" id="UploadCertBtn">Upload</button>
+      </form>
+    </div>
+  </body>
+  <script type="text/javascript" src="upload.js"></script>
+</html>

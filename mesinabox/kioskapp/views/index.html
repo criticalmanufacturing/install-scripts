@@ -2,18 +2,25 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>MES OS</title>
-   
+    <title>CMOS</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
   </head>
   <body>
-    <h1>MES OS</h1>
-    <h2>Upload SSL Certificate</h2>
-  <form action="/upload" method="POST" enctype="multipart/form-data">
-    <input type="file" name="sslCertificate">
-    <button type="submit">Upload</button>
-  </form>
-  <div id="enrollButtonDiv"></div>
-  <div id="content"></div>
+    <div class="logo-container">
+      <img src="cmLogo.png" alt="CM Logo">
+      <img src="asmptLogo.png" alt="ASMPT Logo">
+    </div>
+    <div class="lightbox">
+      <h1 class="title-center">CMOS</h1>
+      <div id="ButtonsDiv">
+        <div id="content"></div>
+        <div id="enrollButtonDiv"></div>
+        <button class="cmf-btn" id="ManageSslCertBtn">Manage SSL Certificate</button>
+      </div>
+    </div>
   </body>
   <script type="text/javascript" src="client.js"></script>
 </html>

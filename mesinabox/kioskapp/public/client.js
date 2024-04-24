@@ -1,16 +1,25 @@
-console.log('Client-side code running');
-
 const clusterAddress = window.location.origin;
 
 // Function to create a button
 function createButton() {
   const button = document.createElement('button');
-  button.textContent = 'Button Text';
+  button.className = 'cmf-btn-primary';
+  button.textContent = 'Go to Portal';
+  button.id = 'GoToPortalBtn';
   button.addEventListener('click', () => {
     window.location.replace(`https://portalqa.criticalmanufacturing.dev/DevOpsCenter/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
-    console.log('button was clicked');
+    console.log("'Go To Portal' Button was clicked");
   });
   return button;
+}
+
+function infraAlreadyCreated(contentDiv, data) {
+  const checkmark = document.createElement('img');
+  checkmark.src = 'checked-checkbox-64.png';
+  contentDiv.appendChild(checkmark);
+  const text = document.createElement('p');
+  text.textContent = `The ${JSON.stringify(data, null, 2)} infrastructure already has an agent installed in this cluster.`
+  contentDiv.appendChild(text);
 }
 
 // Fetch dynamic content from the server
@@ -33,7 +42,7 @@ fetch('/api/content')
           buttonContainer.appendChild(button);
       } else {
           // File exists, display content
-          contentDiv.textContent = `The infrastructure named ${JSON.stringify(data, null, 2)} has already an agent installed in this cluster.`;
+          infraAlreadyCreated(contentDiv, data);
       }
   })
   .catch(error => {
@@ -42,3 +51,8 @@ fetch('/api/content')
   });
 
 
+const btnManageSslCert = document.getElementById('ManageSslCertBtn');
+btnManageSslCert.addEventListener('click', function (e) {
+  window.location = `/sslcert`;
+  console.log("'Manage SSL Certificate' was clicked");
+});
