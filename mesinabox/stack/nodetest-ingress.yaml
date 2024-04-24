@@ -12,7 +12,7 @@ metadata:
   namespace: nodetest
 spec:
   rules:
-  - host: kioskapp.apps.172.19.73.158.nip.io #our domain
+  - host: kioskapp.apps.192.168.129.223.nip.io #our domain
     http:
       paths:
       - backend:

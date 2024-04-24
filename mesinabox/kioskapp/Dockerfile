@@ -8,10 +8,6 @@ FROM registry.access.redhat.com/ubi8/nodejs-14:latest as builder
 COPY package*.json ./
 #COPY ./nodejs-rest-http/package*.json ./
 
-# COPY ./scriptAfterEnrollment/afterEnrollment.ps1 /opt/app
-# COPY ./scriptAfterEnrollment/deployAgent.ps1 /opt/app
-# COPY ./scriptAfterEnrollment/importSDK.ps1 /opt/app
-
 ### Install app dependencies
 RUN npm install --production
 ### Copy the dependencies into a minimal Node.js image
@@ -33,14 +29,11 @@ COPY --from=builder /opt/app-root/src/node_modules /opt/app-root/src/node_module
 
 ### Copy project content
 COPY . /opt/app-root/src
-#COPY ./nodejs-rest-http/ /opt/app-root/src
 
 # Copy necessary scripts
 COPY ./scriptAfterEnrollment/afterEnrollment.ps1 /opt/app-root
 COPY ./scriptAfterEnrollment/deployAgent.ps1 /opt/app-root
 COPY ./scriptAfterEnrollment/importSDK.ps1 /opt/app-root
-
-
 
 ### Add licenses to this directory
 ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/license.txt
@@ -50,9 +43,8 @@ ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/
 
 ### Install other packages that we need/can need
 USER root
-RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip lvm2 readline && \
+RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip readline && \
         yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm && \
-        yum -y install http://mirror.centos.org/centos/7/os/x86_64/Packages/xfsprogs-4.5.0-22.el7.x86_64.rpm &&\
         curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
         tar -xzf oc.tar.gz && \
         mv oc /usr/local/bin/oc && \
