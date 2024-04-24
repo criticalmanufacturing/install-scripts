@@ -3,7 +3,6 @@ console.log('Client-side code running');
 const clusterAddress = window.location.origin;
 const expandDiskButton = document.getElementById("expandDiskButton");
 expandDiskButton.addEventListener("click", function() {
-    // Make an HTTP POST request to trigger script execution
     fetch('/expandDisk', {
         method: 'POST',
         headers: {
@@ -20,11 +19,9 @@ expandDiskButton.addEventListener("click", function() {
         return response.json();
     })
     .then(data => {
-        // Handle success response from server
         console.log('Script executed successfully:', data);
     })
     .catch(error => {
-        // Handle errors
         console.error('There was a problem with the expand disk operation:', error);
     });
 });
