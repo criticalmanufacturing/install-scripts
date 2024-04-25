@@ -338,6 +338,10 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
   try {
     const subdomain = req.get('host').split('.')[0];
 
+    if (req.file == null) {
+      res.status(400).json({ message: 'No file was selected' });
+      return;
+    }
     const filePath = req.file.path;
     const fileContent = fs.readFileSync(filePath, 'utf8');
 
@@ -365,7 +369,10 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
       'tls.crt': Buffer.from(fileContent).toString('base64')
     };
 
-    await createOrUpdateSecret(secretName, namespace, secretData)
+    // Start updating k8s object only after closing the request with a status 200,
+    // otherwise the router restart will make the request fail with a 504 gateway timeout
+    setTimeout(async () => {
+      await createOrUpdateSecret(secretName, namespace, secretData)
       .then(() => {
         console.log('Secret creation or update completed successfully');
       })
@@ -373,20 +380,23 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
         console.error('An error occurred during secret creation or update:', error);
       });
 
-    try {
-      const deploymentNamespace = 'openshift-ingress';
-      const deploymentName = 'router-default';
-      const deployment = await fetchDeployment(deploymentNamespace, deploymentName);
-      await updateDeployment(deployment, secretName, deploymentNamespace, deploymentName, domain);
-      await waitForDeploymentReady(deploymentNamespace, deploymentName);
-      await updateIngresses(domain);
-      res.redirect(`${subdomain}.${domain}`);
-    } catch (error) {
-      console.log('An error occurred:', error);
-    }
+      try {
+        const deploymentNamespace = 'openshift-ingress';
+        const deploymentName = 'router-default';
+        const deployment = await fetchDeployment(deploymentNamespace, deploymentName);
+        await updateDeployment(deployment, secretName, deploymentNamespace, deploymentName, domain);
+        await waitForDeploymentReady(deploymentNamespace, deploymentName);
+        await updateIngresses(domain);
+        res.redirect(`${subdomain}.${domain}`);
+      } catch (error) {
+        console.log('An error occurred:', error);
+      }
+    }, 1000);
+    
+    res.status(200).json({ message: 'Upload successful, updating domain...', newEndpoint: `${subdomain}.${domain}` });
   } catch (error) {
     console.log('Error:', error);
-    res.status(500).send('Internal Server Error');
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
