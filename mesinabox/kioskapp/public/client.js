@@ -1,5 +1,5 @@
 const clusterAddress = window.location.origin;
-const expandDiskButton = document.getElementById("expandDiskButton");
+const expandDiskButton = document.getElementById("ExpandDiskBtn");
 expandDiskButton.addEventListener("click", function() {
     fetch('/expandDisk', {
         method: 'POST',

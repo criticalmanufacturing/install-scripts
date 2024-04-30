@@ -1,5 +1,5 @@
 const express = require('express');
-const { spawn, exec } = require('child_process');
+const { spawn } = require('child_process');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -313,17 +313,42 @@ app.get('/enrollstart', (req, res) => {
 });
 
 
+const pipePath = "pipe";
 
 // API endpoint to execute script to expand disk space
 app.post('/expandDisk', (req, res) => {
 
-  const pipePath = "pipe";
-  const commandToRun = 'pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"';
-  const wstream = fs.createWriteStream(pipePath)
-  wstream.write(commandToRun)
-  wstream.close()
-  
-  });
+   // Open the FIFO in write mode
+   const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
+
+   // Write the script content to the FIFO
+   fifoStream.write(script);
+
+    console.log('Script injected into FIFO for execution.');
+    fifoStream.end();
+    fifoStream.close()
+    });
+
+    // Example usage: Execute the script
+const script = `
+largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
+
+pvdisplay "/dev/\${largest_disk_device}"
+
+if [ $? -ne 0 ]; then
+    pvcreate "/dev/\${largest_disk_device}"
+    echo "Physical volume created on /dev/\${largest_disk_device}"
+
+    vgcreate externalDiskVG "/dev/\${largest_disk_device}"
+    echo "Volume group externalDiskVG created"
+else
+    echo "Physical volume already exists on /dev/\${largest_disk_device}"
+fi
+
+pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
+`;
+
+
 // Serve index.html for root URL
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'index.html')); 

@@ -94,12 +94,17 @@ body {
 #ManageSslCertBtn {
     width: 188px;
 }
+#ExpandDiskBtn { 
+    width: 188px;
+}
 #SelectCertBtn {
     width: 96px;
 }
 #UploadCertBtn {
     width: 112px;
 }
+
+
 
 #ButtonsDiv {
     width: 100%;
