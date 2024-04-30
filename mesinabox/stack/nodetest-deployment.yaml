@@ -40,6 +40,6 @@ spec:
            claimName: nodetest-pvc
         - name: pipe-volume
           hostPath:
-            path: /etc/resizeDiskPipe            # Path on the host node containing the named pipe 
+            path: /var/run/resizeDiskPipe            # Path on the host node containing the named pipe 
       restartPolicy: Always
       
