@@ -16,7 +16,7 @@ fetch('/api/config/portalAddress')
     });
   }) 
   .catch(error => {
-    console.error('Error fetching environment variable:', error);
+    console.error('Error fetching data from API:', error);
   });
 
 //handle Server-Sent Events
