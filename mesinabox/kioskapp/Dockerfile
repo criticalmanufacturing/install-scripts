@@ -44,7 +44,7 @@ ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/
 
 ### Install other packages that we need/can need
 USER root
-RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip iputils && \
+RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip && \
         yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm &&\
         curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
         tar -xzf oc.tar.gz && \

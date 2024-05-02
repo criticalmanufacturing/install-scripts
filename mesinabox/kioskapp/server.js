@@ -4,8 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const forge = require('node-forge');
 const { spawn } = require('child_process');
-const ping = require('ping');
 const app = express();
+const https = require('https');
 const { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api } = require('@kubernetes/client-node');
 
 // Initialize Kubernetes/OpenShift configuration
@@ -250,11 +250,6 @@ function sendEvent(res, type, data) {
 }
 
 
-function checkPing(address, callback) {
-  ping.sys.probe(address, function(isAlive) {
-      callback(isAlive);
-  });
-}
 
 app.get('/enroll', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'enroll.html'));
@@ -359,25 +354,36 @@ app.get('/api/content', async (req, res) => {
 
 app.get('/api/connectivity', async (req, res) => {
 
-  const registryAddress = process.env.REGISTRY_ADDRESS
-  const portalAddress = process.env.CUSTOMER_PORTAL_ADDRESS
+  const registryAddress = `https://${process.env.REGISTRY_ADDRESS}` 
+  const portalAddress = `https://${process.env.CUSTOMER_PORTAL_ADDRESS}/api/ping`
   const results = {};
 
-  function handlePingResponse(label,  isAlive) {
+  function sendResponse(label,  isAlive) {
     results[label] = isAlive;
 
     if (Object.keys(results).length === 2) {
         res.json(results);
     }
   }
-
-  checkPing(registryAddress, isAlive => {
-    handlePingResponse("portal", isAlive);
-  });
-
-  checkPing(portalAddress, isAlive => {
-    handlePingResponse("registry", isAlive);
-  });
+    // Make a GET request to the portal
+    https.get(portalAddress, {timeout: 1000}, (response) => {
+      sendResponse("portal", response.statusCode === 200);
+    }).on('timeout', () => {
+     console.log("timeout")
+     sendResponse("portal", false);
+    }).on('error', (error) => {
+      console.error('Error fetching data from portal', error);
+    });
+  
+    // Make a GET request to the registry
+    https.get(registryAddress, {timeout: 1000}, (response) => {
+      sendResponse("registry", response.statusCode === 200);
+    }).on('timeout', () => {
+      sendResponse("registry", false);
+     })
+    .on('error', (error) => {
+      console.error('Error fetching data from registry', error);
+    });
 })
 
 // Serve sslCert.html for /sslcert URL
