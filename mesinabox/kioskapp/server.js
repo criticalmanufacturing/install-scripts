@@ -365,25 +365,22 @@ app.get('/api/connectivity', async (req, res) => {
         res.json(results);
     }
   }
-    // Make a GET request to the portal
-    https.get(portalAddress, {timeout: 1000}, (response) => {
-      sendResponse("portal", response.statusCode === 200);
-    }).on('timeout', () => {
-     console.log("timeout")
-     sendResponse("portal", false);
-    }).on('error', (error) => {
-      console.error('Error fetching data from portal', error);
-    });
   
-    // Make a GET request to the registry
-    https.get(registryAddress, {timeout: 1000}, (response) => {
-      sendResponse("registry", response.statusCode === 200);
-    }).on('timeout', () => {
-      sendResponse("registry", false);
-     })
-    .on('error', (error) => {
-      console.error('Error fetching data from registry', error);
-    });
+  try {
+    const resp = await fetch(portalAddress, {signal: AbortSignal.timeout(500)});
+    sendResponse("portal", resp.ok)
+  } catch(e) {
+    sendResponse("portal", false)
+    console.error("Error occured:", e.message);   
+  }
+
+  try {
+    const resp = await fetch(registryAddress, {signal: AbortSignal.timeout(500)});
+    sendResponse("registry", resp.ok)
+  } catch(e) {
+    sendResponse("registry", false)
+    console.error("Error occured:", e.message);   
+  }
 })
 
 // Serve sslCert.html for /sslcert URL
