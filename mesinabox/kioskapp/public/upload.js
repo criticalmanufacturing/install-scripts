@@ -6,9 +6,7 @@ fileInput.addEventListener("change", updateFileDisplay);
 
 function clearErrorMessages() {
   const errorDiv = document.getElementById('uploadErrorMessage');
-  while (errorDiv.firstChild) {
-    errorDiv.removeChild(errorDiv.lastChild);
-  }
+  errorDiv.replaceChildren(); // removes all child nodes
 }
 
 function updateFileDisplay() {
