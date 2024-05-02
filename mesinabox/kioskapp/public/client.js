@@ -17,7 +17,9 @@ expandDiskButton.addEventListener("click", function() {
         return response.json();
     })
     .then(data => {
-        console.log('Script executed successfully:', data);
+      const expandDiskLabel = document.getElementById('ExpandDiskLabel');
+      expandDiskLabel.textContent = data === 0  ? "The disk was expanded with success!" : "There's was an issue while trying to expand the disk!";
+      expandDiskLabel.className = data === 0 ? 'success' : 'failure';
     })
     .catch(error => {
         console.error('There was a problem with the expand disk operation:', error);

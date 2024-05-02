@@ -188,3 +188,19 @@ a:hover, a:active {
     display: flex;
     justify-content: space-between;
 }
+
+#ExpandDiskLabel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    line-height: 0;
+    font-size: 14px;
+}
+.success {
+    color: green;
+}
+
+.failure {
+    color: red;
+}

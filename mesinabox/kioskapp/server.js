@@ -313,23 +313,43 @@ app.get('/enrollstart', (req, res) => {
 });
 
 
-const pipePath = "pipe";
+const pipePath = "./pipe/resizeDiskPipe";
+const outputPath = "./pipe/output.txt";
 
 // API endpoint to execute script to expand disk space
 app.post('/expandDisk', (req, res) => {
 
    // Open the FIFO in write mode
+   if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
    const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
 
    // Write the script content to the FIFO
-   fifoStream.write(script);
+  fifoStream.write(script);
 
-    console.log('Script injected into FIFO for execution.');
-    fifoStream.end();
-    fifoStream.close()
+  console.log('Script injected into FIFO for execution.');
+  fifoStream.close();
+
+    // Start listening for exit code
+
+    let timeout = 10000 //stop waiting after 10 seconds (something might be wrong)
+    const timeoutStart = Date.now()
+    const myLoop = setInterval(function () {
+        if (Date.now() - timeoutStart > timeout) {
+            clearInterval(myLoop);
+            console.log("timed out")
+        } else {
+            //if output.txt exists, read it
+            if (fs.existsSync(outputPath)) {
+                clearInterval(myLoop);
+                const data = fs.readFileSync(outputPath).toString()
+                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath) //delete the output file
+                res.send(data);
+            }
+        }
+    }, 300);
+    
     });
 
-    // Example usage: Execute the script
 const script = `
 largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
 
@@ -347,7 +367,6 @@ fi
 
 pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
 `;
-
 
 // Serve index.html for root URL
 app.get('/', (req, res) => {
