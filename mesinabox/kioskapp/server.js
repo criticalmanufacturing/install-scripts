@@ -497,7 +497,6 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
         await updateDeployment(deployment, secretName, deploymentNamespace, deploymentName, domain);
         await waitForDeploymentReady(deploymentNamespace, deploymentName);
         await updateIngresses(domain);
-        res.redirect(`${subdomain}.${domain}`);
       } catch (error) {
         console.log('An error occurred:', error);
       }
