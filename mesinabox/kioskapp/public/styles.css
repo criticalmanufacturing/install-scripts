@@ -88,6 +88,11 @@ body {
     color: white;
 }
 
+.cmf-btn-primary:disabled {
+    background: rgba(0, 102, 161, .3);
+    border: 1px solid rgba(0, 102, 161, .3);
+}
+
 #GoToPortalBtn {
     width: 188px;
 }

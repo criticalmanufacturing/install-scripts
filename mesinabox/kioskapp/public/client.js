@@ -5,24 +5,27 @@ expandDiskButton.addEventListener("click", function() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            size: 5
-        })
+        }
     })
     .then(response => {
+        console.log(response)
         if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
-    .then(data => {
-      const expandDiskLabel = document.getElementById('ExpandDiskLabel');
-      expandDiskLabel.textContent = data === 0  ? "The disk was expanded with success!" : "There's was an issue while trying to expand the disk!";
-      expandDiskLabel.className = data === 0 ? 'success' : 'failure';
-    })
+            return response.text().then(errorMessage => {
+                throw new Error(errorMessage);
+              });
+        }    
+       return response.text()
+    }).then(data => {
+        const expandDiskLabel = document.getElementById('ExpandDiskLabel');
+        expandDiskLabel.textContent = data
+        expandDiskLabel.className = 'success';
+      })
     .catch(error => {
-        console.error('There was a problem with the expand disk operation:', error);
+        const expandDiskLabel = document.getElementById('ExpandDiskLabel');
+        expandDiskLabel.textContent = error.message
+        expandDiskLabel.className = 'failure'
+        
+        console.error('There was a problem with the expand disk operation:', error.message);
     });
 });
 
@@ -58,12 +61,14 @@ fetch('/api/connectivity')
 
     // Update HTML content based on ping results
     const customerPortalConnectivity = document.getElementById('customerPortalConnectivity');
+    const GoToPortalBtn = document.getElementById('GoToPortalBtn');
     customerPortalConnectivity.textContent = isCustomerPortalReachable ? 'Customer Portal is reachable' : 'Customer Portal is unreachable';
     customerPortalConnectivity.className = isCustomerPortalReachable ? 'alive' : 'dead';
 
     const registryConnectivity = document.getElementById('registryConnectivity');
     registryConnectivity.textContent = isRegistryReachable ? 'Registry is reachable' : 'Registry is unreachable';
     registryConnectivity.className = isRegistryReachable ? 'alive' : 'dead';
+    GoToPortalBtn.disabled = !isRegistryReachable || !isCustomerPortalReachable;
 })
 .catch(error => {
     console.error('Error fetching ping result:', error);

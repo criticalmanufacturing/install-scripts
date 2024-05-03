@@ -354,14 +354,18 @@ app.post('/expandDisk', (req, res) => {
     const myLoop = setInterval(function () {
         if (Date.now() - timeoutStart > timeout) {
             clearInterval(myLoop);
-            console.log("timed out")
+            res.status(408).send('Expand Disk: Operation timed out.')
         } else {
             //if output.txt exists, read it
             if (fs.existsSync(outputPath)) {
                 clearInterval(myLoop);
-                const data = fs.readFileSync(outputPath).toString()
+                const data = fs.readFileSync(outputPath).toString().trim()
                 if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath) //delete the output file
-                res.send(data);
+                if (data === '0') {
+                  res.status(200).send("The disk was expanded with success!");
+                } else {
+                  res.status(500).send("There was an issue while trying to expand the disk!");
+                }
             }
         }
     }, 300);

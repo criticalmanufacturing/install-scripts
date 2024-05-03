@@ -6,6 +6,6 @@ parameters:
   csi.storage.k8s.io/fstype: xfs
   topolvm.io/device-class: externalDiskVG
 provisioner: topolvm.io
-reclaimPolicy: Delete
+reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
