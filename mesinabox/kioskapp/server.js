@@ -403,7 +403,7 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
     res.status(200).json({ message: 'Upload successful, updating domain...', newDomain: `${subdomain}.${domain}` });
   } catch (error) {
     console.log('Error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: error.message });
   }
 });
 
