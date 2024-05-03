@@ -73,6 +73,40 @@ async function pingNewDomain(newDomain) {
   });
 }
 
+// Display the seconds remaining until timeout, decreasing every second
+function displayCertWaitingProgress() {
+  const statusDiv = document.getElementById('uploadStatusMessage');
+  pollStatusText = document.createElement('p');
+  pollStatusText.textContent = `Waiting up to ${pollingTimeoutSeconds} seconds for new domain to be up...`
+  statusDiv.appendChild(pollStatusText);
+  
+  let remainingTimeoutSeconds = pollingTimeoutSeconds;
+  pollingStatusTextInterval = setInterval(() => {
+    remainingTimeoutSeconds--;
+    pollStatusText.textContent = `Waiting up to ${remainingTimeoutSeconds} seconds for new domain to be up...`;
+    if (remainingTimeoutSeconds <= 0) {
+      clearInterval(pollingStatusTextInterval);
+    }
+  }, 1000);
+}
+
+// Wait 5 seconds until forced redirect
+function certTimeoutWaitingProgress(pollingInterval) {
+  clearInterval(pollingInterval); // stop polling the new domain
+  let redirectTimeoutSecs = 5;
+  pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
+
+  const redirectInterval = setInterval(() => {
+    redirectTimeoutSecs--;
+    pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
+    if (redirectTimeoutSecs == 0) {
+      pollStatusText.textContent = `Redirecting...`
+      clearInterval(redirectInterval); // stops the timeout messages from going negative trying to override this
+      window.location.href = `https://${data.newDomain}`;
+    }
+  }, 1000);
+}
+
 // Form upload + error processing
 document.getElementById('UploadCertificateForm').addEventListener('submit', async (event) => {
   uploadBtn.disabled = true;
@@ -94,34 +128,10 @@ document.getElementById('UploadCertificateForm').addEventListener('submit', asyn
     
     uploadBtn.innerText = uploadBtnPollingStr;
 
-    const statusDiv = document.getElementById('uploadStatusMessage');
-    pollStatusText = document.createElement('p');
-    statusDiv.appendChild(pollStatusText);
-    pollStatusText.textContent = `Waiting up to ${pollingTimeoutSeconds} seconds for new domain to be up...`
-    let remainingTimeoutSeconds = pollingTimeoutSeconds;
-    pollingStatusTextInterval = setInterval(() => {
-      remainingTimeoutSeconds--;
-      pollStatusText.textContent = `Waiting up to ${remainingTimeoutSeconds} seconds for new domain to be up...`;
-      if (remainingTimeoutSeconds <= 0) {
-        clearInterval(pollingStatusTextInterval);
-      }
-    }, 1000);
-
     pollingInterval = setInterval(pingNewDomain, 2000, data.newDomain);
-    pollingTimeout = setTimeout(() => {
-      clearInterval(pollingInterval);
-      let redirectTimeoutSecs = 5;
-      pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
-      const redirectInterval = setInterval(() => {
-        redirectTimeoutSecs--;
-        pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
-        if (redirectTimeoutSecs == 0) {
-          pollStatusText.textContent = `Redirecting...`
-          clearInterval(redirectInterval);
-          window.location.href = `https://${data.newDomain}`;
-        }
-      }, 1000);
-    }, pollingTimeoutSeconds * 1000);
+    displayCertWaitingProgress();
+
+    pollingTimeout = setTimeout(certTimeoutWaitingProgress, pollingTimeoutSeconds * 1000, pollingInterval);
 
   } catch (error) {
     clearErrorMessages();
