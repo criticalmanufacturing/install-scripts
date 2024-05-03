@@ -18,6 +18,13 @@ const filePath = path.join(dataDirectory, installedAgentInfoFile);
 // Serve static files from the public directory
 app.use(express.static('public'));
 
+// Middleware to enable CORS for certificate upload & domain change
+app.use((req, res, next) => {
+  // Allow requests from all origins for now ( TODO: Replace '*' with current domain )
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next(); // Pass control to the next middleware
+});
+
 // Middleware to set a timeout for requests
 function timeoutMiddleware(timeout) {
   return function (req, res, next) {
@@ -393,7 +400,7 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
       }
     }, 1000);
     
-    res.status(200).json({ message: 'Upload successful, updating domain...', newEndpoint: `${subdomain}.${domain}` });
+    res.status(200).json({ message: 'Upload successful, updating domain...', newDomain: `${subdomain}.${domain}` });
   } catch (error) {
     console.log('Error:', error);
     res.status(500).json({ message: 'Internal server error' });

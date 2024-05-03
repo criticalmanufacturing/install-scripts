@@ -2,6 +2,14 @@ const fileInput = document.querySelector("#sslCertPicker");
 const filePreview = document.querySelector(".preview");
 const uploadBtn = document.getElementById('UploadCertBtn');
 
+const uploadBtnBaseStr =      'Upload Certificate';
+const uploadBtnUploadingStr = 'Uploading...';
+const uploadBtnPollingStr =   'Waiting for Domain';
+uploadBtn.innerText = uploadBtnBaseStr;
+
+let pollingInterval;
+let pollingTimeout;
+
 fileInput.addEventListener("change", updateFileDisplay);
 
 function clearErrorMessages() {
@@ -35,9 +43,27 @@ function updateFileDisplay() {
   clearErrorMessages();
 }
 
+async function pingNewDomain(newDomain) {
+  const fullDomain = `https://${newDomain}`
+  fetch(fullDomain)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error("Response not ok", {cause: response});
+    }
+    clearTimeout(pollingTimeout);
+    clearInterval(pollingInterval);
+    window.location.href = fullDomain;
+  })
+  .catch(error => {
+    // Handle errors (e.g., network issues, server errors)
+    console.error('Error checking domain availability:', error);
+  });
+}
+
 // Form upload + error processing
 document.getElementById('UploadCertificateForm').addEventListener('submit', async (event) => {
   uploadBtn.disabled = true;
+  uploadBtn.innerText = uploadBtnUploadingStr;
   event.preventDefault();
   const formData = new FormData(event.target);
   try {
@@ -55,15 +81,16 @@ document.getElementById('UploadCertificateForm').addEventListener('submit', asyn
       }
       throw new Error(data.message);
     }
-    alert(data.message); // Display success message
+    
+    uploadBtn.innerText = uploadBtnPollingStr;
 
-    // const success = await waitForEndpointUp(data.newEndpoint, 120000)
-    // if (!success) {
-    //   throw new Error('Timeout: Failed to ping the endpoint within 2 minutes');
-    // }
+    pollingInterval = setInterval(pingNewDomain, 2000, data.newDomain);
+    pollingTimeout = setTimeout(() => {
+      clearInterval(pollingInterval);
+      alert('Timeout while waiting for new domain to be up.\nForcing a redirect to the new domain');
+      window.location.href = `https://${data.newDomain}`;
+    }, 90000); // 90s timeout
 
-    // Redirect to the new endpoint
-    // window.location.href = data.newEndpoint; // Commented for now since we need a way of only redirecting when route(r)+ingress is up.
   } catch (error) {
     clearErrorMessages();
     const errorDiv = document.getElementById('uploadErrorMessage');
@@ -71,7 +98,7 @@ document.getElementById('UploadCertificateForm').addEventListener('submit', asyn
     const text = document.createElement('p');
     text.textContent = error.message;
     errorDiv.appendChild(text);
-  } finally {
     uploadBtn.disabled = false;
+    uploadBtn.innerText = uploadBtnBaseStr;
   }
 });
