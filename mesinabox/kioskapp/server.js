@@ -248,6 +248,8 @@ function sendEvent(res, type, data) {
   res.write(`data: ${JSON.stringify({ type, data })}\n\n`)
 }
 
+
+
 app.get('/enroll', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'enroll.html'));
 });
@@ -271,8 +273,24 @@ app.get('/enrollstart', (req, res) => {
     }
   });
 
+const appSettingsRaw = fs.readFileSync('./scriptAfterEnrollment/appsettings.json');
+let appSettings = JSON.parse(appSettingsRaw);
+
+// Set or override parameters dynamically
+appSettings.ClientConfiguration.HostAddress = `${process.env.CUSTOMER_PORTAL_ADDRESS}:${process.env.CUSTOMER_PORTAL_PORT}`
+appSettings.ClientConfiguration.ClientTenantName = process.env.TENANT_NAME;
+appSettings.ClientConfiguration.ClientId = process.env.CLIENT_ID;
+appSettings.ClientConfiguration.SecurityPortalBaseAddress = `https://${process.env.SECURITY_PORTAL_ADRESS}:${process.env.CUSTOMER_PORTAL_PORT}`;
+
+// Convert the modified settings back to JSON
+const updatedSettings = JSON.stringify(appSettings, null, 2);
+
+// Write the updated settings back to the appsettings.json file
+fs.writeFileSync('./scriptAfterEnrollment/appsettings.json', updatedSettings);
+
+
   // Spawn PowerShell script
-  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
+  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
 
   // Handle stdout data
   powershell.stdout.on('data', (data) => {
@@ -317,6 +335,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'index.html')); 
 });
 
+app.get('/api/config/portalAddress', (req, res) => {
+  const portalAddress = process.env.CUSTOMER_PORTAL_ADDRESS
+  res.json({ customerPortalAddress : portalAddress });
+});
+
 // API to fetch dynamic content
 app.get('/api/content', async (req, res) => {
     try {
@@ -327,6 +350,37 @@ app.get('/api/content', async (req, res) => {
         res.status(500).send('Internal Server Error');
     }
 });
+
+app.get('/api/connectivity', async (req, res) => {
+
+  const registryAddress = `https://${process.env.REGISTRY_ADDRESS}` 
+  const portalAddress = `https://${process.env.CUSTOMER_PORTAL_ADDRESS}/api/ping`
+  const results = {};
+
+  function sendResponse(label,  isAlive) {
+    results[label] = isAlive;
+
+    if (Object.keys(results).length === 2) {
+        res.json(results);
+    }
+  }
+  
+  try {
+    const resp = await fetch(portalAddress, {signal: AbortSignal.timeout(500)});
+    sendResponse("portal", resp.ok)
+  } catch(e) {
+    sendResponse("portal", false)
+    console.error("Error occured:", e.message);   
+  }
+
+  try {
+    const resp = await fetch(registryAddress, {signal: AbortSignal.timeout(500)});
+    sendResponse("registry", resp.ok)
+  } catch(e) {
+    sendResponse("registry", false)
+    console.error("Error occured:", e.message);   
+  }
+})
 
 // Serve sslCert.html for /sslcert URL
 app.get('/sslcert', async (req, res) => {
