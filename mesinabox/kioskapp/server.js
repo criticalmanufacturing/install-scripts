@@ -5,7 +5,6 @@ const fs = require('fs');
 const forge = require('node-forge');
 const { spawn } = require('child_process');
 const app = express();
-const https = require('https');
 const { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api } = require('@kubernetes/client-node');
 
 // Initialize Kubernetes/OpenShift configuration
