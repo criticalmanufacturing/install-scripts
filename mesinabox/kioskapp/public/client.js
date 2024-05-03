@@ -27,13 +27,14 @@ expandDiskButton.addEventListener("click", function() {
 });
 
 // Function to create a button
-function createButton() {
+function createButton(portalAddress) {
   const button = document.createElement('button');
   button.className = 'cmf-btn-primary';
   button.textContent = 'Go to Portal';
   button.id = 'GoToPortalBtn';
   button.addEventListener('click', () => {
-    window.location.replace(`https://portalqa.criticalmanufacturing.dev/DevOpsCenter/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
+    
+    window.location.replace(`https://${portalAddress}/DevOpsCenter/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
     console.log("'Go To Portal' Button was clicked");
   });
   return button;
@@ -47,6 +48,27 @@ function infraAlreadyCreated(contentDiv, data) {
   text.textContent = `The ${JSON.stringify(data, null, 2)} infrastructure already has an agent installed in this cluster.`
   contentDiv.appendChild(text);
 }
+
+fetch('/api/connectivity')
+.then(response => response.json())
+.then(data => {
+    // Get ping results for each address
+    const isCustomerPortalReachable = data["portal"];
+    const isRegistryReachable = data["registry"];
+
+    // Update HTML content based on ping results
+    const customerPortalConnectivity = document.getElementById('customerPortalConnectivity');
+    customerPortalConnectivity.textContent = isCustomerPortalReachable ? 'Customer Portal is reachable' : 'Customer Portal is unreachable';
+    customerPortalConnectivity.className = isCustomerPortalReachable ? 'alive' : 'dead';
+
+    const registryConnectivity = document.getElementById('registryConnectivity');
+    registryConnectivity.textContent = isRegistryReachable ? 'Registry is reachable' : 'Registry is unreachable';
+    registryConnectivity.className = isRegistryReachable ? 'alive' : 'dead';
+})
+.catch(error => {
+    console.error('Error fetching ping result:', error);
+});
+
 
 // Fetch dynamic content from the server
 fetch('/api/content')
@@ -62,10 +84,19 @@ fetch('/api/content')
       console.log(data);
 
       if (data === "false") {
-          // File does not exist, show button
-          const button = createButton();
-          button.textContent = 'Go to Portal';
-          buttonContainer.appendChild(button);
+        fetch('/api/config/portalAddress')
+        .then(response => response.json())
+        .then(data => {
+          const customerPortalAddress = data.customerPortalAddress;
+           // File does not exist, show button
+           const button = createButton(customerPortalAddress);
+           button.textContent = 'Go to Portal';
+           buttonContainer.appendChild(button);
+        })
+        .catch(error => {
+          console.error('Error fetching data from API:', error);
+        });
+          
       } else {
           // File exists, display content
           infraAlreadyCreated(contentDiv, data);
