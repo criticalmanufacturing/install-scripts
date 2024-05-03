@@ -18,6 +18,13 @@ const filePath = path.join(dataDirectory, installedAgentInfoFile);
 // Serve static files from the public directory
 app.use(express.static('public'));
 
+// Middleware to enable CORS for certificate upload & domain change
+app.use((req, res, next) => {
+  // Allow requests from all origins for now ( TODO: Replace '*' with current domain )
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next(); // Pass control to the next middleware
+});
+
 // Set storage engine
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -440,6 +447,10 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
   try {
     const subdomain = req.get('host').split('.')[0];
 
+    if (req.file == null) {
+      res.status(400).json({ message: 'No file was selected' });
+      return;
+    }
     const filePath = req.file.path;
     const fileContent = fs.readFileSync(filePath, 'utf8');
 
@@ -467,28 +478,34 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
       'tls.crt': Buffer.from(fileContent).toString('base64')
     };
 
-    await createOrUpdateSecret(secretName, namespace, secretData)
+    // Start updating k8s object only after closing the request with a status 200,
+    // otherwise the router restart will make the request fail with a 504 gateway timeout
+    setTimeout(async () => {
+      await createOrUpdateSecret(secretName, namespace, secretData)
       .then(() => {
         console.log('Secret creation or update completed successfully');
       })
       .catch((error) => {
         console.error('An error occurred during secret creation or update:', error);
+        return;
       });
 
-    try {
-      const deploymentNamespace = 'openshift-ingress';
-      const deploymentName = 'router-default';
-      const deployment = await fetchDeployment(deploymentNamespace, deploymentName);
-      await updateDeployment(deployment, secretName, deploymentNamespace, deploymentName, domain);
-      await waitForDeploymentReady(deploymentNamespace, deploymentName);
-      await updateIngresses(domain);
-      res.redirect(`${subdomain}.${domain}`);
-    } catch (error) {
-      console.log('An error occurred:', error);
-    }
+      try {
+        const deploymentNamespace = 'openshift-ingress';
+        const deploymentName = 'router-default';
+        const deployment = await fetchDeployment(deploymentNamespace, deploymentName);
+        await updateDeployment(deployment, secretName, deploymentNamespace, deploymentName, domain);
+        await waitForDeploymentReady(deploymentNamespace, deploymentName);
+        await updateIngresses(domain);
+      } catch (error) {
+        console.log('An error occurred:', error);
+      }
+    }, 1000);
+    
+    res.status(200).json({ message: 'Upload successful, updating domain...', newDomain: `${subdomain}.${domain}` });
   } catch (error) {
     console.log('Error:', error);
-    res.status(500).send('Internal Server Error');
+    res.status(500).json({ message: error.message });
   }
 });
 
