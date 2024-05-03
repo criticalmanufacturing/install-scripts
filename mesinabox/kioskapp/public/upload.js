@@ -99,7 +99,7 @@ function certTimeoutWaitingProgress(pollingInterval) {
   const redirectInterval = setInterval(() => {
     redirectTimeoutSecs--;
     pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
-    if (redirectTimeoutSecs == 0) {
+    if (redirectTimeoutSecs <= 0) {
       pollStatusText.textContent = `Redirecting...`
       clearInterval(redirectInterval); // stops the timeout messages from going negative trying to override this
       window.location.href = `https://${data.newDomain}`;
