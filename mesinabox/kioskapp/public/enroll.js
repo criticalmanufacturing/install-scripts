@@ -3,13 +3,21 @@ const queryParams = new Proxy(new URLSearchParams(window.location.search), {
 });
 // Get the value of "infra" in eg "https://example.com/?infra=infraName&agent=agentName"
 let infraName = queryParams.infra;
+const openInPortalButton = document.getElementById('OpenInfraPortalBtn');
 
 // Open Infra In Portal Button
-const openInPortalButton = document.getElementById('OpenInfraPortalBtn');
-openInPortalButton.addEventListener('click', function (e) {
-    console.log("'Open Infra In Portal' Button was clicked");
-    window.location.replace(`https://portalqa.criticalmanufacturing.dev/Entity/CustomerInfrastructure/${encodeURIComponent(infraName)}/View/Details`);
-});
+fetch('/api/config/portalAddress')
+  .then(response => response.json())
+  .then(data => {
+    
+    openInPortalButton.addEventListener('click', function (e) {
+        console.log("'Open Infra In Portal' Button was clicked");
+        window.location.replace(`https://${data.customerPortalAddress}/Entity/CustomerInfrastructure/${encodeURIComponent(infraName)}/View/Details`);
+    });
+  }) 
+  .catch(error => {
+    console.error('Error fetching data from API:', error);
+  });
 
 //handle Server-Sent Events
 function handleSSE() {

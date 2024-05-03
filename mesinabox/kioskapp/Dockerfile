@@ -1,5 +1,5 @@
 ### Install the application dependencies in a full UBI Node docker image
-FROM registry.access.redhat.com/ubi8/nodejs-14:latest as builder
+FROM registry.access.redhat.com/ubi8/nodejs-20:latest as builder
 
 # USER root
 # WORKDIR /opt/app
@@ -10,9 +10,8 @@ COPY package*.json ./
 
 ### Install app dependencies
 RUN npm install --production
-
 ### Copy the dependencies into a minimal Node.js image
-FROM registry.access.redhat.com/ubi8/nodejs-14-minimal:latest 
+FROM registry.access.redhat.com/ubi8/nodejs-20-minimal:latest 
 
 ENV NODE_ENV=production \
     PORT=8081
@@ -45,7 +44,7 @@ ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/
 ### Install other packages that we need/can need
 USER root
 RUN microdnf --nodocs install -y yum wget curl nano dotnet-runtime-8.0 curl ca-certificates gzip && \
-        yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm &&\
+        yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm && \
         curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
         tar -xzf oc.tar.gz && \
         mv oc /usr/local/bin/oc && \

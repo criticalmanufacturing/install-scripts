@@ -92,10 +92,18 @@ body {
     border: 1px solid rgba(0, 102, 161, .3);
 }
 
+.cmf-btn-primary:disabled {
+    background: rgba(0, 102, 161, .3);
+    border: 1px solid rgba(0, 102, 161, .3);
+}
+
 #GoToPortalBtn {
     width: 188px;
 }
 #ManageSslCertBtn {
+    width: 188px;
+}
+#ExpandDiskBtn { 
     width: 188px;
 }
 #SelectCertBtn {
@@ -104,6 +112,8 @@ body {
 #UploadCertBtn {
     width: 155px;
 }
+
+
 
 #ButtonsDiv {
     width: 100%;
@@ -118,6 +128,21 @@ body {
     margin-top: 26px; 
 }
 
+#ConnectivityDiv {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    line-height: 0;
+    font-size: 14px;
+}
+.alive {
+    color: green;
+}
+
+.dead {
+    color: red;
+}
 #content {
     display: flex;
     align-items: center;
@@ -215,4 +240,20 @@ a:hover, a:active {
 #enroll-logs-header {
     display: flex;
     justify-content: space-between;
+}
+
+#ExpandDiskLabel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    line-height: 0;
+    font-size: 14px;
+}
+.success {
+    color: green;
+}
+
+.failure {
+    color: red;
 }

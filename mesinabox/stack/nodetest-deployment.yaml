@@ -25,6 +25,19 @@ spec:
       - name: nodetest
         image: dev.criticalmanufacturing.io/rita/kioskapp:1.0.1
         imagePullPolicy: Always
+        env:
+        - name: CUSTOMER_PORTAL_ADDRESS
+          value: "portalqa.criticalmanufacturing.dev"
+        - name: CUSTOMER_PORTAL_PORT
+          value: "443"
+        - name: SECURITY_PORTAL_ADRESS
+          value: "securityqa.criticalmanufacturing.dev"
+        - name: CLIENT_ID
+          value: "Applications"
+        - name: TENANT_NAME
+          value: "CustomerPortalQA"
+        - name: REGISTRY_ADDRESS
+          value: "dev.criticalmanufacturing.io"
         ports:
         - containerPort: 8081 
         securityContext:
@@ -32,9 +45,14 @@ spec:
         volumeMounts:
         - mountPath: "/opt/app-root/src/data"
           name: nodetest-volume
+        - name: pipe-volume
+          mountPath: /opt/app-root/src/pipe
       volumes:
-        - name: nodetest-volume
-          persistentVolumeClaim:
-           claimName: nodetest-pvc
+       - name: nodetest-volume
+         persistentVolumeClaim:
+          claimName: nodetest-pvc
+       - name: pipe-volume
+         hostPath:
+          path: /var/run            # Path on the host node containing the named pipe 
       restartPolicy: Always
       

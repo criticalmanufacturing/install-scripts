@@ -1,9 +1,9 @@
 const express = require('express');
+const { spawn } = require('child_process');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const forge = require('node-forge');
-const { spawn } = require('child_process');
 const app = express();
 const { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api } = require('@kubernetes/client-node');
 
@@ -24,18 +24,6 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   next(); // Pass control to the next middleware
 });
-
-// Middleware to set a timeout for requests
-function timeoutMiddleware(timeout) {
-  return function (req, res, next) {
-    req.setTimeout(timeout, () => {
-      const err = new Error('Request Timeout');
-      err.status = 408; // Request Timeout status code
-      next(err);
-    });
-    next();
-  };
-}
 
 // Set storage engine
 const storage = multer.diskStorage({
@@ -255,6 +243,8 @@ function sendEvent(res, type, data) {
   res.write(`data: ${JSON.stringify({ type, data })}\n\n`)
 }
 
+
+
 app.get('/enroll', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'enroll.html'));
 });
@@ -278,8 +268,24 @@ app.get('/enrollstart', (req, res) => {
     }
   });
 
+const appSettingsRaw = fs.readFileSync('./scriptAfterEnrollment/appsettings.json');
+let appSettings = JSON.parse(appSettingsRaw);
+
+// Set or override parameters dynamically
+appSettings.ClientConfiguration.HostAddress = `${process.env.CUSTOMER_PORTAL_ADDRESS}:${process.env.CUSTOMER_PORTAL_PORT}`
+appSettings.ClientConfiguration.ClientTenantName = process.env.TENANT_NAME;
+appSettings.ClientConfiguration.ClientId = process.env.CLIENT_ID;
+appSettings.ClientConfiguration.SecurityPortalBaseAddress = `https://${process.env.SECURITY_PORTAL_ADRESS}:${process.env.CUSTOMER_PORTAL_PORT}`;
+
+// Convert the modified settings back to JSON
+const updatedSettings = JSON.stringify(appSettings, null, 2);
+
+// Write the updated settings back to the appsettings.json file
+fs.writeFileSync('./scriptAfterEnrollment/appsettings.json', updatedSettings);
+
+
   // Spawn PowerShell script
-  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.dev.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
+  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
 
   // Handle stdout data
   powershell.stdout.on('data', (data) => {
@@ -319,9 +325,74 @@ app.get('/enrollstart', (req, res) => {
   });
 });
 
+
+const pipePath = "./pipe/resizeDiskPipe";
+const outputPath = "./pipe/output.txt";
+
+// API endpoint to execute script to expand disk space
+app.post('/expandDisk', (req, res) => {
+
+   // Open the FIFO in write mode
+   if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
+   const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
+
+   // Write the script content to the FIFO
+  fifoStream.write(script);
+
+  console.log('Script injected into FIFO for execution.');
+  fifoStream.close();
+
+    // Start listening for exit code
+
+    let timeout = 10000 //stop waiting after 10 seconds (something might be wrong)
+    const timeoutStart = Date.now()
+    const myLoop = setInterval(function () {
+        if (Date.now() - timeoutStart > timeout) {
+            clearInterval(myLoop);
+            res.status(408).send('Expand Disk: Operation timed out.')
+        } else {
+            //if output.txt exists, read it
+            if (fs.existsSync(outputPath)) {
+                clearInterval(myLoop);
+                const data = fs.readFileSync(outputPath).toString().trim()
+                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath) //delete the output file
+                if (data === '0') {
+                  res.status(200).send("The disk was expanded with success!");
+                } else {
+                  res.status(500).send("There was an issue while trying to expand the disk!");
+                }
+            }
+        }
+    }, 300);
+    
+    });
+
+const script = `
+largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
+
+pvdisplay "/dev/\${largest_disk_device}"
+
+if [ $? -ne 0 ]; then
+    pvcreate "/dev/\${largest_disk_device}"
+    echo "Physical volume created on /dev/\${largest_disk_device}"
+
+    vgcreate externalDiskVG "/dev/\${largest_disk_device}"
+    echo "Volume group externalDiskVG created"
+else
+    echo "Physical volume already exists on /dev/\${largest_disk_device}"
+fi
+
+pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
+`;
+
 // Serve index.html for root URL
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'index.html')); 
+});
+
+app.get('/api/config/portalAddress', (req, res) => {
+  const portalAddress = process.env.CUSTOMER_PORTAL_ADDRESS
+  res.json({ customerPortalAddress : portalAddress });
 });
 
 // API to fetch dynamic content
@@ -334,6 +405,37 @@ app.get('/api/content', async (req, res) => {
         res.status(500).send('Internal Server Error');
     }
 });
+
+app.get('/api/connectivity', async (req, res) => {
+
+  const registryAddress = `https://${process.env.REGISTRY_ADDRESS}` 
+  const portalAddress = `https://${process.env.CUSTOMER_PORTAL_ADDRESS}/api/ping`
+  const results = {};
+
+  function sendResponse(label,  isAlive) {
+    results[label] = isAlive;
+
+    if (Object.keys(results).length === 2) {
+        res.json(results);
+    }
+  }
+  
+  try {
+    const resp = await fetch(portalAddress, {signal: AbortSignal.timeout(500)});
+    sendResponse("portal", resp.ok)
+  } catch(e) {
+    sendResponse("portal", false)
+    console.error("Error occured:", e.message);   
+  }
+
+  try {
+    const resp = await fetch(registryAddress, {signal: AbortSignal.timeout(500)});
+    sendResponse("registry", resp.ok)
+  } catch(e) {
+    sendResponse("registry", false)
+    console.error("Error occured:", e.message);   
+  }
+})
 
 // Serve sslCert.html for /sslcert URL
 app.get('/sslcert', async (req, res) => {
