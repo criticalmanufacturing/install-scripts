@@ -18,18 +18,6 @@ const filePath = path.join(dataDirectory, installedAgentInfoFile);
 // Serve static files from the public directory
 app.use(express.static('public'));
 
-// Middleware to set a timeout for requests
-function timeoutMiddleware(timeout) {
-  return function (req, res, next) {
-    req.setTimeout(timeout, () => {
-      const err = new Error('Request Timeout');
-      err.status = 408; // Request Timeout status code
-      next(err);
-    });
-    next();
-  };
-}
-
 // Set storage engine
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
