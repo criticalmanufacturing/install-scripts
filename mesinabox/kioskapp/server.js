@@ -385,6 +385,7 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
       })
       .catch((error) => {
         console.error('An error occurred during secret creation or update:', error);
+        return;
       });
 
       try {

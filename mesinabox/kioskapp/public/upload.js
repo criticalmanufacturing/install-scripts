@@ -9,8 +9,21 @@ uploadBtn.innerText = uploadBtnBaseStr;
 
 let pollingInterval;
 let pollingTimeout;
+let pollingStatusTextInterval;
+
+let pollStatusText = null;
+
+const pollingTimeoutSeconds = 90;
 
 fileInput.addEventListener("change", updateFileDisplay);
+
+function createErrorMessage(errorMessage) {
+  const errorDiv = document.getElementById('uploadErrorMessage');
+  // Display error message
+  const text = document.createElement('p');
+  text.textContent = errorMessage;
+  errorDiv.appendChild(text);
+}
 
 function clearErrorMessages() {
   const errorDiv = document.getElementById('uploadErrorMessage');
@@ -73,31 +86,46 @@ document.getElementById('UploadCertificateForm').addEventListener('submit', asyn
     });
     const data = await response.json();
     if (!response.ok) {
-      switch (response.status) {
-        case 504:
-          throw new Error('504 Gateway Timeout');
-        default:
-          break;
+      if (response.status == 504) {
+        throw new Error('504 Gateway Timeout');
       }
       throw new Error(data.message);
     }
     
     uploadBtn.innerText = uploadBtnPollingStr;
 
+    const statusDiv = document.getElementById('uploadStatusMessage');
+    pollStatusText = document.createElement('p');
+    statusDiv.appendChild(pollStatusText);
+    pollStatusText.textContent = `Waiting up to ${pollingTimeoutSeconds} seconds for new domain to be up...`
+    let remainingTimeoutSeconds = pollingTimeoutSeconds;
+    pollingStatusTextInterval = setInterval(() => {
+      remainingTimeoutSeconds--;
+      pollStatusText.textContent = `Waiting up to ${remainingTimeoutSeconds} seconds for new domain to be up...`;
+      if (remainingTimeoutSeconds <= 0) {
+        clearInterval(pollingStatusTextInterval);
+      }
+    }, 1000);
+
     pollingInterval = setInterval(pingNewDomain, 2000, data.newDomain);
     pollingTimeout = setTimeout(() => {
       clearInterval(pollingInterval);
-      alert('Timeout while waiting for new domain to be up.\nForcing a redirect to the new domain');
-      window.location.href = `https://${data.newDomain}`;
-    }, 90000); // 90s timeout
+      let redirectTimeoutSecs = 5;
+      pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
+      const redirectInterval = setInterval(() => {
+        redirectTimeoutSecs--;
+        pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
+        if (redirectTimeoutSecs == 0) {
+          pollStatusText.textContent = `Redirecting...`
+          clearInterval(redirectInterval);
+          window.location.href = `https://${data.newDomain}`;
+        }
+      }, 1000);
+    }, pollingTimeoutSeconds * 1000);
 
   } catch (error) {
     clearErrorMessages();
-    const errorDiv = document.getElementById('uploadErrorMessage');
-    // Display error message
-    const text = document.createElement('p');
-    text.textContent = error.message;
-    errorDiv.appendChild(text);
+    createErrorMessage(error.message)
     uploadBtn.disabled = false;
     uploadBtn.innerText = uploadBtnBaseStr;
   }
