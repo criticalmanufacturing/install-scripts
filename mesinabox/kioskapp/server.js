@@ -1,9 +1,9 @@
 const express = require('express');
+const { spawn } = require('child_process');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const forge = require('node-forge');
-const { spawn } = require('child_process');
 const app = express();
 const { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api } = require('@kubernetes/client-node');
 
@@ -17,18 +17,6 @@ const filePath = path.join(dataDirectory, installedAgentInfoFile);
 
 // Serve static files from the public directory
 app.use(express.static('public'));
-
-// Middleware to set a timeout for requests
-function timeoutMiddleware(timeout) {
-  return function (req, res, next) {
-    req.setTimeout(timeout, () => {
-      const err = new Error('Request Timeout');
-      err.status = 408; // Request Timeout status code
-      next(err);
-    });
-    next();
-  };
-}
 
 // Set storage engine
 const storage = multer.diskStorage({
@@ -329,6 +317,66 @@ fs.writeFileSync('./scriptAfterEnrollment/appsettings.json', updatedSettings);
     closeConnectionTimer = setTimeout(() => res.end(), 2000);
   });
 });
+
+
+const pipePath = "./pipe/resizeDiskPipe";
+const outputPath = "./pipe/output.txt";
+
+// API endpoint to execute script to expand disk space
+app.post('/expandDisk', (req, res) => {
+
+   // Open the FIFO in write mode
+   if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
+   const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
+
+   // Write the script content to the FIFO
+  fifoStream.write(script);
+
+  console.log('Script injected into FIFO for execution.');
+  fifoStream.close();
+
+    // Start listening for exit code
+
+    let timeout = 10000 //stop waiting after 10 seconds (something might be wrong)
+    const timeoutStart = Date.now()
+    const myLoop = setInterval(function () {
+        if (Date.now() - timeoutStart > timeout) {
+            clearInterval(myLoop);
+            res.status(408).send('Expand Disk: Operation timed out.')
+        } else {
+            //if output.txt exists, read it
+            if (fs.existsSync(outputPath)) {
+                clearInterval(myLoop);
+                const data = fs.readFileSync(outputPath).toString().trim()
+                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath) //delete the output file
+                if (data === '0') {
+                  res.status(200).send("The disk was expanded with success!");
+                } else {
+                  res.status(500).send("There was an issue while trying to expand the disk!");
+                }
+            }
+        }
+    }, 300);
+    
+    });
+
+const script = `
+largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
+
+pvdisplay "/dev/\${largest_disk_device}"
+
+if [ $? -ne 0 ]; then
+    pvcreate "/dev/\${largest_disk_device}"
+    echo "Physical volume created on /dev/\${largest_disk_device}"
+
+    vgcreate externalDiskVG "/dev/\${largest_disk_device}"
+    echo "Volume group externalDiskVG created"
+else
+    echo "Physical volume already exists on /dev/\${largest_disk_device}"
+fi
+
+pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
+`;
 
 // Serve index.html for root URL
 app.get('/', (req, res) => {
