@@ -85,7 +85,7 @@ const waitForDeploymentReady = async (namespace, deploymentName) => {
 
       if (availableReplicas === desiredReplicas) {
         console.log(`Deployment ${deploymentName} is ready`);
-        deploymentReady = true;    
+        deploymentReady = true;
       } else {
         console.log(`Waiting for deployment ${deploymentName} to be ready...`);
         await new Promise(resolve => setTimeout(resolve, 5000)); // Wait for 5 seconds before checking again
@@ -101,7 +101,6 @@ const waitForDeploymentReady = async (namespace, deploymentName) => {
 // Update the Deployment
 const updateDeployment = async (deployment, secretName, namespace, deploymentName, domain) => {
   try {
-
     // Update environment variable
     const container = deployment.spec.template.spec.containers.find(container => container.name === 'router');
     const envVarIndex = container.env.findIndex(envVar => envVar.name === 'ROUTER_DOMAIN');
@@ -183,62 +182,62 @@ async function updateIngresses(newRouterDomain) {
 
 // Function to check if a file exists and read its content
 function readFileIfExists(filePath) {
-    return new Promise((resolve, reject) => {
-        fs.access(filePath, fs.constants.F_OK, async (err) => {
-            if (err) {
-                // File doesn't exist
-                console.log("Error  "+err);
-                resolve(false); // Resolve with false if the file doesn't exist
-            } else {
-                // File exists, read its content
-                fs.readFile(filePath, 'utf8',async (err, data) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        try {
-                            console.log(data);
-                            const jsonData = JSON.parse(data);
-                            const infra = jsonData.infra;
-                            console.log('Infra', infra);
-                            await listPods().then(namespace => {
-                                if (namespace) {
-                                    resolve(infra);
-                                } else {
-                                    resolve(false);
-                                }
-                            });
-                            
-                          } catch (parseError) {
-                            console.error('Error parsing JSON:', parseError);
-                            reject(parseError);
-                          }
-                        
-                    }
-                });
+  return new Promise((resolve, reject) => {
+    fs.access(filePath, fs.constants.F_OK, async (err) => {
+      if (err) {
+        // File doesn't exist
+        console.log("Error  " + err);
+        resolve(false); // Resolve with false if the file doesn't exist
+      } else {
+        // File exists, read its content
+        fs.readFile(filePath, 'utf8', async (err, data) => {
+          if (err) {
+            reject(err);
+          } else {
+            try {
+              console.log(data);
+              const jsonData = JSON.parse(data);
+              const infra = jsonData.infra;
+              console.log('Infra', infra);
+              await listPods().then(namespace => {
+                if (namespace) {
+                  resolve(infra);
+                } else {
+                  resolve(false);
+                }
+              });
+
+            } catch (parseError) {
+              console.error('Error parsing JSON:', parseError);
+              reject(parseError);
             }
+
+          }
         });
+      }
     });
+  });
 }
 
 async function listPods() {
-    try {
-        const response = await coreApi.listPodForAllNamespaces();
-        console.log('Pods:');
-        const podName = "edgesquidproxy";
-        const pods = response.body.items.filter(pod => pod.metadata.name.startsWith(podName));
-        console.log(pods);
-  
-        if (pods.length > 0) {
-            return pods[0].metadata.namespace;
-        } else {
-            return null;
-        }
-    } catch (err) {
-        console.error('Error:', err);
-        return null;
+  try {
+    const response = await coreApi.listPodForAllNamespaces();
+    console.log('Pods:');
+    const podName = "edgesquidproxy";
+    const pods = response.body.items.filter(pod => pod.metadata.name.startsWith(podName));
+    console.log(pods);
+
+    if (pods.length > 0) {
+      return pods[0].metadata.namespace;
+    } else {
+      return null;
     }
+  } catch (err) {
+    console.error('Error:', err);
+    return null;
   }
-  
+}
+
 function sendEvent(res, type, data) {
   res.write(`data: ${JSON.stringify({ type, data })}\n\n`)
 }
@@ -268,20 +267,20 @@ app.get('/enrollstart', (req, res) => {
     }
   });
 
-const appSettingsRaw = fs.readFileSync('./scriptAfterEnrollment/appsettings.json');
-let appSettings = JSON.parse(appSettingsRaw);
+  const appSettingsRaw = fs.readFileSync('./scriptAfterEnrollment/appsettings.json');
+  let appSettings = JSON.parse(appSettingsRaw);
 
-// Set or override parameters dynamically
-appSettings.ClientConfiguration.HostAddress = `${process.env.CUSTOMER_PORTAL_ADDRESS}:${process.env.CUSTOMER_PORTAL_PORT}`
-appSettings.ClientConfiguration.ClientTenantName = process.env.TENANT_NAME;
-appSettings.ClientConfiguration.ClientId = process.env.CLIENT_ID;
-appSettings.ClientConfiguration.SecurityPortalBaseAddress = `https://${process.env.SECURITY_PORTAL_ADRESS}:${process.env.CUSTOMER_PORTAL_PORT}`;
+  // Set or override parameters dynamically
+  appSettings.ClientConfiguration.HostAddress = `${process.env.CUSTOMER_PORTAL_ADDRESS}:${process.env.CUSTOMER_PORTAL_PORT}`
+  appSettings.ClientConfiguration.ClientTenantName = process.env.TENANT_NAME;
+  appSettings.ClientConfiguration.ClientId = process.env.CLIENT_ID;
+  appSettings.ClientConfiguration.SecurityPortalBaseAddress = `https://${process.env.SECURITY_PORTAL_ADRESS}:${process.env.CUSTOMER_PORTAL_PORT}`;
 
-// Convert the modified settings back to JSON
-const updatedSettings = JSON.stringify(appSettings, null, 2);
+  // Convert the modified settings back to JSON
+  const updatedSettings = JSON.stringify(appSettings, null, 2);
 
-// Write the updated settings back to the appsettings.json file
-fs.writeFileSync('./scriptAfterEnrollment/appsettings.json', updatedSettings);
+  // Write the updated settings back to the appsettings.json file
+  fs.writeFileSync('./scriptAfterEnrollment/appsettings.json', updatedSettings);
 
 
   // Spawn PowerShell script
@@ -309,7 +308,7 @@ fs.writeFileSync('./scriptAfterEnrollment/appsettings.json', updatedSettings);
       };
       // Convert the data object to a JSON string
       const jsonData = JSON.stringify(dataToWrite, null, 2);
-    
+
       // Write the JSON string to a file
       fs.writeFile(filePath, jsonData, 'utf8', (err) => {
         if (err) {
@@ -318,7 +317,7 @@ fs.writeFileSync('./scriptAfterEnrollment/appsettings.json', updatedSettings);
         }
       })
     }
-    
+
     // give it a safe buffer of time before we shut it down manually
     sendEvent(res, 'close', code);
     closeConnectionTimer = setTimeout(() => res.end(), 2000);
@@ -332,40 +331,44 @@ const outputPath = "./pipe/output.txt";
 // API endpoint to execute script to expand disk space
 app.post('/expandDisk', (req, res) => {
 
-   // Open the FIFO in write mode
-   if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
-   const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
+  // Open the FIFO in write mode
+  if (fs.existsSync(outputPath)) {
+    fs.unlinkSync(outputPath);
+  }
+  const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
 
-   // Write the script content to the FIFO
+  // Write the script content to the FIFO
   fifoStream.write(script);
 
   console.log('Script injected into FIFO for execution.');
   fifoStream.close();
 
-    // Start listening for exit code
+  // Start listening for exit code
 
-    let timeout = 10000 //stop waiting after 10 seconds (something might be wrong)
-    const timeoutStart = Date.now()
-    const myLoop = setInterval(function () {
-        if (Date.now() - timeoutStart > timeout) {
-            clearInterval(myLoop);
-            res.status(408).send('Expand Disk: Operation timed out.')
-        } else {
-            //if output.txt exists, read it
-            if (fs.existsSync(outputPath)) {
-                clearInterval(myLoop);
-                const data = fs.readFileSync(outputPath).toString().trim()
-                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath) //delete the output file
-                if (data === '0') {
-                  res.status(200).send("The disk was expanded with success!");
-                } else {
-                  res.status(500).send("There was an issue while trying to expand the disk!");
-                }
-            }
+  let timeout = 10000; //stop waiting after 10 seconds (something might be wrong)
+  const timeoutStart = Date.now();
+  const myLoop = setInterval(function () {
+    if (Date.now() - timeoutStart > timeout) {
+      clearInterval(myLoop);
+      res.status(408).send('Expand Disk: Operation timed out.');
+    } else {
+      //if output.txt exists, read it
+      if (fs.existsSync(outputPath)) {
+        clearInterval(myLoop);
+        const data = fs.readFileSync(outputPath).toString().trim();
+        if (fs.existsSync(outputPath)) {
+          fs.unlinkSync(outputPath); //delete the output file
         }
-    }, 300);
-    
-    });
+        if (data === '0') {
+          res.status(200).send("Disk successfully expanded!");
+        } else {
+          res.status(500).send("There was an issue while trying to expand the disk!");
+        }
+      }
+    }
+  }, 300);
+
+});
 
 const script = `
 largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
@@ -387,23 +390,23 @@ pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | 
 
 // Serve index.html for root URL
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html')); 
+  res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
 app.get('/api/config/portalAddress', (req, res) => {
-  const portalAddress = process.env.CUSTOMER_PORTAL_ADDRESS
-  res.json({ customerPortalAddress : portalAddress });
+  const portalAddress = process.env.CUSTOMER_PORTAL_ADDRESS;
+  res.json({ customerPortalAddress: portalAddress });
 });
 
 // API to fetch dynamic content
 app.get('/api/content', async (req, res) => {
-    try {
-        const content = await readFileIfExists(filePath);
-        res.send(content || false); // Send false if file does not exist
-    } catch (err) {
-        console.error('Error:', err);
-        res.status(500).send('Internal Server Error');
-    }
+  try {
+    const content = await readFileIfExists(filePath);
+    res.send(content || false); // Send false if file does not exist
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 app.get('/api/connectivity', async (req, res) => {
@@ -412,28 +415,21 @@ app.get('/api/connectivity', async (req, res) => {
   const portalAddress = `https://${process.env.CUSTOMER_PORTAL_ADDRESS}/api/ping`
   const results = {};
 
-  function sendResponse(label,  isAlive) {
-    results[label] = isAlive;
-
-    if (Object.keys(results).length === 2) {
-        res.json(results);
-    }
-  }
-  
   try {
-    const resp = await fetch(portalAddress, {signal: AbortSignal.timeout(500)});
-    sendResponse("portal", resp.ok)
-  } catch(e) {
-    sendResponse("portal", false)
-    console.error("Error occured:", e.message);   
-  }
+    // Execute the pings in parallel
+    const [portalResponse, registryResponse] = await Promise.allSettled([
+      fetch(portalAddress, { signal: AbortSignal.timeout(1000) }),
+      fetch(registryAddress, { signal: AbortSignal.timeout(1000) })
+    ]);
 
-  try {
-    const resp = await fetch(registryAddress, {signal: AbortSignal.timeout(500)});
-    sendResponse("registry", resp.ok)
-  } catch(e) {
-    sendResponse("registry", false)
-    console.error("Error occured:", e.message);   
+    // Process responses
+    results['portal'] = portalResponse.status === 'fulfilled' && portalResponse.value.ok;
+    results['registry'] = registryResponse.status === 'fulfilled' && registryResponse.value.ok;
+    res.json(results);
+    console.log(JSON.stringify(results));
+  } catch (error) {
+    console.error('Error during connectivity check:', error);
+    res.status(500).json({ error: 'An error occurred during connectivity check.' });
   }
 })
 
@@ -468,7 +464,7 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
     });
     let domain;
     if (domainNames.length > 0) {
-        domain = removeFirstPartOfDomain(domainNames[0]);
+      domain = removeFirstPartOfDomain(domainNames[0]);
     }
 
     const secretName = 'ssl-certificate-secret';
@@ -482,13 +478,13 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
     // otherwise the router restart will make the request fail with a 504 gateway timeout
     setTimeout(async () => {
       await createOrUpdateSecret(secretName, namespace, secretData)
-      .then(() => {
-        console.log('Secret creation or update completed successfully');
-      })
-      .catch((error) => {
-        console.error('An error occurred during secret creation or update:', error);
-        return;
-      });
+        .then(() => {
+          console.log('Secret creation or update completed successfully');
+        })
+        .catch((error) => {
+          console.error('An error occurred during secret creation or update:', error);
+          return;
+        });
 
       try {
         const deploymentNamespace = 'openshift-ingress';
@@ -501,7 +497,7 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
         console.log('An error occurred:', error);
       }
     }, 1000);
-    
+
     res.status(200).json({ message: 'Upload successful, updating domain...', newDomain: `${subdomain}.${domain}` });
   } catch (error) {
     console.log('Error:', error);
