@@ -77,13 +77,13 @@ async function pingNewDomain(newDomain) {
 function displayCertWaitingProgress() {
   const statusDiv = document.getElementById('uploadStatusMessage');
   pollStatusText = document.createElement('p');
-  pollStatusText.innerHTML = `Waiting up to ${pollingTimeoutSeconds} seconds for<br>new domain to be up...`
+  pollStatusText.innerHTML = `Waiting up to ${pollingTimeoutSeconds} seconds for<br>the new domain to be up...`
   statusDiv.appendChild(pollStatusText);
 
   let remainingTimeoutSeconds = pollingTimeoutSeconds;
   pollingStatusTextInterval = setInterval(() => {
     remainingTimeoutSeconds--;
-    pollStatusText.innerHTML = `Waiting up to ${remainingTimeoutSeconds} seconds for<br>new domain to be up...`;
+    pollStatusText.innerHTML = `Waiting up to ${remainingTimeoutSeconds} seconds for<br>the new domain to be up...`;
     if (remainingTimeoutSeconds <= 0) {
       clearInterval(pollingStatusTextInterval);
     }
@@ -94,11 +94,11 @@ function displayCertWaitingProgress() {
 function certTimeoutWaitingProgress(pollingInterval) {
   clearInterval(pollingInterval); // stop polling the new domain
   let redirectTimeoutSecs = 5;
-  pollStatusText.innerHTML = `Timed out waiting for new deployment to be up.<br>Redirecting in ${redirectTimeoutSecs} seconds...`
+  pollStatusText.innerHTML = `Timed out waiting for the new deployment <br>to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
 
   const redirectInterval = setInterval(() => {
     redirectTimeoutSecs--;
-    pollStatusText.innerHTML = `Timed out waiting for new deployment to be up.<br>Redirecting in ${redirectTimeoutSecs} seconds...`
+    pollStatusText.innerHTML = `Timed out waiting for the new deployment <br>to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
     if (redirectTimeoutSecs <= 0) {
       pollStatusText.textContent = `Redirecting...`
       clearInterval(redirectInterval); // stops the timeout messages from going negative trying to override this

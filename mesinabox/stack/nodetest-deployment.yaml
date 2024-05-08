@@ -38,6 +38,8 @@ spec:
           value: "CustomerPortalQA"
         - name: REGISTRY_ADDRESS
           value: "dev.criticalmanufacturing.io"
+        - name: CONNECTION_CHECK_TIMEOUT
+          value: "30000"
         ports:
         - containerPort: 8081 
         securityContext:

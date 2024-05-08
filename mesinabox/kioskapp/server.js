@@ -413,6 +413,8 @@ app.get('/api/agentInstalled', async (req, res) => {
   }
 });
 
+const connectivityCheckTimeout = parseInt(process.env.CONNECTION_CHECK_TIMEOUT) || 5000;
+
 app.get('/api/connectivity', async (req, res) => {
 
   const registryAddress = `https://${process.env.REGISTRY_ADDRESS}` 
@@ -422,8 +424,8 @@ app.get('/api/connectivity', async (req, res) => {
   try {
     // Execute the pings in parallel
     const [portalResponse, registryResponse] = await Promise.allSettled([
-      fetch(portalAddress, { signal: AbortSignal.timeout(1000) }),
-      fetch(registryAddress, { signal: AbortSignal.timeout(1000) })
+      fetch(portalAddress, { signal: AbortSignal.timeout(connectivityCheckTimeout) }),
+      fetch(registryAddress, { signal: AbortSignal.timeout(connectivityCheckTimeout) })
     ]);
 
     // Process responses

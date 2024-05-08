@@ -98,6 +98,12 @@ function testConnectivity() {
     })
     .catch(error => {
       console.error('Error fetching ping result:', error);
+      const customerPortalConnectivity = document.getElementById('customerPortalConnectivity');
+      customerPortalConnectivity.textContent = 'Connectivity Check Failed!';
+      customerPortalConnectivity.className = 'dead';
+      const registryConnectivity = document.getElementById('registryConnectivity');
+      registryConnectivity.textContent = '';
+      setOrUpdateGoToPortalButtonDisabled(true);
     })
     .finally(_ => {
       setTimeout(testConnectivity, 5000); // test again after 5 seconds
