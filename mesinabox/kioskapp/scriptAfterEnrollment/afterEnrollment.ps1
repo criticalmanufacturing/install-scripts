@@ -180,9 +180,9 @@ catch {
 
 if($error)
 {
-    Write-Error "The deployment appears to have failed. ErrorMessage: $error"
+    Write-Error "The Infrastructure Agent deployment appears to have failed. ErrorMessage: $error"
     exit 1 
-}else{
-    Write-Host "Stack deployed with Success!!"
+} else {
+    Write-Host "Infrastructure Agent deployed with success!"
 }
 
