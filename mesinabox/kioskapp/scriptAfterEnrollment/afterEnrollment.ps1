@@ -62,7 +62,8 @@ Write-Host " --------------------------------------- "
 
 $currentLocation = $PSScriptRoot
 Set-Location $currentLocation
-$SDKLocation = "$currentLocation/sdk"
+# $SDKLocation = "$currentLocation/sdk"
+$CmfPortalLocation = "$currentLocation/../node_modules/@criticalmanufacturing/portal/bin"
 
 # where will be saved the stack generated
 if ( -Not $Output) {
@@ -76,7 +77,7 @@ try {
     Write-Host "Importing PortalSDK..."
     Write-Host $PSVersionTable.PSVersion
     # Import SDK
-    . ./importSDK.ps1
+    # . ./importSDK.ps1
 }
 catch {
     Write-Error $_.Exception.Message
@@ -94,8 +95,8 @@ if ($PortalSDKAppSettingsPath) {
         exit 1
     }
     else {
-        Write-Host "Copying the AppSettings file... From: $PortalSDKAppSettingsPath | To: $SDKLocation/appsettings.json"
-        Copy-Item $PortalSDKAppSettingsPath -Destination "$SDKLocation/appsettings.json" -Force
+        Write-Host "Copying the AppSettings file... From: $PortalSDKAppSettingsPath | To: $CmfPortalLocation/appsettings.json"
+        Copy-Item $PortalSDKAppSettingsPath -Destination "$CmfPortalLocation/appsettings.json" -Force
         if ($error) {
             Write-Error "Failed copying the AppSettings file for PortalSDK. ExitCode: $LASTEXITCODE | $error"
             exit 1
@@ -106,7 +107,9 @@ if ($PortalSDKAppSettingsPath) {
 # Login using the PAT
  try {
     Write-Host "Using the specified Customer Portal PAT to login..."
-    Set-Login -PAT $PAT
+    # TODO: Cleanup
+    # Set-Login -PAT $PAT
+    Invoke-Expression "$CmfPortalLocation/cmf-portal login --token $PAT"
 }
 catch {
     Write-Error $_.Exception.Message
@@ -125,7 +128,8 @@ if (-Not $agentParamsFileExists) {
 try {
     Write-Host "Creating Infrastructure Agent..."
     $fullPath = Join-Path -Path $PSScriptRoot -ChildPath $AgentParametersPath
-    New-InfrastructureAgent -CustomerInfrastructureName $CustomerInfrastructureName -Name $AgentName -ParametersPath $fullPath -EnvironmentType $EnvironmentType -DeploymentTargetName $Target -OutputDir $Output -Description $Description
+    # New-InfrastructureAgent -CustomerInfrastructureName $CustomerInfrastructureName -Name $AgentName -ParametersPath $fullPath -EnvironmentType $EnvironmentType -DeploymentTargetName $Target -OutputDir $Output -Description $Description
+    Invoke-Expression "$CmfPortalLocation/cmf-portal deployagent -ci $CustomerInfrastructureName -n $AgentName -params $fullPath -type $EnvironmentType -trg $Target -o $Output -d $Description"
 }
 catch {
     Write-Error $_.Exception.Message

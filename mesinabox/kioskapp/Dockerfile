@@ -1,5 +1,5 @@
 # Install the application dependencies in a full UBI Node docker image
-FROM registry.access.redhat.com/ubi8/nodejs-20:latest as builder
+FROM registry.access.redhat.com/ubi9/nodejs-20:latest as builder
 
 # Configure workdir
 USER root
@@ -12,7 +12,7 @@ COPY package*.json ./
 RUN npm ci --only=production
 
 # Use a minimal nodejs image for the final target
-FROM registry.access.redhat.com/ubi8/nodejs-20-minimal:latest 
+FROM registry.access.redhat.com/ubi9/nodejs-20-minimal:latest 
 
 # Configure workdir
 USER root
@@ -35,8 +35,9 @@ ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/
 
 ### Install other packages that we need/can need
 ### TODO: do we need to install: dotnet, oc, wget, gzip
-RUN microdnf --nodocs install -y yum nano curl ca-certificates gzip && \
+RUN microdnf --nodocs install -y yum nano ca-certificates && \
     yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm && \
+    npm install @criticalmanufacturing/portal@latest --no-save \
     # curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
     # tar -xzf oc.tar.gz && \
     # mv oc /usr/local/bin/oc && \
