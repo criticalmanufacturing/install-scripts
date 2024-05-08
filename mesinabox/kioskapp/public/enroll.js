@@ -1,8 +1,8 @@
 const queryParams = new Proxy(new URLSearchParams(window.location.search), {
   get: (searchParams, prop) => searchParams.get(prop),
 });
-// Get the value of "infra" in eg "https://example.com/?infra=infraName&agent=agentName"
-let infraName = queryParams.infra;
+// Get the value of "infraId" in eg "https://example.com/?infraId=123&infraName=xptoInfraName&agent=agentName"
+let infraId = queryParams.infraId;
 const openInPortalButton = document.getElementById('OpenInfraPortalBtn');
 
 // Open Infra In Portal Button
@@ -11,7 +11,7 @@ fetch('/api/config/portalAddress')
   .then(data => {
     openInPortalButton.addEventListener('click', function (e) {
       console.log("'Open Infra In Portal' Button was clicked");
-      window.location.replace(`https://${data.customerPortalAddress}/Entity/CustomerInfrastructure/${encodeURIComponent(infraName)}/View/Details`);
+      window.location.replace(`https://${data.customerPortalAddress}/Entity/CustomerInfrastructure/${infraId}/View/Details`);
     });
   })
   .catch(error => {

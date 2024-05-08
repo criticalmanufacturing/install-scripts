@@ -1,4 +1,6 @@
 const clusterAddress = window.location.origin;
+let customerPortalAddress = null;
+
 const expandDiskButton = document.getElementById("ExpandDiskBtn");
 expandDiskButton.addEventListener("click", function () {
   fetch('/expandDisk', {
@@ -29,76 +31,48 @@ expandDiskButton.addEventListener("click", function () {
     });
 });
 
-// Function to create a button
-function createButton(portalAddress) {
-  const button = document.createElement('button');
-  button.className = 'cmf-btn-primary';
-  button.textContent = 'Go to Portal';
-  button.id = 'GoToPortalBtn';
-  button.addEventListener('click', () => {
-    window.location.replace(`https://${portalAddress}/DevOpsCenter/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
-    console.log("'Go To Portal' Button was clicked");
-  });
-  return button;
-}
-
-function infraAlreadyCreated(contentDiv, data) {
-  const checkmark = document.createElement('img');
-  checkmark.src = 'checked-checkbox-64.png';
-  contentDiv.appendChild(checkmark);
-  const text = document.createElement('p');
-  text.textContent = `The ${JSON.stringify(data, null, 2)} infrastructure already has an agent installed in this cluster.`
-  contentDiv.appendChild(text);
-}
-
-
-// Fetch dynamic content from the server
-fetch('/api/content')
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    return response.text();
-  })
-  .then(data => {
-    const contentDiv = document.getElementById('content');
-    const buttonContainer = document.getElementById('enrollButtonDiv');
-    console.log(data);
-
-    if (data === "false") {
-      fetch('/api/config/portalAddress')
-        .then(response => response.json())
-        .then(data => {
-          const customerPortalAddress = data.customerPortalAddress;
-          // File does not exist, show button
-          const button = createButton(customerPortalAddress);
-          button.textContent = 'Go to Portal';
-          buttonContainer.appendChild(button);
-        })
-        .catch(error => {
-          console.error('Error fetching data from API:', error);
-        });
-
-    } else {
-      // File exists, display content
-      infraAlreadyCreated(contentDiv, data);
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    document.getElementById('content').innerText = 'Error loading content';
-  });
-
-
 const btnManageSslCert = document.getElementById('ManageSslCertBtn');
 btnManageSslCert.addEventListener('click', function (e) {
   window.location = `/sslcert`;
   console.log("'Manage SSL Certificate' was clicked");
 });
 
+//#region Go To Portal button actions
+
+let goToPortalBtnIsDisabled = true; // start disabled, until connectivity works
+function setOrUpdateGoToPortalButtonDisabled(isDisabled) {
+  if (isDisabled != null) {
+    goToPortalBtnIsDisabled = isDisabled;
+  }
+  const GoToPortalBtn = document.getElementById('GoToPortalBtn');
+  if (GoToPortalBtn != null) {
+    GoToPortalBtn.disabled = goToPortalBtnIsDisabled;
+  }
+}
+
+// Function to create the "Go To Portal" button redirecting to portal depending if infra id exists or not
+function createGoToPortalButton(portalAddress, infraId) {
+  const button = document.createElement('button');
+  button.className = 'cmf-btn-primary';
+  button.textContent = 'Go to Portal';
+  button.id = 'GoToPortalBtn';
+  button.addEventListener('click', () => {
+    if (infraId != null) {
+      window.location.replace(`https://${portalAddress}/Entity/CustomerInfrastructure/${infraId}/View/Details`);
+    }
+    else {
+      window.location.replace(`https://${portalAddress}/DevOpsCenter/Enroll?cluster_uri=${encodeURIComponent(clusterAddress)}`);
+    }
+  });
+  button.disabled = goToPortalBtnIsDisabled;
+  return button;
+}
+
+//#endregion
+
 //#region Check Internet Connection to Portal and Registry
 
-// recursive function for testing connectivity
+// Recursive function for testing connectivity
 function testConnectivity() {
   fetch('/api/connectivity')
     .then(response => {
@@ -114,14 +88,13 @@ function testConnectivity() {
 
       // Update HTML content based on ping results
       const customerPortalConnectivity = document.getElementById('customerPortalConnectivity');
-      const GoToPortalBtn = document.getElementById('GoToPortalBtn');
       customerPortalConnectivity.textContent = isCustomerPortalReachable ? 'Customer Portal is reachable' : 'Customer Portal is unreachable';
       customerPortalConnectivity.className = isCustomerPortalReachable ? 'alive' : 'dead';
 
       const registryConnectivity = document.getElementById('registryConnectivity');
       registryConnectivity.textContent = isRegistryReachable ? 'Registry is reachable' : 'Registry is unreachable';
       registryConnectivity.className = isRegistryReachable ? 'alive' : 'dead';
-      GoToPortalBtn.disabled = !isRegistryReachable || !isCustomerPortalReachable;
+      setOrUpdateGoToPortalButtonDisabled(!isRegistryReachable || !isCustomerPortalReachable);
     })
     .catch(error => {
       console.error('Error fetching ping result:', error);
@@ -132,5 +105,65 @@ function testConnectivity() {
 }
 
 testConnectivity();
+
+//#endregion
+
+//#region Infrastructure Agent Already Installed Checks
+
+// Displays Infra Already installed message
+function infraAlreadyCreated(contentDiv, agentData) {
+  const text = document.createElement('p');
+  text.textContent = `The ${agentData.infraName} infrastructure already has an agent installed in this cluster.`
+  contentDiv.appendChild(text);
+}
+
+const portalAddrFetch = fetch('/api/config/portalAddress')
+    .then(response => response.json())
+    .then(portalAddrData => {
+      customerPortalAddress = portalAddrData.customerPortalAddress;
+      return portalAddrData;
+    })
+    .catch(error => {
+      console.error('Error fetching portal address from API: ', error);
+    });
+
+// Fetch agent installation from the server
+const agentStatusFetch = fetch('/api/agentInstalled')
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    return response.text();
+  })
+  .catch(error => {
+    console.error('Error fetching agent status from API: ', error);
+    document.getElementById('content').innerText = 'Error loading content';
+  });
+
+async function getInfrastructureStatus(params) {
+  const [portalAddrResponse, agentStatusResponse] = await Promise.allSettled([portalAddrFetch, agentStatusFetch]);
+  if (portalAddrResponse.status == "rejected" || agentStatusResponse.status == "rejected") {
+    return new Promise.reject();
+  }
+
+  const agentInstalledData = agentStatusResponse.value;
+  console.log(agentInstalledData);
+
+  let infraId = null; // If left null, the File with infra agent status does not exist, show Go To Portal Button that goes to Enroll Cluster
+
+  if (agentInstalledData !== "false") {
+    // File with infra agent status exists, display message and show button to infrastructure page
+    const contentDiv = document.getElementById('content');
+    const agentJsonData = JSON.parse(agentInstalledData);
+    infraId = agentJsonData.infraId;
+    infraAlreadyCreated(contentDiv, agentJsonData);
+  }
+  
+  // Generate GoToPortalButton
+  const button = createGoToPortalButton(customerPortalAddress, infraId);
+  const buttonContainer = document.getElementById('enrollButtonDiv');
+  buttonContainer.appendChild(button);
+}
+getInfrastructureStatus();
 
 //#endregion

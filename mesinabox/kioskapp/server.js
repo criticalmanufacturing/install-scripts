@@ -180,28 +180,31 @@ async function updateIngresses(newRouterDomain) {
   }
 }
 
-// Function to check if a file exists and read its content
-function readFileIfExists(filePath) {
+// Check if InfrastructureAgent status file exists and get its content
+function getInfraAgentIfInstalled(filePath) {
   return new Promise((resolve, reject) => {
     fs.access(filePath, fs.constants.F_OK, async (err) => {
       if (err) {
-        // File doesn't exist
+        // File doesn't exist - no agent was installed previously
         console.log("Error  " + err);
         resolve(false); // Resolve with false if the file doesn't exist
       } else {
-        // File exists, read its content
+        // Agent was installed previously
         fs.readFile(filePath, 'utf8', async (err, data) => {
           if (err) {
             reject(err);
           } else {
             try {
+              // Parse installed agent json data
               console.log(data);
               const jsonData = JSON.parse(data);
-              const infra = jsonData.infra;
-              console.log('Infra', infra);
-              await listPods().then(namespace => {
+              const infraName = jsonData.infraName;
+              const infraId = jsonData.infraId;
+              console.log('infraName', infraName);
+              console.log('infraId', infraId);
+              await tryGetInstalledAgentNamespace().then(namespace => {
                 if (namespace) {
-                  resolve(infra);
+                  resolve(JSON.stringify({infraName: infraName, infraId: infraId}));
                 } else {
                   resolve(false);
                 }
@@ -211,7 +214,6 @@ function readFileIfExists(filePath) {
               console.error('Error parsing JSON:', parseError);
               reject(parseError);
             }
-
           }
         });
       }
@@ -219,7 +221,8 @@ function readFileIfExists(filePath) {
   });
 }
 
-async function listPods() {
+// Returns the namespace of an existing EdgeSquidProxy pod, null if there is none. EdgeSquidProxy is only used in agents, so its asking for a installed agent's namespace.
+async function tryGetInstalledAgentNamespace() {
   try {
     const response = await coreApi.listPodForAllNamespaces();
     console.log('Pods:');
@@ -284,7 +287,7 @@ app.get('/enrollstart', (req, res) => {
 
 
   // Spawn PowerShell script
-  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infra, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
+  const powershell = spawn('pwsh', ['./scriptAfterEnrollment/afterEnrollment.ps1', req.query.pat, req.query.infraName, req.query.agent, "./as_agent_test_2_Development_parameters.json", "./appsettings.json", "OpenShiftOnPremisesTarget", "desc", "Development", ""]);
 
   // Handle stdout data
   powershell.stdout.on('data', (data) => {
@@ -304,7 +307,8 @@ app.get('/enrollstart', (req, res) => {
     console.log(`Script exited with code ${code}`);
     if (code === 0) {
       const dataToWrite = {
-        infra: req.query.infra
+        infraId: req.query.infraId,
+        infraName: req.query.infraName
       };
       // Convert the data object to a JSON string
       const jsonData = JSON.stringify(dataToWrite, null, 2);
@@ -398,11 +402,11 @@ app.get('/api/config/portalAddress', (req, res) => {
   res.json({ customerPortalAddress: portalAddress });
 });
 
-// API to fetch dynamic content
-app.get('/api/content', async (req, res) => {
+// API to fetch if agent is installed
+app.get('/api/agentInstalled', async (req, res) => {
   try {
-    const content = await readFileIfExists(filePath);
-    res.send(content || false); // Send false if file does not exist
+    const agentStatus = await getInfraAgentIfInstalled(filePath);
+    res.send(agentStatus || false); // Send false if file/agent does not exist
   } catch (err) {
     console.error('Error:', err);
     res.status(500).send('Internal Server Error');
