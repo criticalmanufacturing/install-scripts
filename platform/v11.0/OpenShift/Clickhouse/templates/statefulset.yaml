@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.name" . }}
+  labels:
+    {{- include "clickhouse.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "clickhouse.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clickhouse.labels" . | nindent 8 }}
+    spec:  
+      serviceAccountName: {{ include "clickhouse.name" . }}
+      securityContext:
+        runAsUser: 101
+        fsGroup: 101
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ .Values.image.repository }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - sed 's/id -g/id -gn/' /entrypoint.sh > /tmp/entrypoint.sh; exec bash /tmp/entrypoint.sh
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: {{ .Values.clickhouseData.pvcName }}
+            mountPath: /var/lib/clickhouse/
+          - name: {{ .Values.clickhouseLog.pvcName }}
+            mountPath: /var/log/clickhouse-server/
+          {{- if .Values.kafka.clientCredentials }}
+          - name: kafkasecrets
+            mountPath: {{ .Values.kafka.clientCredentials.credentialsLocation }}
+          {{- end }}
+          - name: clickhousesecrets
+            mountPath: /tmp/ClickHouseData/Certificates/Generic
+          - name: users
+            mountPath: /etc/clickhouse-server/users.d/users.xml
+            subPath: users.xml
+          - name: config
+            mountPath: /etc/clickhouse-server/config.d/config.xml
+            subPath: config.xml
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      {{- if .Values.kafka.clientCredentials }}  
+      - secret:
+          secretName: {{ .Values.kafka.clientCredentials.secretName }}  
+        name: kafkasecrets  
+      {{- end }}
+      - secret:
+          secretName: {{ .Values.clickhouse.secretName }}  
+        name: clickhousesecrets
+      - configMap:
+          items:
+          - key: users
+            path: users.xml
+          name: users
+        name: users
+      - configMap:
+          items:
+          - key: config
+            path: config.xml
+          name: config
+        name: config
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ .Values.clickhouseData.pvcName }}
+        labels:
+          {{- include "clickhouse.labels" . | nindent 10 }}
+      spec:
+        {{- with .Values.clickhouseData.accessModes }}
+        accessModes:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.clickhouseData.resources | nindent 10 }}
+        storageClassName: {{ default ("" | quote) .Values.clickhouseData.storageClassName }}
+        {{- if .Values.clickhouseData.volumeName }}
+        volumeName: {{ .Values.clickhouseData.volumeName }}
+        {{- end }}
+    - metadata:
+        name: {{ .Values.clickhouseLog.pvcName }}
+        labels:
+          {{- include "clickhouse.labels" . | nindent 10 }}
+      spec:
+        {{- with .Values.clickhouseLog.accessModes }}
+        accessModes:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.clickhouseLog.resources | nindent 10 }}
+        storageClassName: {{ default ("" | quote) .Values.clickhouseLog.storageClassName }}
+        {{- if .Values.clickhouseLog.volumeName }}
+        volumeName: {{ .Values.clickhouseLog.volumeName }}
+        {{- end }}
