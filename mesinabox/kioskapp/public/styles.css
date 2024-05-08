@@ -139,7 +139,6 @@ body {
 .alive {
     color: green;
 }
-
 .dead {
     color: red;
 }
@@ -190,7 +189,7 @@ a:hover, a:active {
     border-radius: 4px;
     padding: 0 8px;
     background: none;
-    font-size: 16px;
+    font-size: 14px;
 
     min-width: 96px;
     height: 36px;
@@ -198,17 +197,25 @@ a:hover, a:active {
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
 }
 /* Upload Status Message */
 #uploadStatusMessage p {
     margin-top: 15px;
     padding: 0 8px;
-    font-size: 16px;
+    font-size: 14px;
 
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
 }
+/* Upload File Preview */
+.preview p {
+    font-size: 14px;
+    text-align: center;
+}
+
 
 /* Installation Logs specific */
 .lightbox-big {
