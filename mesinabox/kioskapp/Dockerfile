@@ -14,7 +14,6 @@ RUN npm ci --only=production
 # Use a minimal nodejs image for the final target
 FROM registry.access.redhat.com/ubi9/nodejs-20-minimal:latest 
 
-# Configure workdir
 USER root
 EXPOSE 8081
 WORKDIR /opt/app-root/src
@@ -30,26 +29,21 @@ LABEL name="cmos" \
 ENV NODE_ENV=production \
     PORT=8081
 
-# Add licenses to this directory
+# Add licenses (required for Red Hat certification)
 ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/license.txt
 
-### Install other packages that we need/can need
-### TODO: do we need to install: dotnet, oc, wget, gzip
-RUN microdnf --nodocs install -y yum nano ca-certificates && \
-    yum -y install https://github.com/PowerShell/PowerShell/releases/download/v7.4.1/powershell-7.4.1-1.rh.x86_64.rpm && \
-    npm install @criticalmanufacturing/portal@latest --no-save \
-    # curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
-    # tar -xzf oc.tar.gz && \
-    # mv oc /usr/local/bin/oc && \
-    # rm oc.tar.gz &&\
-    yum clean all && \
+# Install ca-certificates, powershell and portal-sdk
+RUN curl -sSL -O https://packages.microsoft.com/config/rhel/9/packages-microsoft-prod.rpm && \
+    rpm -i packages-microsoft-prod.rpm && \
+    microdnf update && \
+    microdnf --nodocs install -y ca-certificates powershell && \
+    rm packages-microsoft-prod.rpm && \
     microdnf clean all && \
-    rm -rf /var/cache/dnf /var/cache/yum
+    rm -rf /var/cache/dnf
 
 # Copy necessary scripts
 COPY ./scriptAfterEnrollment/afterEnrollment.ps1 /opt/app-root
 COPY ./scriptAfterEnrollment/deployAgent.ps1 /opt/app-root
-COPY ./scriptAfterEnrollment/importSDK.ps1 /opt/app-root
 
 # Install app dependencies from node modules
 COPY --from=builder /opt/app-root/src/node_modules /opt/app-root/src/node_modules

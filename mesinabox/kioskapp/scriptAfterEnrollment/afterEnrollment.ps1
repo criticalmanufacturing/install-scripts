@@ -62,7 +62,6 @@ Write-Host " --------------------------------------- "
 
 $currentLocation = $PSScriptRoot
 Set-Location $currentLocation
-# $SDKLocation = "$currentLocation/sdk"
 $CmfPortalLocation = "$currentLocation/../node_modules/@criticalmanufacturing/portal/bin"
 
 # where will be saved the stack generated
@@ -74,17 +73,14 @@ $error.clear()
 
 # Download PortalSDK and import it
 try {
-    Write-Host "Importing PortalSDK..."
-    Write-Host $PSVersionTable.PSVersion
-    # Import SDK
-    # . ./importSDK.ps1
+    Write-Host "Downloading portal-sdk..."
+    Invoke-Expression "npm install @criticalmanufacturing/portal@latest --no-save"
 }
 catch {
     Write-Error $_.Exception.Message
     exit 1 
 }
 
-#Start-Sleep 10
 # Copy appsettings for PortalSDK, if specified
 Write-Host $PortalSDKAppSettingsPath
 $current = Get-Location
@@ -107,8 +103,6 @@ if ($PortalSDKAppSettingsPath) {
 # Login using the PAT
  try {
     Write-Host "Using the specified Customer Portal PAT to login..."
-    # TODO: Cleanup
-    # Set-Login -PAT $PAT
     Invoke-Expression "$CmfPortalLocation/cmf-portal login --token $PAT"
 }
 catch {
@@ -128,7 +122,6 @@ if (-Not $agentParamsFileExists) {
 try {
     Write-Host "Creating Infrastructure Agent..."
     $fullPath = Join-Path -Path $PSScriptRoot -ChildPath $AgentParametersPath
-    # New-InfrastructureAgent -CustomerInfrastructureName $CustomerInfrastructureName -Name $AgentName -ParametersPath $fullPath -EnvironmentType $EnvironmentType -DeploymentTargetName $Target -OutputDir $Output -Description $Description
     Invoke-Expression "$CmfPortalLocation/cmf-portal deployagent -ci $CustomerInfrastructureName -n $AgentName -params $fullPath -type $EnvironmentType -trg $Target -o $Output -d $Description"
 }
 catch {
