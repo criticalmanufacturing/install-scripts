@@ -1,12 +1,12 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: nodetest
-  namespace: nodetest
+  name: cmos
+  namespace: cmos
 spec:
    port:
     targetPort: 8081
    to:
     kind: Service 
-    name: nodetest
+    name: cmos
     weight: 10
