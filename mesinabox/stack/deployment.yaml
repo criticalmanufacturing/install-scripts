@@ -27,15 +27,15 @@ spec:
         imagePullPolicy: Always
         env:
         - name: CUSTOMER_PORTAL_ADDRESS
-          value: "portaldev.criticalmanufacturing.dev"
+          value: "portalqa.criticalmanufacturing.dev"
         - name: CUSTOMER_PORTAL_PORT
           value: "443"
         - name: SECURITY_PORTAL_ADRESS
-          value: "securitydev.criticalmanufacturing.dev"
+          value: "securityqa.criticalmanufacturing.dev"
         - name: CLIENT_ID
-          value: "MES"
+          value: "Applications"
         - name: TENANT_NAME
-          value: "CustomerPortalDEV"
+          value: "CustomerPortalQA"
         - name: REGISTRY_ADDRESS
           value: "dev.criticalmanufacturing.io"
         ports:
