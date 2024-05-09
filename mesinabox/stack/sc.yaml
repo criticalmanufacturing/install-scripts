@@ -4,7 +4,7 @@ metadata:
   name: nodetest
 parameters:
   csi.storage.k8s.io/fstype: xfs
-  topolvm.io/device-class: externalDiskVG
+  topolvm.io/device-class: externalDiskVolumeGroup
 provisioner: topolvm.io
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer

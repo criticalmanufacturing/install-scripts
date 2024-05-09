@@ -1,0 +1,12 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nodetest
+  namespace: nodetest
+spec:
+   port:
+    targetPort: 8081
+   to:
+    kind: Service 
+    name: nodetest
+    weight: 10
