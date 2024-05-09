@@ -137,16 +137,19 @@ const portalAddrFetch = fetch('/api/config/portalAddress')
 const agentStatusFetch = fetch('/api/agentInstalled')
   .then(response => {
     if (!response.ok) {
+      if (response.status == 404) {
+        return null;
+      }
       throw new Error('Network response was not ok');
     }
-    return response.text();
+    return response.json();
   })
   .catch(error => {
     console.error('Error fetching agent status from API: ', error);
     document.getElementById('content').innerText = 'Error loading content';
   });
 
-async function getInfrastructureStatus(params) {
+async function getInfrastructureStatus() {
   const [portalAddrResponse, agentStatusResponse] = await Promise.allSettled([portalAddrFetch, agentStatusFetch]);
   if (portalAddrResponse.status == "rejected" || agentStatusResponse.status == "rejected") {
     return new Promise.reject();
@@ -156,13 +159,11 @@ async function getInfrastructureStatus(params) {
 
   let infraId = null; // If left null, the File with infra agent status does not exist, show Go To Portal Button that goes to Enroll Cluster
 
-  if (agentInstalledData !== "{}") {
+  if (agentInstalledData != null) {
     // File with infra agent status exists, display message and show button to infrastructure page
-    const agentJsonData = JSON.parse(agentInstalledData);
-    infraId = agentJsonData.infraId;
-
+    infraId = agentInstalledData.infraId;
     const contentDiv = document.getElementById('content');
-    infraAlreadyCreated(contentDiv, agentJsonData);
+    infraAlreadyCreated(contentDiv, agentInstalledData);
   }
   
   // Generate GoToPortalButton
