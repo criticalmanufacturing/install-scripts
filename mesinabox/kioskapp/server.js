@@ -187,7 +187,7 @@ function getInfraAgentIfInstalled(filePath) {
       if (err) {
         // File doesn't exist - no agent was installed previously
         console.log("Error  " + err);
-        resolve(false); // Resolve with false if the file doesn't exist
+        resolve(JSON.stringify({})); // Resolve with empty object if the file doesn't exist
       } else {
         // Agent was installed previously
         fs.readFile(filePath, 'utf8', async (err, data) => {
@@ -206,7 +206,7 @@ function getInfraAgentIfInstalled(filePath) {
                 if (namespace) {
                   resolve(JSON.stringify({infraName: infraName, infraId: infraId}));
                 } else {
-                  resolve(false);
+                  resolve(JSON.stringify({}));
                 }
               });
 
@@ -406,14 +406,14 @@ app.get('/api/config/portalAddress', (req, res) => {
 app.get('/api/agentInstalled', async (req, res) => {
   try {
     const agentStatus = await getInfraAgentIfInstalled(filePath);
-    res.send(agentStatus || false); // Send false if file/agent does not exist
+    res.send(agentStatus || JSON.stringify({})); // Send empty object if file/agent does not exist
   } catch (err) {
     console.error('Error:', err);
     res.status(500).send('Internal Server Error');
   }
 });
 
-const connectivityCheckTimeout = parseInt(process.env.CONNECTION_CHECK_TIMEOUT) || 5000;
+const connectivityCheckTimeout = parseInt(process.env.CONNECTION_CHECK_TIMEOUT) || 30000;
 
 app.get('/api/connectivity', async (req, res) => {
 

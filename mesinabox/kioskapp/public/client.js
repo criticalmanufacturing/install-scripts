@@ -153,15 +153,15 @@ async function getInfrastructureStatus(params) {
   }
 
   const agentInstalledData = agentStatusResponse.value;
-  console.log(agentInstalledData);
 
   let infraId = null; // If left null, the File with infra agent status does not exist, show Go To Portal Button that goes to Enroll Cluster
 
-  if (agentInstalledData !== "false") {
+  if (agentInstalledData !== "{}") {
     // File with infra agent status exists, display message and show button to infrastructure page
-    const contentDiv = document.getElementById('content');
     const agentJsonData = JSON.parse(agentInstalledData);
     infraId = agentJsonData.infraId;
+
+    const contentDiv = document.getElementById('content');
     infraAlreadyCreated(contentDiv, agentJsonData);
   }
   
