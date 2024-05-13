@@ -168,7 +168,7 @@ try {
     Write-Host "Deploying agent..."
    
     # deploy agent
-    . ./deployAgent.ps1 -AgentName $AgentName -DeploymentScriptPath $deployStackToKubernetesPath
+    . ./deployAgent.ps1 -AgentName $AgentName -DeploymentScriptPath $deployStackToKubernetesPath -CmfPortalLocation $CmfPortalLocation
 }
 catch {
     Write-Error $_.Exception.Message

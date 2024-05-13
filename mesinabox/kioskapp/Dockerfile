@@ -32,12 +32,18 @@ ENV NODE_ENV=production \
 # Add licenses (required for Red Hat certification)
 ADD  https://dev.criticalmanufacturing.io/repository/http/license.txt /licenses/license.txt
 
-# Install ca-certificates, powershell and portal-sdk
-RUN curl -sSL -O https://packages.microsoft.com/config/rhel/9/packages-microsoft-prod.rpm && \
+# Install ca-certificates, oc, powershell and portal-sdk
+RUN microdnf --nodocs install -y nano gzip && \
+    curl -SLO https://packages.microsoft.com/config/rhel/9/packages-microsoft-prod.rpm && \
+    curl -SLO https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz && \
     rpm -i packages-microsoft-prod.rpm && \
+    tar -xzf oc.tar.gz && \
+    mv oc /usr/local/bin/oc && \
     microdnf update && \
     microdnf --nodocs install -y ca-certificates powershell && \
     rm packages-microsoft-prod.rpm && \
+    rm oc.tar.gz README.md kubectl && \
+    microdnf remove -y gzip && \
     microdnf clean all && \
     rm -rf /var/cache/dnf
 
