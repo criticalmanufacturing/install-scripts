@@ -1,0 +1,23 @@
+cat <<EOF > /etc/init.d/startup_script.sh
+#!/bin/bash
+
+while [ -z "$HOST_IP" ]; do
+    HOST_IP="https://cmos-cmos.apps.$(ip addr show $(ip link | grep DEFAULT | grep -v 'ovn\|br\|cni\|ovs\|lo' | awk '{print $2}' | tr -d ':') | grep -oP 'inet \K[\d.]+').nip.io"
+    sleep 1 
+done
+
+echo "Detected Host IP: $HOST_IP"
+
+echo " _____ _____ _____    _____ __    _____ _____ _____ _____ _____ _____ "
+echo "|  _  |  _  |  _  |  |  _  |  |  |  _  |_   _|   __|     | __  |     |"
+echo "|     |   __|   __|  |   __|  |__|     | | | |   __|  |  |    -| | | |"
+echo "|__|__|__|  |__|     |__|  |_____|__|__| |_| |__|  |_____|__|__|_|_|_|"
+echo ""
+echo "Open $HOST_IP to continue the installation process"
+EOF
+
+# Set execute permissions for the startup script
+chmod +x /etc/init.d/startup_script.sh
+
+# Configure the startup script to run at boot
+update-rc.d startup_script.sh defaults
