@@ -38,8 +38,7 @@ data:
             <sasl_username>{{ .Values.kafka.sasl.username }}</sasl_username>
             <sasl_password>{{ .Values.kafka.sasl.password }}</sasl_password>
         </kafka>
-        {{- end }}
-        {{- if .Values.clientCredentials }}
+        {{- else if .Values.kafka.clientCredentials }}
         <kafka>
             <security_protocol>SSL</security_protocol>
             <ssl_ca_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}root.crt</ssl_ca_location>
