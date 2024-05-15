@@ -4,7 +4,6 @@ metadata:
   labels:
     app.kubernetes.io/name: cmos
     app.kubernetes.io/instance: cmos
-    #app.kubernetes.io/version: 11.0.0
   name: cmos
   namespace: cmos
 spec:
@@ -17,13 +16,12 @@ spec:
       labels:
         app.kubernetes.io/name: cmos
         app.kubernetes.io/instance: cmos
-        #app.kubernetes.io/version: 11.0.0
         app.kubernetes.io/managed-by: devopscenter.criticalmanufacturing
         devopscenter.criticalmanufacturing/version: "1"
     spec:
       containers:
       - name: cmos
-        image: dev.criticalmanufacturing.io/rita/kioskapp:1.0.1
+        image: dev.criticalmanufacturing.io/rita/kioskapp:0.0.2
         imagePullPolicy: Always
         env:
         - name: CUSTOMER_PORTAL_ADDRESS
