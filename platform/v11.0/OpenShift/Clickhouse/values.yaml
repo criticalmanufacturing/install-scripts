@@ -37,8 +37,9 @@ service:
     name: nativetls
 
 # Route
-route:
+ingress:
   name: clickhouse
+  hostSuffix: .apps.rhostest.criticalmanufacturing.dev
 
 # Volumes
 clickhouseData:
