@@ -55,6 +55,5 @@ data:
         <logger>
             <level>Warning</level>
             <console>1</console>
-            <formatting>json</formatting>
         </logger>
     </clickhouse>
