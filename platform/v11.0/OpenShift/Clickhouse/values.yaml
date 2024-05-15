@@ -63,10 +63,13 @@ clickhouseLog:
 # Config maps
 usersConfig:
   name: users
-  defaultPassword: qaz123WSX
+  defaultPassword: P@$$w0rd
 
 clickhouseConfig:
   name: config
+  openSSL:
+    verificationMode: None
+    invalidCertificateHandler: AcceptCertificateHandler
 
 # Secrets
 kafka:  
@@ -78,6 +81,7 @@ kafka:
     # When using AMQ Streams the user can specify the cluster CA location, client certificate location, client key location
     # secretName: "secrets"
     # credentialsLocation: /tmp/ClickHouseData/Certificates/Kafka/
+    # sslEndpointIdentificationAlgorithm: none
 
 clickhouse:
   secretName: clickhouse-secrets

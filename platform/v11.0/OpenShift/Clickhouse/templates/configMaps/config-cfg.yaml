@@ -14,7 +14,7 @@ data:
                 <caConfig>/tmp/ClickHouseData/Certificates/Generic/root.crt</caConfig>
                 <privateKeyFile>/tmp/ClickHouseData/Certificates/Generic/server.key</privateKeyFile>
                 <certificateFile>/tmp/ClickHouseData/Certificates/Generic/server.crt</certificateFile>
-                <verificationMode>none</verificationMode>
+                <verificationMode>{{ .Values.clickhouseConfig.openSSL.verificationMode }}</verificationMode>
                 <cacheSessions>true</cacheSessions>
                 <disableProtocols>sslv2,sslv3</disableProtocols>
                 <preferServerCiphers>true</preferServerCiphers>
@@ -25,9 +25,9 @@ data:
                 <cacheSessions>true</cacheSessions>
                 <disableProtocols>sslv2,sslv3</disableProtocols>
                 <preferServerCiphers>true</preferServerCiphers>
-                <verificationMode>none</verificationMode>
+                <verificationMode>{{ .Values.clickhouseConfig.openSSL.verificationMode }}</verificationMode>
                 <invalidCertificateHandler>
-                    <name>AcceptCertificateHandler</name>
+                    <name>{{ .Values.clickhouseConfig.openSSL.invalidCertificateHandler }}</name>
                 </invalidCertificateHandler>
             </client>
         </openSSL>
@@ -44,7 +44,7 @@ data:
             <ssl_ca_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}root.crt</ssl_ca_location>
             <ssl_certificate_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.crt</ssl_certificate_location>
             <ssl_key_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.key</ssl_key_location>
-            <ssl_endpoint_identification_algorithm>none</ssl_endpoint_identification_algorithm>
+            <ssl_endpoint_identification_algorithm>{{ .Values.kafka.clientCredentials.sslEndpointIdentificationAlgorithm }}</ssl_endpoint_identification_algorithm>
         </kafka>
         {{- end }}
         <http_port>0</http_port>

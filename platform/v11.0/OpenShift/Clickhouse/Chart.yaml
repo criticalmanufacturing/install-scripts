@@ -1,6 +1,6 @@
 apiVersion: v2
 name: clickhouse
-description: Critical Manufacturing ClickHouse
+description: Critical Manufacturing ClickHouse Template
 
 # A chart can be either an 'application' or a 'library' chart.
 #
