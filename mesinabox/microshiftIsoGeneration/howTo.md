@@ -38,6 +38,7 @@
         - Clone install-scripts repository into Rhel VM
             - `git clone https://github.com/criticalmanufacturing/install-scripts.git`
         - Copy files from mesinabox/stack in this repo to the following directory edge-demos/demos/microshift-disconnected/files/manifests/cmos
+        - Based on the content present in [this file](https://github.com/traefik/traefik/blob/v2.10/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml), create a yaml file for each resource in the cmos folder. 
         - Copy cmos-config.j2 file from microshiftIsoGeneration folder to the following directory edge-demos/demos/microshift-disconnected/templates.
         - Delete the install-scripts folder.
     - Move again to the `edge-demos/demos/microshift-disconnected`.
