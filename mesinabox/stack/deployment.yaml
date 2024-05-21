@@ -2,28 +2,26 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app.kubernetes.io/name: nodetest
-    app.kubernetes.io/instance: nodetest
-    #app.kubernetes.io/version: 11.0.0
-  name: nodetest
-  namespace: nodetest
+    app.kubernetes.io/name: cmos
+    app.kubernetes.io/instance: cmos
+  name: cmos
+  namespace: cmos
 spec:
   replicas: 1 # to be checked
   selector:
     matchLabels:
-      app.kubernetes.io/name: nodetest
+      app.kubernetes.io/name: cmos
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: nodetest
-        app.kubernetes.io/instance: nodetest
-        #app.kubernetes.io/version: 11.0.0
+        app.kubernetes.io/name: cmos
+        app.kubernetes.io/instance: cmos
         app.kubernetes.io/managed-by: devopscenter.criticalmanufacturing
         devopscenter.criticalmanufacturing/version: "1"
     spec:
       containers:
-      - name: nodetest
-        image: dev.criticalmanufacturing.io/rita/kioskapp:1.0.1
+      - name: cmos
+        image: dev.criticalmanufacturing.io/criticalmanufacturing/cmos:1.0.0
         imagePullPolicy: Always
         env:
         - name: CUSTOMER_PORTAL_ADDRESS
@@ -46,13 +44,13 @@ spec:
           privileged: true
         volumeMounts:
         - mountPath: "/opt/app-root/src/data"
-          name: nodetest-volume
+          name: cmos-volume
         - name: pipe-volume
           mountPath: /opt/app-root/src/pipe
       volumes:
-       - name: nodetest-volume
+       - name: cmos-volume
          persistentVolumeClaim:
-          claimName: nodetest-pvc
+          claimName: cmos-pvc
        - name: pipe-volume
          hostPath:
           path: /var/run            # Path on the host node containing the named pipe 
