@@ -362,7 +362,6 @@ const readFifoOutput = (res, callback) => {
         if (fs.existsSync(outputPath)) {
           fs.unlinkSync(outputPath); //delete the output file
         }
-        console.log("data ", data);
         callback(data);
       }
     }
@@ -393,7 +392,7 @@ app.post('/expandDisk', async (req, res) => {
             res.status(200).send("System is restarting. Refresh it in 1 minute.");
             await writeToFifo(pipePath, restartMicroshiftService);
           } else {
-            res.status(500).send("There was an issue while trying to expand the disk! 2");
+            res.status(500).send("There was an issue while trying to expand the disk!");
           }})
       }
     })

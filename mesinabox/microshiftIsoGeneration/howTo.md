@@ -1,6 +1,7 @@
 # How to generate Microshift ISO
 
-1. Get [RHEL 9 Binary DVD .iso](https://access.redhat.com/downloads/content/rhel).
+To follow this guide, a Red Hat subscription is required. 
+1. Get [RHEL 9 Binary DVD .iso](https://access.redhat.com/downloads/content/rhel). 
 2. Create the VM.
     
     - This VM needs to be created with the following requirements:
