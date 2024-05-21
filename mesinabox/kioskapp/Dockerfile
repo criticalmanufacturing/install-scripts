@@ -39,7 +39,7 @@ RUN microdnf --nodocs install -y nano gzip && \
     rpm -i packages-microsoft-prod.rpm && \
     tar -xzf oc.tar.gz && \
     mv oc /usr/local/bin/oc && \
-    microdnf update && \
+    microdnf update -y && \
     microdnf --nodocs install -y ca-certificates powershell && \
     rm packages-microsoft-prod.rpm && \
     rm oc.tar.gz README.md kubectl && \

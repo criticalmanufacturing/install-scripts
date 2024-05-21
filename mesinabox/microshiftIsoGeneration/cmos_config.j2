@@ -1,0 +1,115 @@
+mkdir -p /etc/cmos
+mkfifo /etc/cmos/pipe
+cat > /etc/cmos/execpipe.sh << 'EOF'
+#!/bin/bash
+
+while true; do
+   eval "$(cat /etc/cmos/pipe)"
+   echo $? > /etc/cmos/output.txt
+done
+
+EOF
+
+chmod +x /etc/cmos/execpipe.sh
+
+cat > /etc/systemd/system/pipe_listener.service << 'EOF'
+
+[Unit]
+Description= Pipe Listener Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/etc/cmos/execpipe.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+sudo systemctl enable pipe_listener
+sudo systemctl start pipe_listener
+
+cat >  /etc/microshift/lvmd.yaml.default << 'EOF'
+device-classes:
+ - name: default
+   volume-group: rhel
+   spare-gb: 0
+   default: true
+ - name: externalDiskVG
+   volume-group: externalDiskVG
+   spare-gb: 0
+
+EOF
+
+# Update issue service
+
+cat > /etc/systemd/system/update-issue.service << 'EOF'
+
+[Unit]
+Description=Update /etc/issue with VM greeting
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/etc/cmos/issue_script.sh
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+
+cat > /etc/cmos/issue_script.sh << 'EOF'
+#!/bin/bash
+
+while [ -z "$HOST_IP" ]; do
+    HOST_IP=$(ip addr show $(ip link | grep DEFAULT | grep -v 'ovn\|br\|cni\|ovs\|lo' | awk '{print $2}' | tr -d ':') | grep -oP 'inet \K[\d.]+')
+    sleep 1
+done
+CMOS_ADDR="https://cmos-cmos.apps.$HOST_IP.nip.io"
+
+cat << INNER_EOF > /etc/issue
+
+\S
+Kernel \r on an \m
+
+Detected Host IP: $HOST_IP
+
+ _____ _____ _____    _____ __    _____ _____ _____ _____ _____ _____
+|  _  |  _  |  _  |  |  _  |  |  |  _  |_   _|   __|     | __  |     |
+|     |   __|   __|  |   __|  |__|     | | | |   __|  |  |    -| | | |
+|__|__|__|  |__|     |__|  |_____|__|__| |_| |__|  |_____|__|__|_|_|_|
+
+Open $CMOS_ADDR to continue the installation process
+
+INNER_EOF
+
+EOF
+
+chmod +x /etc/cmos/issue_script.sh
+
+
+cat > /etc/cmos/allow_init_write_to_etc_issue.te << 'EOF'
+
+
+module allow_init_write_to_etc_issue 1.0;
+
+require {
+    type etc_t;
+    type init_t;
+    class file write;
+}
+
+#============= init_t ==============
+allow init_t etc_t:file write;
+
+EOF
+
+sudo checkmodule -M -m -o /etc/cmos/allow_init_write_to_etc_issue.mod /etc/cmos/allow_init_write_to_etc_issue.te
+sudo semodule_package -o /etc/cmos/allow_init_write_to_etc_issue.pp -m /etc/cmos/allow_init_write_to_etc_issue.mod
+sudo semodule -i /etc/cmos/allow_init_write_to_etc_issue.pp
+
+sudo systemctl enable update-issue.service
+sudo systemctl start update-issue.service

@@ -14,6 +14,8 @@ kubeConfig.loadFromDefault();
 const dataDirectory = '/opt/app-root/src/data';
 const installedAgentInfoFile = 'installedAgentInfo.json'
 const filePath = path.join(dataDirectory, installedAgentInfoFile);
+const pipePath = "./pipe/pipe";
+const outputPath = "./pipe/output.txt";
 
 // Serve static files from the public directory
 app.use(express.static('public'));
@@ -241,6 +243,21 @@ async function tryGetInstalledAgentNamespace() {
   }
 }
 
+// Helper function to write to the FIFO and handle closing
+const writeToFifo = async (fifoPath, content) => {
+  return new Promise((resolve, reject) => {
+    const fifoStream = fs.createWriteStream(fifoPath, { flags: 'a' });
+    fifoStream.write(content, (err) => {
+      if (err) {
+        reject(err);
+      } else {
+        console.log('Script injected into FIFO for execution.');
+        fifoStream.end(resolve);
+      }
+    });
+  });
+};
+
 function sendEvent(res, type, data) {
   res.write(`data: ${JSON.stringify({ type, data })}\n\n`)
 }
@@ -328,29 +345,11 @@ app.get('/enrollstart', (req, res) => {
   });
 });
 
+// Function to read fifo output file
+const readFifoOutput = (res, callback) => {
 
-const pipePath = "./pipe/resizeDiskPipe";
-const outputPath = "./pipe/output.txt";
-
-// API endpoint to execute script to expand disk space
-app.post('/expandDisk', (req, res) => {
-
-  // Open the FIFO in write mode
-  if (fs.existsSync(outputPath)) {
-    fs.unlinkSync(outputPath);
-  }
-  const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
-
-  // Write the script content to the FIFO
-  fifoStream.write(script);
-
-  console.log('Script injected into FIFO for execution.');
-  fifoStream.close();
-
-  // Start listening for exit code
-
-  let timeout = 10000; //stop waiting after 10 seconds (something might be wrong)
-  const timeoutStart = Date.now();
+  let timeout = 10000 //stop waiting after 10 (something might be wrong)
+  const timeoutStart = Date.now()
   const myLoop = setInterval(function () {
     if (Date.now() - timeoutStart > timeout) {
       clearInterval(myLoop);
@@ -363,32 +362,66 @@ app.post('/expandDisk', (req, res) => {
         if (fs.existsSync(outputPath)) {
           fs.unlinkSync(outputPath); //delete the output file
         }
-        if (data === '0') {
-          res.status(200).send("Disk successfully expanded!");
-        } else {
-          res.status(500).send("There was an issue while trying to expand the disk!");
-        }
+        callback(data);
       }
     }
   }, 300);
+}
+
+// API endpoint to execute script to expand disk space
+app.post('/expandDisk', async (req, res) => {
+
+  // Open the FIFO in write mode
+  if (fs.existsSync(outputPath)) {
+    fs.unlinkSync(outputPath);
+  }
+  await writeToFifo(pipePath, checkIfDiskExists);
+  readFifoOutput(res, async (output) => {
+      if (output === '0') {
+        await writeToFifo(pipePath, expandScript);
+        readFifoOutput(res, async(output) => {
+          if (output === '0') {
+            res.status(200).send("Disk successfully expanded!");
+          } else {
+            res.status(500).send("There was an issue while trying to expand the disk!");
+          }})
+      } else {
+       await writeToFifo(pipePath, createPVScript);
+       readFifoOutput(res, async (output) => {
+          if (output === '0') {
+            res.status(200).send("System is restarting. Refresh it in 1 minute.");
+            await writeToFifo(pipePath, restartMicroshiftService);
+          } else {
+            res.status(500).send("There was an issue while trying to expand the disk!");
+          }})
+      }
+    })
+  
 
 });
 
-const script = `
+
+
+const checkIfDiskExists = `
 largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
 
 pvdisplay "/dev/\${largest_disk_device}"
+`
 
-if [ $? -ne 0 ]; then
-    pvcreate "/dev/\${largest_disk_device}"
+const createPVScript = `
+largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
+
+pvcreate "/dev/\${largest_disk_device}"
     echo "Physical volume created on /dev/\${largest_disk_device}"
 
-    vgcreate externalDiskVG "/dev/\${largest_disk_device}"
+    vgcreate externalDiskVolumeGroup "/dev/\${largest_disk_device}"
     echo "Volume group externalDiskVG created"
-else
-    echo "Physical volume already exists on /dev/\${largest_disk_device}"
-fi
+    mv /etc/microshift/lvmd.yaml.default /etc/microshift/lvmd.yaml
+`
 
+const restartMicroshiftService =  `systemctl restart microshift` 
+
+const expandScript = `
 pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
 `;
 
