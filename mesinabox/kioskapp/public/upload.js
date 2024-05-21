@@ -2,9 +2,9 @@ const fileInput = document.querySelector("#sslCertPicker");
 const filePreview = document.querySelector(".preview");
 const uploadBtn = document.getElementById('UploadCertBtn');
 
-const uploadBtnBaseStr =      'Upload Certificate';
+const uploadBtnBaseStr = 'Upload Certificate';
 const uploadBtnUploadingStr = 'Uploading...';
-const uploadBtnPollingStr =   'Waiting for Domain';
+const uploadBtnPollingStr = 'Waiting for Domain';
 uploadBtn.innerText = uploadBtnBaseStr;
 
 let pollingInterval;
@@ -59,31 +59,31 @@ function updateFileDisplay() {
 async function pingNewDomain(newDomain) {
   const fullDomain = `https://${newDomain}`
   fetch(fullDomain)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error("Response not ok", {cause: response});
-    }
-    clearTimeout(pollingTimeout);
-    clearInterval(pollingInterval);
-    window.location.href = fullDomain;
-  })
-  .catch(error => {
-    // Handle errors (e.g., network issues, server errors)
-    console.error('Error checking domain availability:', error);
-  });
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Response not ok", { cause: response });
+      }
+      clearTimeout(pollingTimeout);
+      clearInterval(pollingInterval);
+      window.location.href = fullDomain;
+    })
+    .catch(error => {
+      // Handle errors (e.g., network issues, server errors)
+      console.error('Error checking domain availability:', error);
+    });
 }
 
 // Display the seconds remaining until timeout, decreasing every second
 function displayCertWaitingProgress() {
   const statusDiv = document.getElementById('uploadStatusMessage');
   pollStatusText = document.createElement('p');
-  pollStatusText.textContent = `Waiting up to ${pollingTimeoutSeconds} seconds for new domain to be up...`
+  pollStatusText.innerHTML = `Waiting up to ${pollingTimeoutSeconds} seconds for<br>the new domain to be up...`
   statusDiv.appendChild(pollStatusText);
-  
+
   let remainingTimeoutSeconds = pollingTimeoutSeconds;
   pollingStatusTextInterval = setInterval(() => {
     remainingTimeoutSeconds--;
-    pollStatusText.textContent = `Waiting up to ${remainingTimeoutSeconds} seconds for new domain to be up...`;
+    pollStatusText.innerHTML = `Waiting up to ${remainingTimeoutSeconds} seconds for<br>the new domain to be up...`;
     if (remainingTimeoutSeconds <= 0) {
       clearInterval(pollingStatusTextInterval);
     }
@@ -94,11 +94,11 @@ function displayCertWaitingProgress() {
 function certTimeoutWaitingProgress(pollingInterval) {
   clearInterval(pollingInterval); // stop polling the new domain
   let redirectTimeoutSecs = 5;
-  pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
+  pollStatusText.innerHTML = `Timed out waiting for the new deployment <br>to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
 
   const redirectInterval = setInterval(() => {
     redirectTimeoutSecs--;
-    pollStatusText.textContent = `Timed out waiting for new deployment to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
+    pollStatusText.innerHTML = `Timed out waiting for the new deployment <br>to be up. Redirecting in ${redirectTimeoutSecs} seconds...`
     if (redirectTimeoutSecs <= 0) {
       pollStatusText.textContent = `Redirecting...`
       clearInterval(redirectInterval); // stops the timeout messages from going negative trying to override this
@@ -125,7 +125,7 @@ document.getElementById('UploadCertificateForm').addEventListener('submit', asyn
       }
       throw new Error(data.message);
     }
-    
+
     uploadBtn.innerText = uploadBtnPollingStr;
 
     pollingInterval = setInterval(pingNewDomain, 2000, data.newDomain);
