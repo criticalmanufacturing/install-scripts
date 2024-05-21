@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: cmos
-        image: dev.criticalmanufacturing.io/rita/kioskapp:0.0.2
+        image: dev.criticalmanufacturing.io/criticalmanufacturing/cmos:1.0.0
         imagePullPolicy: Always
         env:
         - name: CUSTOMER_PORTAL_ADDRESS
