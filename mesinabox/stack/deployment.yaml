@@ -53,6 +53,6 @@ spec:
           claimName: cmos-pvc
        - name: pipe-volume
          hostPath:
-          path: /var/run            # Path on the host node containing the named pipe 
+          path: /etc/cmos          # Path on the host node containing the named pipe 
       restartPolicy: Always
       
