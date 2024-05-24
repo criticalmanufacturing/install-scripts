@@ -32,6 +32,8 @@ To follow this guide, a Red Hat subscription is required.
         - `ansible-vault create vars/secrets.yml`
         - Then add the variable microshift_pull_secret in that file with the right value and then save it.
             - `microshift_pull_secret: '<YOUR PULL SECRET>'`
+    - Set the following variables in edge-demos/demos/microshift-disconnected/vars/main.yml to false.
+            - usb_automation, usb_content_create, kiosk_automation.
     - Create CMOS App.
         - Clone install-scripts repository into Rhel VM
             - `git clone https://github.com/criticalmanufacturing/install-scripts.git`
