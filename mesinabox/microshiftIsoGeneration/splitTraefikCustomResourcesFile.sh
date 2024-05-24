@@ -3,7 +3,7 @@
 # GitHub file URL
 github_url="https://raw.githubusercontent.com/traefik/traefik/v2.10/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml"
 
-output_dir="edge-demos/demos/microshift-disconnected/files/manifests/traefikresources"
+output_dir="$HOME/edge-demos/demos/microshift-disconnected/files/manifests/traefikresources"
 
 curl -sS "$github_url" -o "temp.yml"
 
