@@ -4,7 +4,7 @@ metadata:
   name: cmos
 parameters:
   csi.storage.k8s.io/fstype: xfs
-  topolvm.io/device-class: externalDiskVolumeGroup
+  topolvm.io/device-class: externalDiskVG
 provisioner: topolvm.io
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer

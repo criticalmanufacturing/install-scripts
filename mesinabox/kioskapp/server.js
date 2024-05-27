@@ -378,7 +378,7 @@ app.post('/expandDisk', async (req, res) => {
   await writeToFifo(pipePath, checkIfDiskExists);
   readFifoOutput(res, async (output) => {
       if (output === '0') {
-        await writeToFifo(pipePath, expandScript);
+        await writeToFifo(pipePath, expandExternalDiskAndFileSystemScript);
         readFifoOutput(res, async(output) => {
           if (output === '0') {
             res.status(200).send("Disk successfully expanded!");
@@ -400,9 +400,9 @@ app.post('/expandDisk', async (req, res) => {
 
 });
 
-
-
 const checkIfDiskExists = `
+lvextend -L+30G /dev/mapper/rhel-root
+xfs_growfs /
 largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
 
 pvdisplay "/dev/\${largest_disk_device}"
@@ -412,16 +412,13 @@ const createPVScript = `
 largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
 
 pvcreate "/dev/\${largest_disk_device}"
-    echo "Physical volume created on /dev/\${largest_disk_device}"
-
-    vgcreate externalDiskVolumeGroup "/dev/\${largest_disk_device}"
-    echo "Volume group externalDiskVG created"
-    mv /etc/microshift/lvmd.yaml.default /etc/microshift/lvmd.yaml
+vgcreate externalDiskVG "/dev/\${largest_disk_device}"
+cp /etc/microshift/lvmd.yaml.default /etc/microshift/lvmd.yaml
 `
 
 const restartMicroshiftService =  `systemctl restart microshift` 
 
-const expandScript = `
+const expandExternalDiskAndFileSystemScript = `
 pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
 `;
 
