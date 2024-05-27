@@ -5,7 +5,6 @@ To follow this guide, a Red Hat subscription is required.
 2. Create the VM.
     
     - This VM needs to be created with the following requirements:
-
         - Generation 2 to support newer virtualization features.
         - Network is connected to the default virtual switch or another virtual switch that has external connectivity.
         - A 100 GB or larger virtual disk.
@@ -19,10 +18,8 @@ To follow this guide, a Red Hat subscription is required.
         - `dnf install -y ansible-core`
     -  Download the infra.osbuild Ansible collection.
         - `ansible-galaxy collection install -f git+https://github.com/redhat-cop/infra.osbuild --upgrade ` 
-    - Clone the repo
-        - `git clone https://github.com/luisarizmendi/edge-demos`
-    - Move to the `edge-demos/demos/microshift-disconnected` directory
-    - Remove all the directories located in edge-demos/demos/microshift-disconnected/files/manifests. Currently, this folder contains only example projects. 
+    - Clone install-scripts repository into Rhel VM and navigate into edge-demos/demos/microshift-disconnected. 
+        - `git clone https://github.com/criticalmanufacturing/install-scripts.git`
     - Modify the Ansible inventory file.
         - Change ansible_host to the VM IP. It is possible to find it through `hostname -I`
         - Change ansible_user and ansible_become_password to the current VM user data.
@@ -32,14 +29,9 @@ To follow this guide, a Red Hat subscription is required.
         - `ansible-vault create vars/secrets.yml`
         - Then add the variable microshift_pull_secret in that file with the right value and then save it.
             - `microshift_pull_secret: '<YOUR PULL SECRET>'`
-    - Set the following variables in edge-demos/demos/microshift-disconnected/vars/main.yml to false.
-
-         - usb_automation, usb_content_create, kiosk_automation.
     - Create CMOS App.
-        - Clone install-scripts repository into Rhel VM
-            - `git clone https://github.com/criticalmanufacturing/install-scripts.git`
-        - Create cmos folder in edge-demos/demos/microshift-disconnected/files/manifests and copy yaml files from mesinabox/stack in this repo to it. 
-        - Run the splitTraefikCustomResourcesFile script, that is in install-scripts/mesinabox/microshiftIsoGeneration folder, to create individual files for each Traefik CRD resources.
+        - Create cmos folder in edge-demos/demos/microshift-disconnected/files/manifests and copy yaml files from mesinabox/stack into it. 
+        - Run the splitTraefikCustomResourcesFile script, that is in mesinabox/microshiftIsoGeneration folder, to create individual files for each Traefik CRD resources.
         - Copy cmos_config.j2 file from microshiftIsoGeneration folder to the following directory edge-demos/demos/microshift-disconnected/templates.
         - Delete the install-scripts folder.
     - Move again to the `edge-demos/demos/microshift-disconnected`.
@@ -51,7 +43,6 @@ To follow this guide, a Red Hat subscription is required.
     - Access the address that is presented at the end of the command execution and download the ISO.
 
 4. After the Microshift ISO is ready to download, download it and mount a VM with it.
-
 
 ## Known Issues
 
