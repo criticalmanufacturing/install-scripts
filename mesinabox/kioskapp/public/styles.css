@@ -286,13 +286,9 @@ a:hover, a:active {
 }
 
 #ProxyForm {
-    /* display:grid;
-    grid-template-columns: max-content 1fr;
-    grid-gap:5px; */
     display: grid;
     gap: 10px;
     grid-template-columns: max-content 1fr;
-    /* align-items: ; */
 }
 #ProxyForm label {
     text-align:right;
@@ -301,7 +297,6 @@ a:hover, a:active {
     margin-right: 0px;
 }
 #ProxyForm input {
-    /* width: 100%; */
     box-sizing: border-box;
     margin-left: 5px;
     font-size: 16px;
@@ -310,23 +305,14 @@ a:hover, a:active {
     grid-column: 2;
     width: calc(100% - 20px);
 }
-/* #ProxyForm div {
-    text-align: left;
-} */
 #ProxyForm input[type="checkbox"] {
     width: 20px;
     height: 20px;
 }
-/* #proxyUserDiv, #proxyPassDiv {
-    grid-column: 2;
-    display: none;
-    grid-column: span 2;
-} */
 #ProxyForm #BtnDiv {
     display: flex;
     grid-column: span 2;
     justify-content: center;
-    /* justify-content: right; */
     margin-top: 25px;
 }
 #proxyFeedbackMessage {
