@@ -1,4 +1,7 @@
 const express = require('express');
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
 const { spawn } = require('child_process');
 const multer = require('multer');
 const path = require('path');
@@ -6,6 +9,9 @@ const fs = require('fs');
 const forge = require('node-forge');
 const app = express();
 const { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api } = require('@kubernetes/client-node');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+
+//#region Init / Constants
 
 // Initialize Kubernetes/OpenShift configuration
 const kubeConfig = new KubeConfig();
@@ -15,7 +21,8 @@ const dataDirectory = '/opt/app-root/src/data';
 const installedAgentInfoFile = 'installedAgentInfo.json'
 const filePath = path.join(dataDirectory, installedAgentInfoFile);
 const pipePath = "./pipe/pipe";
-const outputPath = "./pipe/output.txt";
+const pipeOutputPath = "./pipe/output.txt";
+const proxyFilePath = path.join(dataDirectory, 'proxyInfo.json');
 
 // Serve static files from the public directory
 app.use(express.static('public'));
@@ -51,6 +58,37 @@ const appsApi = kubeConfig.makeApiClient(AppsV1Api);
 const coreApi = kubeConfig.makeApiClient(CoreV1Api);
 const networkingApi = kubeConfig.makeApiClient(NetworkingV1Api);
 
+const registryAddress = `https://${process.env.REGISTRY_ADDRESS}`;
+const portalAddress = `https://${process.env.CUSTOMER_PORTAL_ADDRESS}/api/ping`;
+
+const edgeSquidProxyDeploymentName = "edgesquidproxy";
+
+//#endregion
+
+//#region Proxy Configs
+
+let currentProxyConfigs = {
+  // basic proxy info
+  address: null,
+  port: null,
+  useAuth: null,
+  user: null,
+  password: null,
+  // computed urls created from the basic info
+  hostAddress: null,
+  hostAddressEscaped: null,
+  fullAuth: null,
+  fullAuthEscaped: null,
+  fullProxyAddr: null,
+  fullProxyAddrEscaped: null,
+  authProxyRequestHeader: null
+};
+
+let httpsAgent = null; // HttpsProxyAgent
+
+//#endregion
+
+//#region Upload Certificate
 
 // Fetch the Deployment
 const fetchDeployment = async (deploymentNamespace, deploymentName) => {
@@ -182,6 +220,10 @@ async function updateIngresses(newRouterDomain) {
   }
 }
 
+//#endregion
+
+//#region Infra Agent Status
+
 // Check if InfrastructureAgent status file exists and get its content
 function getInfraAgentIfInstalled(filePath) {
   return new Promise((resolve, reject) => {
@@ -228,8 +270,7 @@ async function tryGetInstalledAgentNamespace() {
   try {
     const response = await coreApi.listPodForAllNamespaces();
     console.log('Pods:');
-    const podName = "edgesquidproxy";
-    const pods = response.body.items.filter(pod => pod.metadata.name.startsWith(podName));
+    const pods = response.body.items.filter(pod => pod.metadata.name.startsWith(edgeSquidProxyDeploymentName));
     console.log(pods);
 
     if (pods.length > 0) {
@@ -242,6 +283,10 @@ async function tryGetInstalledAgentNamespace() {
     return null;
   }
 }
+
+//#endregion
+
+//#region Expand Disk
 
 // Helper function to write to the FIFO and handle closing
 const writeToFifo = async (fifoPath, content) => {
@@ -258,18 +303,393 @@ const writeToFifo = async (fifoPath, content) => {
   });
 };
 
-function sendEvent(res, type, data) {
-  res.write(`data: ${JSON.stringify({ type, data })}\n\n`)
+// Function to read fifo output file
+const readFifoOutput = (res, callback, timeoutToThrow) => {
+  let timeout = timeoutToThrow ?? 10000; //stop waiting after 10 (something might be wrong)
+  const timeoutStart = Date.now();
+  const myLoop = setInterval(function () {
+    if (Date.now() - timeoutStart > timeout) {
+      clearInterval(myLoop);
+      if (res != null) {
+        res.status(408).send('Inserted Pipe Instructions: Operation timed out.');
+      } else {
+        throw new Error('Inserted Pipe Instructions: Operation timed out.');
+      }
+    } else {
+      //if output.txt exists, read it
+      if (fs.existsSync(pipeOutputPath)) {
+        clearInterval(myLoop);
+        const data = fs.readFileSync(pipeOutputPath).toString().trim();
+        if (fs.existsSync(pipeOutputPath)) {
+          fs.unlinkSync(pipeOutputPath); //delete the output file
+        }
+        callback(data);
+      }
+    }
+  }, 300);
 }
 
+const checkIfDiskExists = `
+largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
 
+pvdisplay "/dev/\${largest_disk_device}"
+`;
 
+const createPVScript = `
+largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
+
+pvcreate "/dev/\${largest_disk_device}"
+    echo "Physical volume created on /dev/\${largest_disk_device}"
+
+    vgcreate externalDiskVolumeGroup "/dev/\${largest_disk_device}"
+    echo "Volume group externalDiskVG created"
+    mv /etc/microshift/lvmd.yaml.default /etc/microshift/lvmd.yaml
+`;
+
+const restartMicroshiftService =  `systemctl restart microshift` 
+
+const expandScript = `
+pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
+`;
+
+//#endregion
+
+//#region Proxy Update
+
+// Validates that the information on the proxy input is valid
+function validateProxyInput(newProxyConfig) {
+  if ( !( (newProxyConfig.address && newProxyConfig.port) || (!newProxyConfig.address && !newProxyConfig.port) ) ) { // If one is defined but the other isn't
+    return 'Proxy adress and port need to be both defined to set a proxy, or none should be set to remove it';
+  }
+  if (!newProxyConfig.address && !newProxyConfig.port) { // basic proxy info "falsy"
+    if (newProxyConfig.useAuth && (newProxyConfig.user || newProxyConfig.password)) {
+      return 'Proxy authentication should only be set if address and port are also set';
+    }
+  } else { // basic proxy set
+    if (newProxyConfig.useAuth && (!newProxyConfig.user != !newProxyConfig.password)) { // If one is defined but the other isn't
+      return 'Proxy username and password need to be both defined to set authentication, or none should be set to remove it';
+    } 
+    if (newProxyConfig.useAuth && (!newProxyConfig.user && !newProxyConfig.password)) { // useAuth true but no auth defined
+      return 'Proxy username and password need to be both defined to set authentication';
+    }
+  }
+  return null;
+}
+
+function calculateProxyFullUrl() {
+  if (!currentProxyConfigs.address && !currentProxyConfigs.port) {
+    clearCurrentProxyFullUrl();
+    return;
+  }
+
+  const escapingChars = {
+    '@': "\\@",
+    '\\': "\\\\"
+  };
+  currentProxyConfigs.hostAddress = `${currentProxyConfigs.address}:${currentProxyConfigs.port}`;
+  currentProxyConfigs.hostAddressEscaped = currentProxyConfigs.hostAddress.replace(/[\\]/g, m => escapingChars[m]); // escapes \ -> \\
+
+  const proxyOptions = new URL(`http://${currentProxyConfigs.hostAddress}`);
+
+  if (currentProxyConfigs.useAuth) {
+    currentProxyConfigs.fullAuth = `${currentProxyConfigs.user}:${currentProxyConfigs.password}`;
+    currentProxyConfigs.fullAuthEscaped = currentProxyConfigs.fullAuth.replace(/[@\\]/g, m => escapingChars[m]); // escapes @ -> \@ && \-> \\
+    currentProxyConfigs.authProxyRequestHeader = 'Basic ' + Buffer.from(currentProxyConfigs.fullAuth).toString('base64');
+
+    currentProxyConfigs.fullProxyAddr = `http://${currentProxyConfigs.fullAuth}@${currentProxyConfigs.hostAddress}`;
+    currentProxyConfigs.fullProxyAddrEscaped = `http://${currentProxyConfigs.fullAuthEscaped}@${currentProxyConfigs.hostAddressEscaped}`;
+    
+    proxyOptions.username = currentProxyConfigs.user;
+    proxyOptions.password = currentProxyConfigs.password;
+  } else {
+    currentProxyConfigs.fullProxyAddr = `http://${currentProxyConfigs.hostAddress}`;
+    currentProxyConfigs.fullProxyAddrEscaped = `http://${currentProxyConfigs.hostAddressEscaped}`;
+    
+    currentProxyConfigs.fullAuth = null;
+    currentProxyConfigs.fullAuthEscaped = null;
+    currentProxyConfigs.authProxyRequestHeader = null;
+  }
+  
+  httpsAgent = new HttpsProxyAgent(proxyOptions);
+}
+
+function clearCurrentProxyFullUrl() {
+  currentProxyConfigs.hostAddress = null;
+  currentProxyConfigs.hostAddressEscaped = null;
+  currentProxyConfigs.fullAuth = null;
+  currentProxyConfigs.fullAuthEscaped = null;
+  currentProxyConfigs.fullProxyAddr = null;
+  currentProxyConfigs.fullProxyAddrEscaped = null;
+  currentProxyConfigs.authProxyRequestHeader = null;
+
+  httpsAgent = null;
+}
+
+// Update the Agent proxy variables if it already exists or create/remove them
+async function updateAgentProxy() {
+  try {
+    const namespace = await tryGetInstalledAgentNamespace();
+    if (!namespace) {
+      console.log("No namespace for agent detected, skipping updateAgentProxy!")
+      return;
+    }
+    const deployment = await fetchDeployment(namespace, edgeSquidProxyDeploymentName);
+
+    // Update environment variables
+    const container = deployment.spec.template.spec.containers.find(container => container.name.startsWith(edgeSquidProxyDeploymentName));
+    if (container == null) {
+      console.error("Attempted to update proxy of agent, but unable to find agent container.");
+      return;
+    }
+    
+    const httpProxyEnvVarIndex = container.env.findIndex(envVar => envVar.name === 'HTTP_PROXY');
+    const httpsProxyEnvVarIndex = container.env.findIndex(envVar => envVar.name === 'HTTPS_PROXY');
+    const noProxyEnvVarIndex = container.env.findIndex(envVar => envVar.name === 'NO_PROXY');
+    if (!currentProxyConfigs.address) { // no address = remove proxy
+      if (httpProxyEnvVarIndex !== -1) {
+        container.env.splice(httpProxyEnvVarIndex, 1);
+      }
+      if (httpsProxyEnvVarIndex !== -1) {
+        container.env.splice(httpsProxyEnvVarIndex, 1);
+      }
+      if (noProxyEnvVarIndex !== -1) {
+        container.env.splice(noProxyEnvVarIndex, 1);
+      }
+    } else {
+      if (httpProxyEnvVarIndex !== -1) {
+        container.env[httpProxyEnvVarIndex].value = currentProxyConfigs.fullProxyAddrEscaped;
+      } else {
+        container.env.push({ name: 'HTTP_PROXY', value: fullProxyAddrEscaped });
+      }
+      if (httpsProxyEnvVarIndex !== -1) {
+        container.env[httpsProxyEnvVarIndex].value = fullProxyAddrEscaped;
+      } else {
+        container.env.push({ name: 'HTTPS_PROXY', value: fullProxyAddrEscaped });
+      }
+      if (noProxyEnvVarIndex !== -1) {
+        container.env[noProxyEnvVarIndex].value = "localhost,127.0.0.1";
+      } else {
+        container.env.push({ name: 'NO_PROXY', value: "localhost,127.0.0.1" });
+      }
+    }
+
+    await appsApi.replaceNamespacedDeployment(edgeSquidProxyDeploymentName, namespace, deployment);
+  } catch (error) {
+    console.error('Error updating Agent Deployment:', error);
+  }
+}
+
+// Function to update proxy settings - at first on this pod to make pings go through the proxy, and then on the whole network. (proxy on this pod may then have to be reverted after network restart)
+async function updateProxy() {
+  await updateAgentProxy();
+
+  // Open the FIFO in write mode
+  if (fs.existsSync(pipeOutputPath)) {
+    fs.unlinkSync(pipeOutputPath);
+  }
+  // Open the FIFO in write mode
+  if (fs.existsSync(pipeOutputPath)) {
+    fs.unlinkSync(pipeOutputPath);
+  }
+  const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
+
+  let proxyCommands;
+
+  // Write the script content to the FIFO
+  if (!currentProxyConfigs.address) { // no address = remove proxy
+    const deleteProxyScript = proxyCommands = `
+    echo -n "" > /etc/environment
+    unset http_proxy
+    unset https_proxy
+    unset no_proxy
+    
+    mkdir -p /etc/systemd/system/crio.service.d/
+    mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
+    echo -n "" > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf
+    echo -n "" > /etc/systemd/system/crio.service.d/00-proxy.conf
+    systemctl daemon-reload
+    systemctl restart rpm-ostreed.service
+    systemctl restart crio
+    systemctl restart microshift
+    `;
+    
+    fifoStream.write(deleteProxyScript);
+  } else {
+    const createOrUpdateProxyScript = proxyCommands = `
+    echo "http_proxy=${currentProxyConfigs.fullProxyAddrEscaped}" > /etc/environment
+    echo "https_proxy=${currentProxyConfigs.fullProxyAddrEscaped}" >> /etc/environment
+    echo "no_proxy=localhost,127.0.0.1" >> /etc/environment
+    source /etc/environment
+
+    mkdir -p /etc/systemd/system/crio.service.d/
+    mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
+    
+    cat > /etc/systemd/system/crio.service.d/00-proxy.conf <<EOF
+    [Service]
+    Environment=NO_PROXY="localhost,127.0.0.1"
+    Environment=HTTP_PROXY="${currentProxyConfigs.fullProxyAddrEscaped}"
+    Environment=HTTPS_PROXY="${currentProxyConfigs.fullProxyAddrEscaped}"
+    EOF
+    
+    cat > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf <<EOF
+    [Service]
+    Environment="http_proxy=${currentProxyConfigs.fullProxyAddrEscaped}"
+    EOF
+    
+    systemctl daemon-reload
+    systemctl restart rpm-ostreed.service
+    systemctl restart crio
+    systemctl restart microshift
+    `;
+    
+    fifoStream.write(createOrUpdateProxyScript);
+  }
+
+  console.log(`${!currentProxyConfigs.address ? "Delete Proxy":"Create Proxy"} script injected into FIFO for execution.`);
+  fifoStream.close();
+
+  await writeToFifo(pipePath, proxyCommands);
+  readFifoOutput(undefined, async (output) => {
+    if (output === '0') {
+      console.log(`Proxy settings updated. New proxy: ${currentProxyConfigs.fullProxyAddr}`);
+      return;
+    } else {
+      console.error('Update Proxy: There was an issue while trying to change the proxy configuration.');
+    }
+  }, 300000); // 5 minute script timeout
+}
+
+async function makeProxydGet(url, proxyHost, proxyPort, proxyAuth) {
+  return new Promise ((resolve, reject) => {
+    let req;
+    const urlParsed = new URL(url);
+    if (currentProxyConfigs.address) {
+      if (urlParsed.protocol == 'https:') {
+        // console.log("https w/ proxy");
+        req = https.get(url, {agent: httpsAgent, timeout: connectivityCheckTimeout});
+      } else {
+        // console.log("http w/ proxy");
+        const options = {
+          host: currentProxyConfigs.address,
+          port: currentProxyConfigs.port,
+          path: url,
+          timeout: connectivityCheckTimeout,
+          headers: {
+            Host: urlParsed.host
+          }
+        };
+        if (currentProxyConfigs.fullAuth) {
+          options.headers['Proxy-Authorization'] = currentProxyConfigs.authProxyRequestHeader;
+        }
+        req = http.get(options);
+      }
+    } else {
+      const httpModule = urlParsed.protocol == 'https:' ? https : http;
+      // console.log("no proxy request");
+      req = httpModule.get(url, {timeout: connectivityCheckTimeout});
+    }
+
+    req.on('response', res => {
+      // console.log('res', res.statusCode);
+      resolve(res);
+    });
+
+    req.on('error', err => {
+      // console.log("res err:", err);
+      console.log("Proxied Request Error Code:", err.code);
+      reject(err);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      console.log(`Request timeout to: ${urlParsed}`);
+      reject();
+    });
+
+    req.end();
+  }); 
+}
+
+// Saves the current proxy settings to a local file.
+function saveProxyConfigsToFile() {
+  const dataToWrite = { 
+    proxyAddr: currentProxyConfigs.address,
+    proxyPort: currentProxyConfigs.port,
+    proxyUseAuth: currentProxyConfigs.useAuth,
+    proxyUser: currentProxyConfigs.user,
+    proxyPass: currentProxyConfigs.password
+  };
+  const jsonData = JSON.stringify(dataToWrite, null, 2);
+  console.log("proxyConfig:", jsonData);
+  fs.writeFile(proxyFilePath, jsonData, 'utf8', (err) => {
+    if (err) {
+      console.error('Error writing file:', err);
+      return;
+    }
+  });
+}
+
+// Check if proxy configurations were saved in file and load its values
+function getSavedProxyConfigs() {
+  return new Promise((resolve, reject) => {
+    fs.access(proxyFilePath, fs.constants.F_OK, async (err) => {
+      if (err) {
+        // File doesn't exist
+        console.log("Error accessing proxy file, may not exist: " + err);
+        resolve({proxyAddr: undefined, proxyPort: undefined, proxyUseAuth: undefined, proxyUser: undefined, proxyPass: undefined}); // Resolve with empty if the file doesn't exist
+      } else {
+        fs.readFile(proxyFilePath, 'utf8', async (err, data) => {
+          if (err) {
+            reject(err);
+          } else {
+            try {
+              // Parse proxy config json data
+              console.log(data);
+              const jsonData = JSON.parse(data);
+              const proxyAddr = jsonData.proxyAddr;
+              const proxyPort = jsonData.proxyPort;
+              const proxyUseAuth = jsonData.proxyUseAuth;
+              const proxyUser = jsonData.proxyUser;
+              const proxyPass = jsonData.proxyPass;
+              console.log('proxySavedJsonData', jsonData);
+              resolve({proxyAddr: proxyAddr, proxyPort: proxyPort, proxyUseAuth: proxyUseAuth, proxyUser: proxyUser, proxyPass: proxyPass});
+            } catch (parseError) {
+              console.error('Error parsing JSON:', parseError);
+              reject(parseError);
+            }
+          }
+        });
+      }
+    });
+  });
+}
+
+// Load saved proxy configs on start
+getSavedProxyConfigs().then((proxyConfigs) => {
+  console.log(proxyConfigs);
+  currentProxyConfigs.address = proxyConfigs.proxyAddr;
+  currentProxyConfigs.port = proxyConfigs.proxyPort;
+  currentProxyConfigs.useAuth = proxyConfigs.proxyUseAuth;
+  currentProxyConfigs.user = proxyConfigs.proxyUser;
+  currentProxyConfigs.password = proxyConfigs.proxyPass;
+  calculateProxyFullUrl();  
+}).catch();// ignore
+
+//#endregion
+
+function sendEvent(res, type, data) {
+  res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+}
+
+//#region API
+
+//#region Enroll API
 app.get('/enroll', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'enroll.html'));
 });
 
 // Route to handle running the PowerShell script
-app.get('/enrollstart', (req, res) => {
+app.get('/enrollstart', async (req, res) => {
   // Set response headers for Server-Sent Events
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -336,7 +756,9 @@ app.get('/enrollstart', (req, res) => {
           console.error('Error writing file:', err);
           return;
         }
-      })
+      });
+
+      updateAgentProxy();
     }
 
     // give it a safe buffer of time before we shut it down manually
@@ -344,36 +766,16 @@ app.get('/enrollstart', (req, res) => {
     closeConnectionTimer = setTimeout(() => res.end(), 2000);
   });
 });
+//#endregion
 
-// Function to read fifo output file
-const readFifoOutput = (res, callback) => {
-
-  let timeout = 10000 //stop waiting after 10 (something might be wrong)
-  const timeoutStart = Date.now()
-  const myLoop = setInterval(function () {
-    if (Date.now() - timeoutStart > timeout) {
-      clearInterval(myLoop);
-      res.status(408).send('Expand Disk: Operation timed out.');
-    } else {
-      //if output.txt exists, read it
-      if (fs.existsSync(outputPath)) {
-        clearInterval(myLoop);
-        const data = fs.readFileSync(outputPath).toString().trim();
-        if (fs.existsSync(outputPath)) {
-          fs.unlinkSync(outputPath); //delete the output file
-        }
-        callback(data);
-      }
-    }
-  }, 300);
-}
+//#region Expand Disk API
 
 // API endpoint to execute script to expand disk space
 app.post('/expandDisk', async (req, res) => {
 
   // Open the FIFO in write mode
-  if (fs.existsSync(outputPath)) {
-    fs.unlinkSync(outputPath);
+  if (fs.existsSync(pipeOutputPath)) {
+    fs.unlinkSync(pipeOutputPath);
   }
   await writeToFifo(pipePath, checkIfDiskExists);
   readFifoOutput(res, async (output) => {
@@ -396,34 +798,11 @@ app.post('/expandDisk', async (req, res) => {
           }})
       }
     })
-  
-
 });
 
+//#endregion
 
-
-const checkIfDiskExists = `
-largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
-
-pvdisplay "/dev/\${largest_disk_device}"
-`
-
-const createPVScript = `
-largest_disk_device=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT -d -n | awk '$2 ~ /^[0-9]/ && $3=="disk" {print $2,$1,$4}' | sort -nr | head -n 1 | awk '{print $2}')
-
-pvcreate "/dev/\${largest_disk_device}"
-    echo "Physical volume created on /dev/\${largest_disk_device}"
-
-    vgcreate externalDiskVolumeGroup "/dev/\${largest_disk_device}"
-    echo "Volume group externalDiskVG created"
-    mv /etc/microshift/lvmd.yaml.default /etc/microshift/lvmd.yaml
-`
-
-const restartMicroshiftService =  `systemctl restart microshift` 
-
-const expandScript = `
-pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | head -n1 | awk \'{print $1}\')"
-`;
+//#region Main Page API
 
 // Serve index.html for root URL
 app.get('/', (req, res) => {
@@ -431,7 +810,6 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/config/portalAddress', (req, res) => {
-  const portalAddress = process.env.CUSTOMER_PORTAL_ADDRESS;
   res.json({ customerPortalAddress: portalAddress });
 });
 
@@ -453,28 +831,35 @@ app.get('/api/agentInstalled', async (req, res) => {
 const connectivityCheckTimeout = parseInt(process.env.CONNECTION_CHECK_TIMEOUT) || 30000;
 
 app.get('/api/connectivity', async (req, res) => {
-
-  const registryAddress = `https://${process.env.REGISTRY_ADDRESS}` 
-  const portalAddress = `https://${process.env.CUSTOMER_PORTAL_ADDRESS}/api/ping`
   const results = {};
 
   try {
     // Execute the pings in parallel
     const [portalResponse, registryResponse] = await Promise.allSettled([
-      fetch(portalAddress, { signal: AbortSignal.timeout(connectivityCheckTimeout) }),
-      fetch(registryAddress, { signal: AbortSignal.timeout(connectivityCheckTimeout) })
+      makeProxydGet(portalAddress),
+      makeProxydGet(registryAddress)
     ]);
 
     // Process responses
-    results['portal'] = portalResponse.status === 'fulfilled' && portalResponse.value.ok;
-    results['registry'] = registryResponse.status === 'fulfilled' && registryResponse.value.ok;
+    if (portalResponse.status === 'rejected') {
+      console.error("Portal Connectivity Check Error:", portalResponse.reason);
+    }
+    if (registryResponse.status === 'rejected') {
+      console.error("Registry Connectivity Check Error:", registryResponse.reason);
+    }
+    results['portal'] = portalResponse.status === 'fulfilled' && portalResponse.value.statusCode >= 200 && portalResponse.value.statusCode <= 399; // Redirects (3xx) will be considered connected too
+    results['registry'] = registryResponse.status === 'fulfilled' && registryResponse.value.statusCode >= 200 && registryResponse.value.statusCode <= 399;
     res.json(results);
     console.log(JSON.stringify(results));
   } catch (error) {
     console.error('Error during connectivity check:', error);
     res.status(500).json({ error: 'An error occurred during connectivity check.' });
   }
-})
+});
+
+//#endregion
+
+//#region Upload Certificates API
 
 // Serve sslCert.html for /sslcert URL
 app.get('/sslcert', async (req, res) => {
@@ -547,6 +932,62 @@ app.post('/upload', upload.single('sslCertificate'), async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+//#endregion
+
+//#region Proxy Config API
+
+app.get('/proxy', async (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'proxy.html'));
+});
+
+app.post('/changeProxy', upload.none(), async (req, res) => {
+  console.log(req.body);
+  const newProxyConfig = structuredClone(currentProxyConfigs);
+  newProxyConfig.address = req.body.proxyAddr;
+  newProxyConfig.port = req.body.proxyPort;
+  newProxyConfig.useAuth = req.body.UseAuth === 'true';
+  newProxyConfig.user = req.body.proxyUser;
+  newProxyConfig.password = req.body.proxyPass;
+
+  try {
+    const valRes = validateProxyInput(newProxyConfig);
+    if (valRes) {
+      res.status(400).send(valRes);
+      console.error('Non-valid Proxy:', valRes);
+      return;
+    }
+    currentProxyConfigs = newProxyConfig;
+    saveProxyConfigsToFile();
+    calculateProxyFullUrl();
+    updateProxy().catch((err) => console.error(err));
+    res.status(200).send('Proxy settings updated successfully! System is restarting.');
+  } catch (error) {
+    console.error('Error updating proxy settings: ', error);
+    res.status(500).send('Failed to update proxy settings.');
+    return;
+  }
+});
+
+app.get('/proxyConfig', async (req, res, next) => {
+  try {
+    res.json({
+      proxyAddr: currentProxyConfigs.address,
+      proxyPort: currentProxyConfigs.port,
+      proxyUseAuth: currentProxyConfigs.useAuth,
+      proxyUser: currentProxyConfigs.user,
+      proxyPass: currentProxyConfigs.password
+    });
+  } catch (err) {
+    console.error('Error retrieving proxy settings: ', error);
+    res.status(500).send('Error retrieving proxy settings: ', error);
+    return;
+  }
+});
+
+//#endregion
+
+//#endregion
 
 // Start server
 const port = process.env.port || 8081;

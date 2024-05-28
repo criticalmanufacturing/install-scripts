@@ -34,7 +34,11 @@ expandDiskButton.addEventListener("click", function () {
 const btnManageSslCert = document.getElementById('ManageSslCertBtn');
 btnManageSslCert.addEventListener('click', function (e) {
   window.location = `/sslcert`;
-  console.log("'Manage SSL Certificate' was clicked");
+});
+
+const btnProxyConfig = document.getElementById('ProxyConfigBtn');
+btnProxyConfig.addEventListener('click', function (e) {
+  window.location = `/proxy`;
 });
 
 //#region Go To Portal button actions

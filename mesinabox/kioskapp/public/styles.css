@@ -8,7 +8,7 @@ body {
     margin-top: 40px;
     margin-left: 40px;
 }
-.logo-container img {
+.logo-container img, .logo-container a img {
     max-height: 36px;
     height: auto; /* Maintain aspect ratio */
     margin-right: 10px; /* spacing between logos */
@@ -21,6 +21,22 @@ body {
 
     width: 340px;
     min-height: 200px;
+    padding: 44px;
+
+    /* Center Div */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Main/Central White Box */
+.lightbox-plus {
+    background-color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+
+    width: 510px;
+    min-height: 260px;
     padding: 44px;
 
     /* Center Div */
@@ -101,6 +117,9 @@ body {
     width: 188px;
 }
 #ManageSslCertBtn {
+    width: 188px;
+}
+#ProxyConfigBtn {
     width: 188px;
 }
 #ExpandDiskBtn { 
@@ -264,4 +283,66 @@ a:hover, a:active {
 
 .failure {
     color: red;
+}
+
+#ProxyForm {
+    /* display:grid;
+    grid-template-columns: max-content 1fr;
+    grid-gap:5px; */
+    display: grid;
+    gap: 10px;
+    grid-template-columns: max-content 1fr;
+    /* align-items: ; */
+}
+#ProxyForm label {
+    text-align:right;
+    grid-column: 1;
+    margin: auto;
+    margin-right: 0px;
+}
+#ProxyForm input {
+    /* width: 100%; */
+    box-sizing: border-box;
+    margin-left: 5px;
+    font-size: 16px;
+    padding: 5px 11px;
+    font-family: "Open Sans", sans-serif;
+    grid-column: 2;
+    width: calc(100% - 20px);
+}
+/* #ProxyForm div {
+    text-align: left;
+} */
+#ProxyForm input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+}
+/* #proxyUserDiv, #proxyPassDiv {
+    grid-column: 2;
+    display: none;
+    grid-column: span 2;
+} */
+#ProxyForm #BtnDiv {
+    display: flex;
+    grid-column: span 2;
+    justify-content: center;
+    /* justify-content: right; */
+    margin-top: 25px;
+}
+#proxyFeedbackMessage {
+    margin-top: 15px;
+    max-width: 510px;
+}
+#proxyFeedbackMessage p {
+    padding: 0 8px;
+    background: none;
+    font-size: 14px;
+
+    min-width: 96px;
+    min-height: 36px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
