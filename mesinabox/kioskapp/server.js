@@ -63,8 +63,6 @@ const portalAddress = `https://${process.env.CUSTOMER_PORTAL_ADDRESS}/api/ping`;
 
 const edgeSquidProxyDeploymentName = "edgesquidproxy";
 
-//#endregion
-
 //#region Proxy Configs
 
 let currentProxyConfigs = {
@@ -85,6 +83,64 @@ let currentProxyConfigs = {
 };
 
 let httpsAgent = null; // HttpsProxyAgent
+
+const deleteProxyScript = `
+  echo "Delete Proxy START"
+  echo -n "" > /etc/environment
+  unset http_proxy
+  unset https_proxy
+  unset no_proxy
+
+  mkdir -p /etc/systemd/system/crio.service.d/
+  mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
+  echo -n "" > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf
+  echo -n "" > /etc/systemd/system/crio.service.d/00-proxy.conf
+  echo "systemctl start"
+  systemctl daemon-reload
+  echo "systemctl 0"
+  systemctl restart rpm-ostreed.service
+  echo "systemctl 1"
+  systemctl restart crio
+  echo "systemctl 2"
+  systemctl restart microshift
+  echo "Delete Proxy END"
+  `;
+
+const createOrUpdateProxyScript = `
+  echo "Create Proxy START"
+  echo "http_proxy={FULL_PROXY_ADDR}" > /etc/environment
+  echo "https_proxy={FULL_PROXY_ADDR}" >> /etc/environment
+  echo "no_proxy=localhost,127.0.0.1" >> /etc/environment
+  source /etc/environment
+  echo "source'd /etc/environment"
+
+  mkdir -p /etc/systemd/system/crio.service.d/
+  mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
+  
+  cat > /etc/systemd/system/crio.service.d/00-proxy.conf <<EOF
+  [Service]
+  Environment=NO_PROXY="localhost,127.0.0.1"
+  Environment=HTTP_PROXY="{FULL_PROXY_ADDR}"
+  Environment=HTTPS_PROXY="{FULL_PROXY_ADDR}"
+  EOF
+  
+  cat > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf <<EOF
+  [Service]
+  Environment="http_proxy={FULL_PROXY_ADDR}"
+  EOF
+  
+  echo "systemctl start"
+  systemctl daemon-reload
+  echo "systemctl 0"
+  systemctl restart rpm-ostreed.service
+  echo "systemctl 1"
+  systemctl restart crio
+  echo "systemctl 2"
+  systemctl restart microshift
+  echo "Create Proxy END"
+  `;
+
+//#endregion
 
 //#endregion
 
@@ -311,7 +367,7 @@ const readFifoOutput = (res, callback, timeoutToThrow) => {
     if (Date.now() - timeoutStart > timeout) {
       clearInterval(myLoop);
       if (res != null) {
-        res.status(408).send('Inserted Pipe Instructions: Operation timed out.');
+        res.status(408).send('Expand Disk: Operation timed out.');
       } else {
         throw new Error('Inserted Pipe Instructions: Operation timed out.');
       }
@@ -358,22 +414,22 @@ pvresize "$(pvdisplay --units b -c | awk -F: \'{print $1,$7}\' | sort -k2 -nr | 
 
 // Validates that the information on the proxy input is valid
 function validateProxyInput(newProxyConfig) {
-  if ( !( (newProxyConfig.address && newProxyConfig.port) || (!newProxyConfig.address && !newProxyConfig.port) ) ) { // If one is defined but the other isn't
-    return 'Proxy adress and port need to be both defined to set a proxy, or none should be set to remove it';
+  if (!((newProxyConfig.address && newProxyConfig.port) || (!newProxyConfig.address && !newProxyConfig.port))) { // If one is defined but the other isn't
+    return {valid:false, reason:'Proxy adress and port need to be both defined to set a proxy, or none should be set to remove it'};
   }
   if (!newProxyConfig.address && !newProxyConfig.port) { // basic proxy info "falsy"
     if (newProxyConfig.useAuth && (newProxyConfig.user || newProxyConfig.password)) {
-      return 'Proxy authentication should only be set if address and port are also set';
+      return {valid:false, reason:'Proxy authentication should only be set if address and port are also set'};
     }
   } else { // basic proxy set
     if (newProxyConfig.useAuth && (!newProxyConfig.user != !newProxyConfig.password)) { // If one is defined but the other isn't
-      return 'Proxy username and password need to be both defined to set authentication, or none should be set to remove it';
+      return {valid:false, reason:'Proxy username and password need to be both defined to set authentication, or none should be set to remove it'};
     } 
     if (newProxyConfig.useAuth && (!newProxyConfig.user && !newProxyConfig.password)) { // useAuth true but no auth defined
-      return 'Proxy username and password need to be both defined to set authentication';
+      return {valid:false, reason:'Proxy username and password need to be both defined to set authentication'};
     }
   }
-  return null;
+  return {valid:true};
 }
 
 function calculateProxyFullUrl() {
@@ -487,63 +543,12 @@ async function updateProxy() {
   if (fs.existsSync(pipeOutputPath)) {
     fs.unlinkSync(pipeOutputPath);
   }
-  // Open the FIFO in write mode
-  if (fs.existsSync(pipeOutputPath)) {
-    fs.unlinkSync(pipeOutputPath);
-  }
   const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
 
-  let proxyCommands;
+  let proxyCommands = !currentProxyConfigs.address ? deleteProxyScript : createOrUpdateProxyScript; // no address = remove proxy
+  proxyCommands = proxyCommands.replaceAll("{FULL_PROXY_ADDR}", currentProxyConfigs.fullProxyAddrEscaped);
 
-  // Write the script content to the FIFO
-  if (!currentProxyConfigs.address) { // no address = remove proxy
-    const deleteProxyScript = proxyCommands = `
-    echo -n "" > /etc/environment
-    unset http_proxy
-    unset https_proxy
-    unset no_proxy
-    
-    mkdir -p /etc/systemd/system/crio.service.d/
-    mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
-    echo -n "" > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf
-    echo -n "" > /etc/systemd/system/crio.service.d/00-proxy.conf
-    systemctl daemon-reload
-    systemctl restart rpm-ostreed.service
-    systemctl restart crio
-    systemctl restart microshift
-    `;
-    
-    fifoStream.write(deleteProxyScript);
-  } else {
-    const createOrUpdateProxyScript = proxyCommands = `
-    echo "http_proxy=${currentProxyConfigs.fullProxyAddrEscaped}" > /etc/environment
-    echo "https_proxy=${currentProxyConfigs.fullProxyAddrEscaped}" >> /etc/environment
-    echo "no_proxy=localhost,127.0.0.1" >> /etc/environment
-    source /etc/environment
-
-    mkdir -p /etc/systemd/system/crio.service.d/
-    mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
-    
-    cat > /etc/systemd/system/crio.service.d/00-proxy.conf <<EOF
-    [Service]
-    Environment=NO_PROXY="localhost,127.0.0.1"
-    Environment=HTTP_PROXY="${currentProxyConfigs.fullProxyAddrEscaped}"
-    Environment=HTTPS_PROXY="${currentProxyConfigs.fullProxyAddrEscaped}"
-    EOF
-    
-    cat > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf <<EOF
-    [Service]
-    Environment="http_proxy=${currentProxyConfigs.fullProxyAddrEscaped}"
-    EOF
-    
-    systemctl daemon-reload
-    systemctl restart rpm-ostreed.service
-    systemctl restart crio
-    systemctl restart microshift
-    `;
-    
-    fifoStream.write(createOrUpdateProxyScript);
-  }
+  fifoStream.write(proxyCommands);
 
   console.log(`${!currentProxyConfigs.address ? "Delete Proxy":"Create Proxy"} script injected into FIFO for execution.`);
   fifoStream.close();
@@ -585,17 +590,14 @@ async function makeProxydGet(url, proxyHost, proxyPort, proxyAuth) {
       }
     } else {
       const httpModule = urlParsed.protocol == 'https:' ? https : http;
-      // console.log("no proxy request");
       req = httpModule.get(url, {timeout: connectivityCheckTimeout});
     }
 
     req.on('response', res => {
-      // console.log('res', res.statusCode);
       resolve(res);
     });
 
     req.on('error', err => {
-      // console.log("res err:", err);
       console.log("Proxied Request Error Code:", err.code);
       reject(err);
     });
@@ -952,9 +954,9 @@ app.post('/changeProxy', upload.none(), async (req, res) => {
 
   try {
     const valRes = validateProxyInput(newProxyConfig);
-    if (valRes) {
-      res.status(400).send(valRes);
-      console.error('Non-valid Proxy:', valRes);
+    if (!valRes.valid) {
+      res.status(400).send(valRes.reason);
+      console.error('Non-valid Proxy:', valRes.reason);
       return;
     }
     currentProxyConfigs = newProxyConfig;

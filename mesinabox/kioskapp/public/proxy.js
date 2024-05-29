@@ -57,9 +57,6 @@ changeProxyForm.addEventListener('submit', async (event) => {
     });
     const data = await response.text();
     if (!response.ok) {
-      if (response.status == 504) {
-        throw new Error('504 Gateway Timeout');
-      }
       throw new Error(data);
     }
     createFeedbackMessage(data, false, true);
