@@ -22,7 +22,7 @@ spec:
       containers:
       - name: cmos
         image: dev.criticalmanufacturing.io/criticalmanufacturing/cmos:1.0.0
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: CUSTOMER_PORTAL_ADDRESS
           value: "portalqa.criticalmanufacturing.dev"
