@@ -1,3 +1,6 @@
+mkdir -p /etc/systemd/system/crio.service.d/
+mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
+
 mkdir -p /etc/cmos
 mkfifo /etc/cmos/pipe
 cat > /etc/cmos/execpipe.sh << 'EOF'
