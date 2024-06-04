@@ -84,6 +84,8 @@ let currentProxyConfigs = {
 
 let httpsAgent = null; // HttpsProxyAgent
 
+let isCurrentlyRunningCommandsInPipe = false;
+
 const deleteProxyScript = `
   echo "Delete Proxy START"
   echo -n "" > /etc/environment
@@ -95,47 +97,37 @@ const deleteProxyScript = `
   mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
   echo -n "" > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf
   echo -n "" > /etc/systemd/system/crio.service.d/00-proxy.conf
-  echo "systemctl start"
   systemctl daemon-reload
-  echo "systemctl 0"
   systemctl restart rpm-ostreed.service
-  echo "systemctl 1"
   systemctl restart crio
-  echo "systemctl 2"
   systemctl restart microshift
   echo "Delete Proxy END"
   `;
 
 const createOrUpdateProxyScript = `
   echo "Create Proxy START"
-  echo "http_proxy={FULL_PROXY_ADDR}" > /etc/environment
-  echo "https_proxy={FULL_PROXY_ADDR}" >> /etc/environment
-  echo "no_proxy=localhost,127.0.0.1" >> /etc/environment
+  cat > /etc/environment <<EOF
+  http_proxy={FULL_PROXY_ADDR}
+  https_proxy={FULL_PROXY_ADDR}
+  no_proxy=localhost,127.0.0.1
+EOF
   source /etc/environment
-  echo "source'd /etc/environment"
-
-  mkdir -p /etc/systemd/system/crio.service.d/
-  mkdir -p /etc/systemd/system/rpm-ostreed.service.d/
   
   cat > /etc/systemd/system/crio.service.d/00-proxy.conf <<EOF
   [Service]
   Environment=NO_PROXY="localhost,127.0.0.1"
   Environment=HTTP_PROXY="{FULL_PROXY_ADDR}"
   Environment=HTTPS_PROXY="{FULL_PROXY_ADDR}"
-  EOF
+EOF
   
   cat > /etc/systemd/system/rpm-ostreed.service.d/00-proxy.conf <<EOF
   [Service]
   Environment="http_proxy={FULL_PROXY_ADDR}"
-  EOF
+EOF
   
-  echo "systemctl start"
   systemctl daemon-reload
-  echo "systemctl 0"
   systemctl restart rpm-ostreed.service
-  echo "systemctl 1"
   systemctl restart crio
-  echo "systemctl 2"
   systemctl restart microshift
   echo "Create Proxy END"
   `;
@@ -346,6 +338,7 @@ async function tryGetInstalledAgentNamespace() {
 
 // Helper function to write to the FIFO and handle closing
 const writeToFifo = async (fifoPath, content) => {
+  isCurrentlyRunningCommandsInPipe = true;
   return new Promise((resolve, reject) => {
     const fifoStream = fs.createWriteStream(fifoPath, { flags: 'a' });
     fifoStream.write(content, (err) => {
@@ -361,10 +354,11 @@ const writeToFifo = async (fifoPath, content) => {
 
 // Function to read fifo output file
 const readFifoOutput = (res, callback, timeoutToThrow) => {
-  let timeout = timeoutToThrow ?? 10000; //stop waiting after 10 (something might be wrong)
+  let timeout = timeoutToThrow ?? 10000; //stop waiting after 10s (something might be wrong)
   const timeoutStart = Date.now();
   const myLoop = setInterval(function () {
     if (Date.now() - timeoutStart > timeout) {
+      isCurrentlyRunningCommandsInPipe = false;
       clearInterval(myLoop);
       if (res != null) {
         res.status(408).send('Expand Disk: Operation timed out.');
@@ -374,6 +368,7 @@ const readFifoOutput = (res, callback, timeoutToThrow) => {
     } else {
       //if output.txt exists, read it
       if (fs.existsSync(pipeOutputPath)) {
+        isCurrentlyRunningCommandsInPipe = false;
         clearInterval(myLoop);
         const data = fs.readFileSync(pipeOutputPath).toString().trim();
         if (fs.existsSync(pipeOutputPath)) {
@@ -543,17 +538,13 @@ async function updateProxy() {
   if (fs.existsSync(pipeOutputPath)) {
     fs.unlinkSync(pipeOutputPath);
   }
-  const fifoStream = fs.createWriteStream(pipePath, { flags: 'a' }); // 'a' flag appends data to the FIFO
 
   let proxyCommands = !currentProxyConfigs.address ? deleteProxyScript : createOrUpdateProxyScript; // no address = remove proxy
   proxyCommands = proxyCommands.replaceAll("{FULL_PROXY_ADDR}", currentProxyConfigs.fullProxyAddrEscaped);
 
-  fifoStream.write(proxyCommands);
-
-  console.log(`${!currentProxyConfigs.address ? "Delete Proxy":"Create Proxy"} script injected into FIFO for execution.`);
-  fifoStream.close();
-
+  console.log(`Injecting ${!currentProxyConfigs.address ? "Delete Proxy":"Create Proxy"} script into FIFO for execution.`);
   await writeToFifo(pipePath, proxyCommands);
+
   readFifoOutput(undefined, async (output) => {
     if (output === '0') {
       console.log(`Proxy settings updated. New proxy: ${currentProxyConfigs.fullProxyAddr}`);
@@ -981,6 +972,16 @@ app.get('/proxyConfig', async (req, res, next) => {
       proxyPass: currentProxyConfigs.password
     });
   } catch (err) {
+    console.error('Error retrieving proxy settings: ', error);
+    res.status(500).send('Error retrieving proxy settings: ', error);
+    return;
+  }
+});
+
+app.get('/isExecutingCommands', async (req, res) => {
+  try {
+    res.json({ isExecutingCommands: isCurrentlyRunningCommandsInPipe });
+  } catch (error) {
     console.error('Error retrieving proxy settings: ', error);
     res.status(500).send('Error retrieving proxy settings: ', error);
     return;

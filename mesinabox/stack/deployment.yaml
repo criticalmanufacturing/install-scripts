@@ -39,7 +39,7 @@ spec:
         - name: CONNECTION_CHECK_TIMEOUT
           value: "30000"
         ports:
-        - containerPort: 8081 
+        - containerPort: 8081
         securityContext:
           privileged: true
         volumeMounts:
