@@ -47,7 +47,7 @@ data:
             <ssl_endpoint_identification_algorithm>{{ .Values.kafka.clientCredentials.sslEndpointIdentificationAlgorithm }}</ssl_endpoint_identification_algorithm>
         </kafka>
         {{- end }}
-        <http_port>0</http_port>
+        <http_port>8123</http_port>
         <https_port>8443</https_port>
         <tcp_port>9000</tcp_port>
         <tcp_port_secure>9440</tcp_port_secure>

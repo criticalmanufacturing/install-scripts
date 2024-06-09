@@ -35,6 +35,9 @@ service:
   nativetls:
     port: 9440
     name: nativetls
+  https:
+    port: 8443
+    name: https
 
 # Route
 ingress:

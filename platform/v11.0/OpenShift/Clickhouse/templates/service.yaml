@@ -11,5 +11,9 @@ spec:
       protocol: TCP
       port: {{ .Values.service.nativetls.port }}
       targetPort: {{ .Values.service.nativetls.port }}
+    - name: {{ .Values.service.https.name }}
+      protocol: TCP
+      port: {{ .Values.service.https.port }}
+      targetPort: {{ .Values.service.https.port }}
   selector:
     {{- include "clickhouse.selectorLabels" . | nindent 6 }}
