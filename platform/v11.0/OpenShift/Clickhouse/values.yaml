@@ -71,7 +71,7 @@ usersConfig:
 clickhouseConfig:
   name: config
   openSSL:
-    verificationMode: None
+    validateCertificates: true
     invalidCertificateHandler: AcceptCertificateHandler
 
 # Secrets
@@ -84,7 +84,7 @@ kafka:
     # When using AMQ Streams the user can specify the cluster CA location, client certificate location, client key location
     # secretName: "secrets"
     # credentialsLocation: /tmp/ClickHouseData/Certificates/Kafka/
-    # sslEndpointIdentificationAlgorithm: none
+    # validateCertificates: true
 
 clickhouse:
   secretName: clickhouse-secrets
