@@ -1,11 +1,11 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nodetest
+  name: cmos
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: nodetest
+  namespace: cmos
 roleRef:
   kind: ClusterRole
   name: cluster-admin # or the specific ClusterRole you want to grant access to

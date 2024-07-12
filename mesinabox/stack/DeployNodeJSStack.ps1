@@ -1,6 +1,6 @@
-oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f nodetest-namespace.yaml
-oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f nodetest-deployment.yaml
-oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f nodetest-service.yaml
-oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f nodetest-ingress.yaml
-oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f nodetest-crb.yaml
-oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f nodetest-pvc.yaml
+oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f namespace.yaml
+oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f deployment.yaml
+oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f service.yaml
+oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f route.yaml
+oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f crb.yaml
+oc apply --server-side --field-manager=devopscenter.criticalmanufacturing --force-conflicts -f pvc.yaml

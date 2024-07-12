@@ -1,6 +1,7 @@
 param (
     [Parameter(Mandatory=$true)][string]$AgentName,
-    [Parameter(Mandatory=$true)][string]$DeploymentScriptPath
+    [Parameter(Mandatory=$true)][string]$DeploymentScriptPath,
+    [Parameter(Mandatory=$true)][string]$CmfPortalLocation
 )
 
 $AgentStackFolderPath = Split-Path -Parent $DeploymentScriptPath
@@ -31,7 +32,7 @@ Do
     try
     {
         # check if agent is connected
-        $isConnected = Get-AgentConnection -Name $AgentName
+        $isConnected = Invoke-Expression "$CmfPortalLocation/cmf-portal checkagentconnection -n $AgentName"
     }
     catch 
     {

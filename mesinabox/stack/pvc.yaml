@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: nodetest-pvc
-  namespace: nodetest
+  name: cmos-pvc
+  namespace: cmos
 spec:
   accessModes:
     - ReadWriteOnce
