@@ -4,20 +4,20 @@ namespaceOverride: ""
 
 environmentVariables:
   sourceBootstrapServers: kafka1:9092,kafka2:9092,kafka3:9092
-  targetBootstrapServers: my-cluster-kafka-tls-bootstrap-myexampleobservability.apps.rhostest.criticalmanufacturing.dev:443
-  oldSystemName: cleitedezembrodevelopmentsystem
-  newSystemName: testmigracao
+  targetBootstrapServers: <TargetBootstrapServers>
+  oldSystemName: <OldSystemName>
+  newSystemName: <NewSystemName>
   securityProtocol: SSL
-  sslType: PKCS12
+  sslType: <SslType>
   sslKeystoreLocation: /opt/bitnami/kafka/bin/user/
-  sslKeystorePassword: hrgUpQKsVYt0SfoZ1tbvU0kZw8fgRtWY
+  sslKeystorePassword: <KeystorePassword>
   sslTruststoreLocation: /opt/bitnami/kafka/bin/ca/
-  sslTruststorePassword: GYJoguIQr7wg
+  sslTruststorePassword: <TruststorePassword>
   saslMechanism: 
   saslUsername:
   saslPassword: 
 
 credentials:
   useClientCredentials: true
-  userP12SecretName: userp12secret
-  caP12SecretName: cap12secret
+  userP12SecretName: <UserP12SecretName>
+  caP12SecretName: <CaP12SecretName>
