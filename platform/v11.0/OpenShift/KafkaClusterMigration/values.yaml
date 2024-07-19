@@ -16,8 +16,8 @@ environmentVariables:
   saslMechanism: 
   saslUsername:
   saslPassword: 
-  migratedTopicsReplicationFactor: 3
-  mm2ReplicationFactor: 3
+  migratedTopicsReplicationFactor: <MigratedTopicsReplicationFactor>
+  mm2ReplicationFactor: <MM2ReplicationFactor>
 
 credentials:
   useClientCredentials: true
