@@ -20,6 +20,5 @@ environmentVariables:
   mm2ReplicationFactor: <MM2ReplicationFactor>
 
 credentials:
-  useClientCredentials: true
   userP12SecretName: <UserP12SecretName>
   caP12SecretName: <CaP12SecretName>

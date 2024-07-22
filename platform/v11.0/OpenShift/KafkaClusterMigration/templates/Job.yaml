@@ -46,7 +46,7 @@ spec:
               value: {{ .Values.environmentVariables.migratedTopicsReplicationFactor }} 
             - name: MM2_REPLICATION_FACTOR
               value: {{ .Values.environmentVariables.mm2ReplicationFactor }} 
-          {{- if .Values.credentials.useClientCredentials }}  
+          {{- if eq .Values.environmentVariables.securityProtocol "SSL" }}  
           volumeMounts:
             - name: userp12secret
               mountPath: {{ .Values.environmentVariables.sslKeystoreLocation }}
@@ -55,7 +55,7 @@ spec:
           {{- end }}
       imagePullSecrets:
         - name: dev.criticalmanufacturing.io-cred
-      {{- if .Values.credentials.useClientCredentials }}  
+      {{- if eq .Values.environmentVariables.securityProtocol "SSL" }}  
       volumes:
         - name: userp12secret
           secret:
