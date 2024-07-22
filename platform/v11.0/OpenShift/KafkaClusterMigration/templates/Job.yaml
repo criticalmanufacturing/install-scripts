@@ -43,9 +43,9 @@ spec:
             - name: SASL_PASSWORD
               value: {{ .Values.environmentVariables.saslPassword }} 
             - name: MIGRATED_TOPICS_REPLICATION_FACTOR
-              value: {{ .Values.environmentVariables.migratedTopicsReplicationFactor }} 
+              value: '{{ .Values.environmentVariables.migratedTopicsReplicationFactor }}'
             - name: MM2_REPLICATION_FACTOR
-              value: {{ .Values.environmentVariables.mm2ReplicationFactor }} 
+              value: '{{ .Values.environmentVariables.mm2ReplicationFactor }}'
           {{- if eq .Values.environmentVariables.securityProtocol "SSL" }}  
           volumeMounts:
             - name: userp12secret
