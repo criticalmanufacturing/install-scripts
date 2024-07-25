@@ -1,0 +1,24 @@
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+
+environmentVariables:
+  sourceBootstrapServers: kafka1:9092,kafka2:9092,kafka3:9092
+  targetBootstrapServers: <TargetBootstrapServers>
+  oldSystemName: <OldSystemName>
+  newSystemName: <NewSystemName>
+  securityProtocol: SSL
+  sslType: <SslType>
+  sslKeystoreLocation: /opt/bitnami/kafka/bin/user/
+  sslKeystorePassword: <KeystorePassword>
+  sslTruststoreLocation: /opt/bitnami/kafka/bin/ca/
+  sslTruststorePassword: <TruststorePassword>
+  saslMechanism: 
+  saslUsername:
+  saslPassword: 
+  migratedTopicsReplicationFactor: <MigratedTopicsReplicationFactor>
+  mm2ReplicationFactor: <MM2ReplicationFactor>
+
+credentials:
+  userP12SecretName: <UserP12SecretName>
+  caP12SecretName: <CaP12SecretName>

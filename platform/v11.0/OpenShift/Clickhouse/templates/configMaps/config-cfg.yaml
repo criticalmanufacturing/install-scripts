@@ -14,7 +14,11 @@ data:
                 <caConfig>/tmp/ClickHouseData/Certificates/Generic/root.crt</caConfig>
                 <privateKeyFile>/tmp/ClickHouseData/Certificates/Generic/server.key</privateKeyFile>
                 <certificateFile>/tmp/ClickHouseData/Certificates/Generic/server.crt</certificateFile>
-                <verificationMode>{{ .Values.clickhouseConfig.openSSL.verificationMode }}</verificationMode>
+                {{- if .Values.clickhouseConfig.openSSL.validateCertificates }}
+                <verificationMode>strict</verificationMode>
+                {{- else }}
+                <verificationMode>none</verificationMode>
+                {{- end }}
                 <cacheSessions>true</cacheSessions>
                 <disableProtocols>sslv2,sslv3</disableProtocols>
                 <preferServerCiphers>true</preferServerCiphers>
@@ -25,32 +29,40 @@ data:
                 <cacheSessions>true</cacheSessions>
                 <disableProtocols>sslv2,sslv3</disableProtocols>
                 <preferServerCiphers>true</preferServerCiphers>
-                <verificationMode>{{ .Values.clickhouseConfig.openSSL.verificationMode }}</verificationMode>
+                {{- if .Values.clickhouseConfig.openSSL.validateCertificates }}
+                <verificationMode>strict</verificationMode>
+                {{- else }}
+                <verificationMode>none</verificationMode>
+                {{- end }}
                 <invalidCertificateHandler>
                     <name>{{ .Values.clickhouseConfig.openSSL.invalidCertificateHandler }}</name>
                 </invalidCertificateHandler>
             </client>
         </openSSL>
-        {{- if .Values.kafka.sasl }}
+        {{- if .Values.kafka.useClientCredentials }}
         <kafka>
             <security_protocol>SASL_SSL</security_protocol>
             <sasl_mechanism>PLAIN</sasl_mechanism>
             <sasl_username>{{ .Values.kafka.sasl.username }}</sasl_username>
             <sasl_password>{{ .Values.kafka.sasl.password }}</sasl_password>
         </kafka>
-        {{- else if .Values.kafka.clientCredentials }}
+        {{- else }}
         <kafka>
             <security_protocol>SSL</security_protocol>
             <ssl_ca_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}root.crt</ssl_ca_location>
             <ssl_certificate_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.crt</ssl_certificate_location>
             <ssl_key_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.key</ssl_key_location>
-            <ssl_endpoint_identification_algorithm>{{ .Values.kafka.clientCredentials.sslEndpointIdentificationAlgorithm }}</ssl_endpoint_identification_algorithm>
+            {{- if .Values.kafka.clientCredentials.validateCertificates }}
+            <ssl_endpoint_identification_algorithm>https</ssl_endpoint_identification_algorithm>
+            {{- else }}
+            <ssl_endpoint_identification_algorithm>none</ssl_endpoint_identification_algorithm>
+            {{- end }}
         </kafka>
         {{- end }}
-        <http_port>0</http_port>
-        <https_port>8443</https_port>
+        <http_port>8123</http_port>
+        <https_port>{{ .Values.service.https.port }}</https_port>
         <tcp_port>9000</tcp_port>
-        <tcp_port_secure>9440</tcp_port_secure>
+        <tcp_port_secure>{{ .Values.service.nativetls.port }}</tcp_port_secure>
         <logger>
             <level>Warning</level>
             <console>1</console>

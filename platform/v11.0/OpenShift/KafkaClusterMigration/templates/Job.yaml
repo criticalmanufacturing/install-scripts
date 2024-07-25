@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    {{- include "kafkaclustermigration.labels" . | nindent 4 }}
+  name: kafkaclustermigration
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "kafkaclustermigration.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - image: dev.criticalmanufacturing.io/criticalmanufacturing/kafkaclustermigrationtov11:latest
+          imagePullPolicy: Always
+          name: kafkaclustermigration
+          env:
+            - name: SOURCE_BOOTSTRAP_SERVERS
+              value: {{ .Values.environmentVariables.sourceBootstrapServers }} 
+            - name: TARGET_BOOTSTRAP_SERVERS
+              value: {{ .Values.environmentVariables.targetBootstrapServers }} 
+            - name: OLD_SYSTEM_NAME
+              value: {{ .Values.environmentVariables.oldSystemName }} 
+            - name: NEW_SYSTEM_NAME
+              value: {{ .Values.environmentVariables.newSystemName }} 
+            - name: SECURITY_PROTOCOL
+              value: {{ .Values.environmentVariables.securityProtocol }} 
+            - name: SSL_TYPE
+              value: {{ .Values.environmentVariables.sslType }} 
+            - name: SSL_KEYSTORE_LOCATION
+              value: {{ .Values.environmentVariables.sslKeystoreLocation }}{{ .Values.credentials.userP12SecretName }}  
+            - name: SSL_KEYSTORE_PASSWORD
+              value: {{ .Values.environmentVariables.sslKeystorePassword }} 
+            - name: SSL_TRUSTSTORE_LOCATION
+              value: {{ .Values.environmentVariables.sslTruststoreLocation }}{{ .Values.credentials.caP12SecretName }}  
+            - name: SSL_TRUSTSTORE_PASSWORD
+              value: {{ .Values.environmentVariables.sslTruststorePassword }} 
+            - name: SASL_MECHANISM
+              value: {{ .Values.environmentVariables.saslMechanism }} 
+            - name: SASL_USERNAME
+              value: {{ .Values.environmentVariables.saslUsername }} 
+            - name: SASL_PASSWORD
+              value: {{ .Values.environmentVariables.saslPassword }} 
+            - name: MIGRATED_TOPICS_REPLICATION_FACTOR
+              value: '{{ .Values.environmentVariables.migratedTopicsReplicationFactor }}'
+            - name: MM2_REPLICATION_FACTOR
+              value: '{{ .Values.environmentVariables.mm2ReplicationFactor }}'
+          {{- if eq .Values.environmentVariables.securityProtocol "SSL" }}  
+          volumeMounts:
+            - name: userp12secret
+              mountPath: {{ .Values.environmentVariables.sslKeystoreLocation }}
+            - name: cap12secret
+              mountPath: {{ .Values.environmentVariables.sslTruststoreLocation }}
+          {{- end }}
+      imagePullSecrets:
+        - name: dev.criticalmanufacturing.io-cred
+      {{- if eq .Values.environmentVariables.securityProtocol "SSL" }}  
+      volumes:
+        - name: userp12secret
+          secret:
+            secretName: {{ .Values.credentials.userP12SecretName }}
+        - name: cap12secret
+          secret:
+            secretName: {{ .Values.credentials.caP12SecretName }}
+      {{- end }}
+  backoffLimit: 4
