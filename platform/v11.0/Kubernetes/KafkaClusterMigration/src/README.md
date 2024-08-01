@@ -16,9 +16,6 @@ During the jump between internal and external kafka, there was the need of renam
 - [Kafka Connect Mirror](https://github.com/a0x8o/kafka/blob/master/connect/mirror/README.md)
 - [Microsoft Tutorial](https://learn.microsoft.com/en-us/azure/hdinsight/kafka/apache-kafka-mirror-maker-2)
 
-## Build
-- gradle buildDockerImage
-
 ## Testing
 
 ### Start local clusters

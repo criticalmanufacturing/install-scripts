@@ -30,8 +30,8 @@ services:
       # DYNAMIC_CONFIG_ENABLED: "true"
 
     # volumes:
-    #   - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/certs/user.p12:/user.p12
-    #   - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/certs/ca.p12:/ca.p12
+    #   - ./certs/user.p12:/user.p12
+    #   - ./certs/ca.p12:/ca.p12
 
   sourceKafka:
     image: confluentinc/cp-kafka:7.2.1
@@ -59,7 +59,7 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
     volumes:
-      - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/scripts/update_run.sh:/tmp/update_run.sh
+      - ./scripts/update_run.sh:/tmp/update_run.sh
     command: 'bash -c ''if [ ! -f /tmp/update_run.sh ]; then echo "ERROR: Did you forget the update_run.sh file that came with this docker-compose.yml file?" && exit 1 ; else /tmp/update_run.sh && /etc/confluent/docker/run ; fi'''
 
   targetKafka:
@@ -88,7 +88,7 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
     volumes:
-      - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/scripts/update_run.sh:/tmp/update_run.sh
+      - ./scripts/update_run.sh:/tmp/update_run.sh
     command: 'bash -c ''if [ ! -f /tmp/update_run.sh ]; then echo "ERROR: Did you forget the update_run.sh file that came with this docker-compose.yml file?" && exit 1 ; else /tmp/update_run.sh && /etc/confluent/docker/run ; fi'''
 
   kafka-init-topics:
@@ -97,7 +97,7 @@ services:
     container_name: kafkaInitTopics
     user: root
     volumes:
-      - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/datausers/:/data/
+      - ./datausers/:/data/
     depends_on:
       - sourceKafka
     command: "bash -c 'echo Waiting for Kafka to be ready... && \
@@ -112,7 +112,7 @@ services:
     container_name: kafkaInitTopics2
     user: root
     volumes:
-      - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/datamessages/:/data/
+      - ./test/datamessages/:/data/
     depends_on:
       - sourceKafka
     command: "bash -c 'echo Waiting for Kafka to be ready... && \

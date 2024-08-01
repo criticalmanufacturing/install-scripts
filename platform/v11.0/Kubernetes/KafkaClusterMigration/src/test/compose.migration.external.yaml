@@ -17,8 +17,8 @@ services:
       SSL_TRUSTSTORE_LOCATION: /opt/bitnami/kafka/bin/ca.p12
       SSL_TRUSTSTORE_PASSWORD: ThePassword
     volumes:
-      - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/certs/user.p12:/opt/bitnami/kafka/bin/user.p12
-      - ${SOURCE_PATH}Tools/External/KafkaClusterMigration/test/certs/ca.p12:/opt/bitnami/kafka/bin/ca.p12
+      - ./certs/user.p12:/opt/bitnami/kafka/bin/user.p12
+      - ./certs/ca.p12:/opt/bitnami/kafka/bin/ca.p12
 networks:
   test_default:
     external: true
