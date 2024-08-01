@@ -1,0 +1,18 @@
+services:
+  kafkaclustermigration:
+    container_name: kafkaclustermigration
+    image: dev.criticalmanufacturing.io/criticalmanufacturing/kafkaclustermigrationtov11:local
+    user: root
+    networks:
+      - test_default
+    environment:
+      SOURCE_BOOTSTRAP_SERVERS: sourceKafka:29092
+      TARGET_BOOTSTRAP_SERVERS: targetKafka:29092
+      NEW_SYSTEM_NAME: mesresult
+      OLD_SYSTEM_NAME: MES
+      SECURITY_PROTOCOL: PLAINTEXT
+      MIGRATED_TOPICS_REPLICATION_FACTOR: 1
+      MM2_REPLICATION_FACTOR: 1
+networks:
+  test_default:
+    external: true

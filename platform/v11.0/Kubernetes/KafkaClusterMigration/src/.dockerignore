@@ -1,0 +1,6 @@
+# Ignore everything
+*
+# Allow only necessary files and folders
+!config/
+!src/
+!pom.xml
