@@ -22,7 +22,7 @@ During the jump between internal and external kafka, there was the need of renam
 ## Testing
 
 ### Start local clusters
-Under KafkaClusterMigration run `docker compose -f ./test/compose.local.yaml up` to start a docker stack with:
+Under KafkaClusterMigration/src run `docker compose -f ./test/compose.local.yaml up` to start a docker stack with:
 - 2 Kafka clusters
 - Kafka UI connected to both clusters
 - An Init container that will create topics, consumers and publish some messages to the sourceKafka cluster
