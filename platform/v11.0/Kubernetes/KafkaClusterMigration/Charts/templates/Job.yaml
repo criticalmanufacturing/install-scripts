@@ -12,7 +12,7 @@ spec:
     spec:
       restartPolicy: Never
       containers:
-        - image: push.criticalmanufacturing.io/tech/kafka-cluster-migration:11.0.0
+        - image: criticalmanufacturing.io/tech/kafka-cluster-migration:11.0.0
           imagePullPolicy: Always
           name: kafkaclustermigration
           env:
