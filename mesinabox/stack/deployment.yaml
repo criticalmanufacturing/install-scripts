@@ -22,7 +22,7 @@ spec:
       containers:
       - name: cmos
         image: dev.criticalmanufacturing.io/criticalmanufacturing/cmos:1.0.0
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: CUSTOMER_PORTAL_ADDRESS
           value: "portalqa.criticalmanufacturing.dev"
@@ -39,7 +39,7 @@ spec:
         - name: CONNECTION_CHECK_TIMEOUT
           value: "30000"
         ports:
-        - containerPort: 8081 
+        - containerPort: 8081
         securityContext:
           privileged: true
         volumeMounts:
