@@ -1,0 +1,24 @@
+services:
+  kafkaclustermigration:
+    container_name: kafkaclustermigration
+    image: criticalmanufacturing.io/tech/kafka-cluster-migration:11.0.0
+    user: root
+    networks:
+      - test_default
+    environment:
+      SOURCE_BOOTSTRAP_SERVERS: sourceKafka:29092
+      TARGET_BOOTSTRAP_SERVERS: bootstrap.dev:443
+      NEW_SYSTEM_NAME: mesresult
+      OLD_SYSTEM_NAME: MES
+      SECURITY_PROTOCOL: SSL
+      SSL_TYPE: PKCS12
+      SSL_KEYSTORE_LOCATION: /opt/bitnami/kafka/bin/user.p12
+      SSL_KEYSTORE_PASSWORD: ThePassword
+      SSL_TRUSTSTORE_LOCATION: /opt/bitnami/kafka/bin/ca.p12
+      SSL_TRUSTSTORE_PASSWORD: ThePassword
+    volumes:
+      - ./certs/user.p12:/opt/bitnami/kafka/bin/user.p12
+      - ./certs/ca.p12:/opt/bitnami/kafka/bin/ca.p12
+networks:
+  test_default:
+    external: true

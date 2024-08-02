@@ -1,0 +1,122 @@
+---
+# based on https://github.com/provectus/kafka-ui/blob/master/documentation/compose/kafka-ui.yaml
+services:
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    user: root
+    ports:
+      - 8080:8080
+    depends_on:
+      - sourceKafka
+      - targetKafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: sourceKafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: sourceKafka:29092
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+      KAFKA_CLUSTERS_1_NAME: targetKafka
+      KAFKA_CLUSTERS_1_BOOTSTRAPSERVERS: targetKafka:29092
+      KAFKA_CLUSTERS_1_METRICS_PORT: 9998
+      # KAFKA_CLUSTERS_2_NAME: externalKafka
+      # KAFKA_CLUSTERS_2_BOOTSTRAPSERVERS: bootstrap.dev:443
+      # KAFKA_CLUSTERS_2_PROPERTIES_SECURITY_PROTOCOL: SSL
+      # KAFKA_CLUSTERS_2_PROPERTIES_SSL_KEYSTORE_LOCATION: /user.p12
+      # KAFKA_CLUSTERS_2_PROPERTIES_SSL_KEYSTORE_PASSWORD: ThePassword
+      # KAFKA_CLUSTERS_2_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      # KAFKA_CLUSTERS_2_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /ca.p12
+      # KAFKA_CLUSTERS_2_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ThePassword
+      # KAFKA_CLUSTERS_2_PROPERTIES_SSL_TRUSTSTORE_TYPE: PKCS12
+      # KAFKA_CLUSTERS_2_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ''
+      # DYNAMIC_CONFIG_ENABLED: "true"
+
+    # volumes:
+    #   - ./certs/user.p12:/user.p12
+    #   - ./certs/ca.p12:/ca.p12
+
+  sourceKafka:
+    image: confluentinc/cp-kafka:7.2.1
+    hostname: sourceKafka
+    container_name: sourceKafka
+    user: root
+    ports:
+      - "9092:9092"
+      - "9997:9997"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://sourceKafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_OPTS: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=sourceKafka -Dcom.sun.management.jmxremote.rmi.port=9997
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@sourceKafka:29093"
+      KAFKA_LISTENERS: "PLAINTEXT://sourceKafka:29092,CONTROLLER://sourceKafka:29093,PLAINTEXT_HOST://0.0.0.0:9092"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+    volumes:
+      - ./scripts/update_run.sh:/tmp/update_run.sh
+    command: 'bash -c ''if [ ! -f /tmp/update_run.sh ]; then echo "ERROR: Did you forget the update_run.sh file that came with this docker-compose.yml file?" && exit 1 ; else /tmp/update_run.sh && /etc/confluent/docker/run ; fi'''
+
+  targetKafka:
+    image: confluentinc/cp-kafka:7.2.1
+    hostname: targetKafka
+    container_name: targetKafka
+    user: root
+    ports:
+      - "9093:9092"
+      - "9998:9998"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://targetKafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9998
+      KAFKA_JMX_OPTS: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=sourceKafka -Dcom.sun.management.jmxremote.rmi.port=9998
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@targetKafka:29093"
+      KAFKA_LISTENERS: "PLAINTEXT://targetKafka:29092,CONTROLLER://targetKafka:29093,PLAINTEXT_HOST://0.0.0.0:9092"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+    volumes:
+      - ./scripts/update_run.sh:/tmp/update_run.sh
+    command: 'bash -c ''if [ ! -f /tmp/update_run.sh ]; then echo "ERROR: Did you forget the update_run.sh file that came with this docker-compose.yml file?" && exit 1 ; else /tmp/update_run.sh && /etc/confluent/docker/run ; fi'''
+
+  kafka-init-topics:
+    image: confluentinc/cp-kafka:7.6.1-1-ubi8
+    hostname: kafkaInitTopics
+    container_name: kafkaInitTopics
+    user: root
+    volumes:
+      - ./datausers/:/data/
+    depends_on:
+      - sourceKafka
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+      cub kafka-ready -b sourceKafka:29092 1 30 && \
+      kafka-topics --create --topic mes_users --partitions 3 --replication-factor 1 --if-not-exists --bootstrap-server sourceKafka:29092 && \
+      kafka-console-producer --bootstrap-server sourceKafka:29092 -topic mes_users < /data/users.json && \
+      kafka-console-consumer --bootstrap-server sourceKafka:29092 -topic mes_users -group CDMBuilder -from-beginning'"
+
+  kafka-init-topics2:
+    image: confluentinc/cp-kafka:7.6.1-1-ubi8
+    hostname: kafkaInitTopics2
+    container_name: kafkaInitTopics2
+    user: root
+    volumes:
+      - ./test/datamessages/:/data/
+    depends_on:
+      - sourceKafka
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+      cub kafka-ready -b sourceKafka:29092 1 30 && \
+      kafka-topics --create --topic MES_dp_replication_shids --partitions 4 --replication-factor 1 --if-not-exists --bootstrap-server sourceKafka:29092 && \
+      kafka-console-producer --bootstrap-server sourceKafka:29092 -topic MES_dp_replication_shids < /data/messages.json && \
+      kafka-console-consumer --bootstrap-server sourceKafka:29092 -topic MES_dp_replication_shids -group MES_messages_consumer -from-beginning'"

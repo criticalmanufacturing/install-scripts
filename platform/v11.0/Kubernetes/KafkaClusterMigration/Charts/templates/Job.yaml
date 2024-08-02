@@ -10,9 +10,9 @@ spec:
       labels:
         {{- include "kafkaclustermigration.labels" . | nindent 8 }}
     spec:
-      restartPolicy: Never
+      restartPolicy: OnFailure
       containers:
-        - image: dev.criticalmanufacturing.io/criticalmanufacturing/kafkaclustermigrationtov11:latest
+        - image: criticalmanufacturing.io/tech/kafka-cluster-migration:11.0.0
           imagePullPolicy: Always
           name: kafkaclustermigration
           env:
