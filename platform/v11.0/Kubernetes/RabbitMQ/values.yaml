@@ -86,8 +86,8 @@ service:
     manager: "http-stats"
 
 auth:
-  password: "defaultPassword"
-  username: "default"
+  username: <username>
+  password: <password>
   ## Enable encryption to rabbitmq
   ## ref: https://www.rabbitmq.com/ssl.html
   ## @param auth.tls.enabled Enable TLS support on RabbitMQ
