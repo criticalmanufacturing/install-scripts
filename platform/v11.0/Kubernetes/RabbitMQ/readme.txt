@@ -1,5 +1,5 @@
 This helmchart was created based of the documentation provided in https://artifacthub.io/packages/helm/bitnami/rabbitmq and 
-https://github.com/bitnami/charts/blob/main/bitnami/rabbitmq/values.yaml. 
+https://github.com/bitnami/charts/blob/main/bitnami/rabbitmq/README.md. 
 
 Before running the script please verify and edit the values in values.yaml.
 
