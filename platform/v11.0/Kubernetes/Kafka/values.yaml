@@ -159,6 +159,22 @@ listeners:
     containerPort: 9095
     protocol: SASL_PLAINTEXT
     sslClientAuth: ""
+  ## @param listeners.extraListeners Array of listener objects to be appended to already existing listeners
+  ## E.g.
+  ## extraListeners:
+  ##  - name: CUSTOM
+  ##    containerPort: 9097
+  ##    protocol: SASL_PLAINTEXT
+  ##    sslClientAuth: ""
+  ##
+  extraListeners: []
+  ## NOTE: If set, below values will override configuration set using the above values (extraListeners.*, controller.*, interbroker.*, client.* and external.*)
+  ## @param listeners.overrideListeners Overrides the Kafka 'listeners' configuration setting.
+  ## @param listeners.advertisedListeners Overrides the Kafka 'advertised.listener' configuration setting.
+  ## @param listeners.securityProtocolMap Overrides the Kafka 'security.protocol.map' configuration setting.
+  overrideListeners: ""
+  advertisedListeners: "CLIENT://localhost:32125,INTERNAL://localhost:9094"
+  securityProtocolMap: ""
 ## @section Kafka SASL parameters
 ## Kafka SASL settings for authentication, required if SASL_PLAINTEXT or SASL_SSL listeners are configured
 ##
@@ -227,7 +243,7 @@ sasl:
 tls:
   ## @param tls.type Format to use for TLS certificates. Allowed types: `JKS` and `PEM`
   ##
-  type: PEM
+  type: JKS
   ## @param tls.pemChainIncluded Flag to denote that the Certificate Authority (CA) certificates are bundled with the endpoint cert.
   ## Certificates must be in proper order, where the top certificate is the leaf and the bottom certificate is the top-most intermediate CA.
   ##
@@ -667,7 +683,7 @@ provisioning:
   numPartitions: 1
   ## @param provisioning.replicationFactor Default replication factor for topics when unspecified
   ##
-  replicationFactor: 1
+  replicationFactor: 2
   ## Auth Configuration for kafka provisioning Job
   ##
   auth:
@@ -677,7 +693,7 @@ provisioning:
       ## @param provisioning.auth.tls.type Format to use for TLS certificates. Allowed types: `JKS` and `PEM`.
       ## Note: ignored if auth.tls.client.protocol different from one of these values: "SSL" "SASL_SSL"
       ##
-      type: PEM
+      type: JKS
       ## @param provisioning.auth.tls.certificatesSecret Existing secret containing the TLS certificates for the Kafka provisioning Job.
       ## When using 'jks' format for certificates, the secret should contain a truststore and a keystore.
       ## When using 'pem' format for certificates, the secret should contain one of the following:
