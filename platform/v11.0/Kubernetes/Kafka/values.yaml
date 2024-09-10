@@ -27,10 +27,15 @@ global:
 nameOverride: ""
 ## @param fullnameOverride String to fully override common.names.fullname
 ##
-fullnameOverride: ""
+fullnameOverride: "kafka-test"
 ## @param clusterDomain Default Kubernetes cluster domain
 ##
 clusterDomain: cluster.local
+## @param serviceBindings.enabled Create secret for service binding (Experimental)
+## Ref: https://servicebinding.io/service-provider/
+##
+serviceBindings:
+  enabled: false
 
 ## Bitnami Kafka image version
 ## ref: https://hub.docker.com/r/bitnami/kafka/tags/
@@ -62,7 +67,7 @@ image:
   pullSecrets: []
   ## Set to true if you would like to see extra information on logs
   ##
-  debug: false
+  debug: true
 
 ## @param extraInit Additional content for the kafka init script, rendered as a template.
 ##
@@ -122,9 +127,9 @@ listeners:
   ## @param listeners.client.protocol Security protocol for the Kafka client listener. Allowed values are 'PLAINTEXT', 'SASL_PLAINTEXT', 'SASL_SSL' and 'SSL'
   ## @param listeners.client.sslClientAuth Optional. If SASL_SSL is enabled, configure mTLS TLS authentication type. If SSL protocol is enabled, overrides tls.authType for this listener. Allowed values are 'none', 'requested' and 'required'
   client:
+    name: CLIENT
     containerPort: 9092
     protocol: SASL_SSL
-    name: CLIENT
     sslClientAuth: ""
   ## @param listeners.controller.name Name for the Kafka controller listener
   ## @param listeners.controller.containerPort Port for the Kafka controller listener
@@ -141,18 +146,18 @@ listeners:
   ## @param listeners.interbroker.protocol Security protocol for the Kafka inter-broker listener. Allowed values are 'PLAINTEXT', 'SASL_PLAINTEXT', 'SASL_SSL' and 'SSL'
   ## @param listeners.interbroker.sslClientAuth Optional. If SASL_SSL is enabled, configure mTLS TLS authentication type. If SSL protocol is enabled, overrides tls.authType for this listener. Allowed values are 'none', 'requested' and 'required'
   interbroker:
+    name: INTERNAL
     containerPort: 9094
     protocol: SASL_PLAINTEXT
-    name: INTERNAL
     sslClientAuth: ""
   ## @param listeners.external.containerPort Port for the Kafka external listener
   ## @param listeners.external.protocol Security protocol for the Kafka external listener. . Allowed values are 'PLAINTEXT', 'SASL_PLAINTEXT', 'SASL_SSL' and 'SSL'
   ## @param listeners.external.name Name for the Kafka external listener
   ## @param listeners.external.sslClientAuth Optional. If SASL_SSL is enabled, configure mTLS TLS authentication type. If SSL protocol is enabled, overrides tls.sslClientAuth for this listener. Allowed values are 'none', 'requested' and 'required'
   external:
+    name: EXTERNAL
     containerPort: 9095
     protocol: SASL_PLAINTEXT
-    name: EXTERNAL
     sslClientAuth: ""
 ## @section Kafka SASL parameters
 ## Kafka SASL settings for authentication, required if SASL_PLAINTEXT or SASL_SSL listeners are configured
@@ -209,13 +214,6 @@ sasl:
     users:
       - default
     passwords: "defaultPassword"
-  ## Credentials for Zookeeper communications.
-  ## @param sasl.zookeeper.user Username for zookeeper communications when SASL is enabled.
-  ## @param sasl.zookeeper.password Password for zookeeper communications when SASL is enabled.
-  ##
-  zookeeper:
-    user: ""
-    password: ""
   ## @param sasl.existingSecret Name of the existing secret containing credentials for clientUsers, interBrokerUser, controllerUser and zookeeperUser
   ## Create this secret running the command below where SECRET_NAME is the name of the secret you want to create:
   ##       kubectl create secret generic SECRET_NAME --from-literal=client-passwords=CLIENT_PASSWORD1,CLIENT_PASSWORD2 --from-literal=inter-broker-password=INTER_BROKER_PASSWORD --from-literal=inter-broker-client-secret=INTER_BROKER_CLIENT_SECRET --from-literal=controller-password=CONTROLLER_PASSWORD --from-literal=controller-client-secret=CONTROLLER_CLIENT_SECRET --from-literal=zookeeper-password=ZOOKEEPER_PASSWORD
@@ -229,7 +227,7 @@ sasl:
 tls:
   ## @param tls.type Format to use for TLS certificates. Allowed types: `JKS` and `PEM`
   ##
-  type: JKS
+  type: PEM
   ## @param tls.pemChainIncluded Flag to denote that the Certificate Authority (CA) certificates are bundled with the endpoint cert.
   ## Certificates must be in proper order, where the top certificate is the leaf and the bottom certificate is the top-most intermediate CA.
   ##
@@ -312,49 +310,12 @@ tls:
   ## ref: https://docs.confluent.io/current/kafka/authentication_ssl.html#optional-settings
   ##
   sslClientAuth: "required"
-  ## Zookeeper TLS connection configuration for Kafka
-  ##
-  zookeeper:
-    ## @param tls.zookeeper.enabled Enable TLS for Zookeeper client connections.
-    ##
-    enabled: false
-    ## @param tls.zookeeper.verifyHostname Hostname validation.
-    ##
-    verifyHostname: true
-    ## @param tls.zookeeper.existingSecret Name of the existing secret containing the TLS certificates for ZooKeeper client communications.
-    ##
-    existingSecret: ""
-    ## @param tls.zookeeper.existingSecretKeystoreKey The secret key from the  tls.zookeeper.existingSecret containing the Keystore.
-    ##
-    existingSecretKeystoreKey: zookeeper.keystore.jks
-    ## @param tls.zookeeper.existingSecretTruststoreKey The secret key from the tls.zookeeper.existingSecret containing the Truststore.
-    ##
-    existingSecretTruststoreKey: zookeeper.truststore.jks
-    ## @param tls.zookeeper.passwordsSecret Existing secret containing Keystore and Truststore passwords.
-    ##
-    passwordsSecret: ""
-    ## @param tls.zookeeper.passwordsSecretKeystoreKey The secret key from the tls.zookeeper.passwordsSecret containing the password for the Keystore.
-    ## If no keystore password is included in the passwords secret, set this value to an empty string.
-    ##
-    passwordsSecretKeystoreKey: keystore-password
-    ## @param tls.zookeeper.passwordsSecretTruststoreKey The secret key from the tls.zookeeper.passwordsSecret containing the password for the Truststore.
-    ## If no truststore password is included in the passwords secret, set this value to an empty string.
-    ##
-    passwordsSecretTruststoreKey: truststore-password
-    ## @param tls.zookeeper.keystorePassword Password to access the JKS keystore when it is password-protected. Ignored when 'tls.passwordsSecret' is provided.
-    ## When using tls.type=PEM, the generated keystore will use this password or randomly generate one.
-    ##
-    keystorePassword: ""
-    ## @param tls.zookeeper.truststorePassword Password to access the JKS truststore when it is password-protected. Ignored when 'tls.passwordsSecret' is provided.
-    ## When using tls.type=PEM, the generated keystore will use this password or randomly generate one.
-    ##
-    truststorePassword: ""
 
 controller:
   ## @param controller.replicaCount Number of Kafka controller-eligible nodes
   ## Ignore this section if running in Zookeeper mode.
   ##
-  replicaCount: 3
+  replicaCount: 2
   resourcesPreset: "small"
   ## @param controller.resources Set container requests and limits for different resources like CPU or memory (essential for production workloads)
   ## Example:
@@ -366,7 +327,7 @@ controller:
   ##     cpu: 3
   ##     memory: 1024Mi
   ##
-  resources: {}
+  ## resources: {}
   ## Kafka pods' Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
   ## @param controller.podSecurityContext.enabled Enable security context for the pods
@@ -511,7 +472,7 @@ broker:
   ##     cpu: 3
   ##     memory: 1024Mi
   ##
-  resources: {}
+  ## resources: {}
   ## Kafka pods' Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
   ## @param broker.podSecurityContext.enabled Enable security context for the pods
@@ -661,8 +622,8 @@ service:
   ## NOTE: choose port between <30000-32767>
   ##
   nodePorts:
-    client: ""
-    external: ""
+    client: "32125"
+    external: "32126"
 
 ## ServiceAccount for Kafka
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
@@ -716,7 +677,7 @@ provisioning:
       ## @param provisioning.auth.tls.type Format to use for TLS certificates. Allowed types: `JKS` and `PEM`.
       ## Note: ignored if auth.tls.client.protocol different from one of these values: "SSL" "SASL_SSL"
       ##
-      type: jks
+      type: PEM
       ## @param provisioning.auth.tls.certificatesSecret Existing secret containing the TLS certificates for the Kafka provisioning Job.
       ## When using 'jks' format for certificates, the secret should contain a truststore and a keystore.
       ## When using 'pem' format for certificates, the secret should contain one of the following:
@@ -785,7 +746,7 @@ provisioning:
   ## @param provisioning.resourcesPreset Set container resources according to one common preset (allowed values: none, nano, micro, small, medium, large, xlarge, 2xlarge). This is ignored if provisioning.resources is set (provisioning.resources is recommended for production).
   ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
   ##
-  resourcesPreset: "micro"
+  resourcesPreset: "small"
   ## @param provisioning.resources Set container requests and limits for different resources like CPU or memory (essential for production workloads)
   ## Example:
   ## resources:
@@ -796,7 +757,7 @@ provisioning:
   ##     cpu: 3
   ##     memory: 1024Mi
   ##
-  resources: {}
+  ## resources: {}
   ## Kafka provisioning pods' Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
   ## @param provisioning.podSecurityContext.enabled Enable security context for the pods
@@ -867,50 +828,7 @@ kraft:
   controllerQuorumVoters: ""
 
 ## @section ZooKeeper chart parameters
-##
-## @param zookeeperChrootPath Path which puts data under some path in the global ZooKeeper namespace
-## ref: https://kafka.apache.org/documentation/#brokerconfigs_zookeeper.connect
-##
-zookeeperChrootPath: ""
-## ZooKeeper chart configuration
-## https://github.com/bitnami/charts/blob/main/bitnami/zookeeper/values.yaml
-##
 zookeeper:
   ## @param zookeeper.enabled Switch to enable or disable the ZooKeeper helm chart. Must be false if you use KRaft mode.
   ##
   enabled: false
-  ## @param zookeeper.replicaCount Number of ZooKeeper nodes
-  ##
-  replicaCount: 1
-  ## ZooKeeper authentication
-  ##
-  auth:
-    client:
-      ## @param zookeeper.auth.client.enabled Enable ZooKeeper auth
-      ##
-      enabled: false
-      ## @param zookeeper.auth.client.clientUser User that will use ZooKeeper client (zkCli.sh) to authenticate. Must exist in the serverUsers comma-separated list.
-      ##
-      clientUser: ""
-      ## @param zookeeper.auth.client.clientPassword Password that will use ZooKeeper client (zkCli.sh) to authenticate. Must exist in the serverPasswords comma-separated list.
-      ##
-      clientPassword: ""
-      ## @param zookeeper.auth.client.serverUsers Comma, semicolon or whitespace separated list of user to be created. Specify them as a string, for example: "user1,user2,admin"
-      ##
-      serverUsers: ""
-      ## @param zookeeper.auth.client.serverPasswords Comma, semicolon or whitespace separated list of passwords to assign to users when created. Specify them as a string, for example: "pass4user1, pass4user2, pass4admin"
-      ##
-      serverPasswords: ""
-  ## ZooKeeper Persistence parameters
-  ## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
-  ## @param zookeeper.persistence.enabled Enable persistence on ZooKeeper using PVC(s)
-  ## @param zookeeper.persistence.storageClass Persistent Volume storage class
-  ## @param zookeeper.persistence.accessModes Persistent Volume access modes
-  ## @param zookeeper.persistence.size Persistent Volume size
-  ##
-  persistence:
-    enabled: true
-    storageClass: ""
-    accessModes:
-      - ReadWriteOnce
-    size: 8Gi
