@@ -27,7 +27,7 @@ global:
 nameOverride: ""
 ## @param fullnameOverride String to fully override common.names.fullname
 ##
-fullnameOverride: "kafka-test"
+fullnameOverride: ""
 ## @param clusterDomain Default Kubernetes cluster domain
 ##
 clusterDomain: cluster.local
@@ -639,8 +639,8 @@ service:
   ## NOTE: choose port between <30000-32767>
   ##
   nodePorts:
-    client: "32125"
-    external: "32126"
+    client: ""
+    external: ""
 
 ## ServiceAccount for Kafka
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
