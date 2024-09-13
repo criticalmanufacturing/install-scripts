@@ -175,6 +175,7 @@ listeners:
   overrideListeners: ""
   advertisedListeners: "CLIENT://localhost:32125,INTERNAL://localhost:9094"
   securityProtocolMap: ""
+
 ## @section Kafka SASL parameters
 ## Kafka SASL settings for authentication, required if SASL_PLAINTEXT or SASL_SSL listeners are configured
 ##
@@ -331,7 +332,7 @@ controller:
   ## @param controller.replicaCount Number of Kafka controller-eligible nodes
   ## Ignore this section if running in Zookeeper mode.
   ##
-  replicaCount: 2
+  replicaCount: 3
   resourcesPreset: "small"
   ## @param controller.resources Set container requests and limits for different resources like CPU or memory (essential for production workloads)
   ## Example:
@@ -680,10 +681,10 @@ provisioning:
   automountServiceAccountToken: false
   ## @param provisioning.numPartitions Default number of partitions for topics when unspecified
   ##
-  numPartitions: 1
+  numPartitions: 3
   ## @param provisioning.replicationFactor Default replication factor for topics when unspecified
   ##
-  replicationFactor: 2
+  replicationFactor: 3
   ## Auth Configuration for kafka provisioning Job
   ##
   auth:
