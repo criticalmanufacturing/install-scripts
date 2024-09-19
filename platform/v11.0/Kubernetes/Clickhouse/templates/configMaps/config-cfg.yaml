@@ -42,11 +42,11 @@ data:
         {{- if not .Values.kafka.useSasl }}
         <kafka>
             <security_protocol>SSL</security_protocol>
-            {{- if .Values.kafka.mTLS.isToSetCA }}
-            <ssl_ca_location>{{ .Values.kafka.mTLS.credentialsLocation }}root.crt</ssl_ca_location>
+            {{- if .Values.kafka.clientCredentials.isToSetCA }}
+            <ssl_ca_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}root.crt</ssl_ca_location>
             {{- end }}
-            <ssl_certificate_location>{{ .Values.kafka.mTLS.credentialsLocation }}client.crt</ssl_certificate_location>
-            <ssl_key_location>{{ .Values.kafka.mTLS.credentialsLocation }}client.key</ssl_key_location>
+            <ssl_certificate_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.crt</ssl_certificate_location>
+            <ssl_key_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.key</ssl_key_location>
             {{- if .Values.kafka.validateCertificates }}
             <ssl_endpoint_identification_algorithm>https</ssl_endpoint_identification_algorithm>
             <enable_ssl_certificate_verification>true</enable_ssl_certificate_verification>

@@ -37,7 +37,7 @@ spec:
             mountPath: /var/log/clickhouse-server/
           {{- if not .Values.kafka.useSasl }}
           - name: kafkasecrets
-            mountPath: {{ .Values.kafka.mTLS.credentialsLocation }}
+            mountPath: {{ .Values.kafka.clientCredentials.credentialsLocation }}
           {{- end }}
           - name: clickhousesecrets
             mountPath: /tmp/ClickHouseData/Certificates/Generic
@@ -62,7 +62,7 @@ spec:
       volumes:
       {{- if not .Values.kafka.useSasl }}  
       - secret:
-          secretName: {{ .Values.kafka.mTLS.secretName }}  
+          secretName: {{ .Values.kafka.clientCredentials.secretName }}  
         name: kafkasecrets  
       {{- end }}
       - secret:

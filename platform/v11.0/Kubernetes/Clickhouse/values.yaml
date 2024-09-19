@@ -82,7 +82,7 @@ kafka:
   sasl: 
     username: theUsername
     password: thePassword
-  mTLS:    
+  clientCredentials:    
     credentialsLocation: /tmp/ClickHouseData/Certificates/Kafka/
     isToSetCA: false # When using self signed certificates, set to true
     # When using existing secrets the must must specify Cluster CA, user private key and user public key
