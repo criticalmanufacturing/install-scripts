@@ -50,7 +50,7 @@ serviceBindings:
 image:
   registry: docker.io
   repository: bitnami/kafka
-  tag: 3.8.0-debian-12-r3
+  tag: 3.8.0-debian-12-r5
   digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
@@ -67,7 +67,7 @@ image:
   pullSecrets: []
   ## Set to true if you would like to see extra information on logs
   ##
-  debug: true
+  debug: false
 
 ## @param extraInit Additional content for the kafka init script, rendered as a template.
 ##
@@ -173,7 +173,7 @@ listeners:
   ## @param listeners.advertisedListeners Overrides the Kafka 'advertised.listener' configuration setting.
   ## @param listeners.securityProtocolMap Overrides the Kafka 'security.protocol.map' configuration setting.
   overrideListeners: ""
-  advertisedListeners: "CLIENT://localhost:32125,INTERNAL://localhost:9094"
+  advertisedListeners: ""
   securityProtocolMap: ""
 
 ## @section Kafka SASL parameters
@@ -333,6 +333,11 @@ controller:
   ## Ignore this section if running in Zookeeper mode.
   ##
   replicaCount: 3
+  ## Kafka resource requests and limits
+  ## ref: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  ## @param controller.resourcesPreset Set container resources according to one common preset (allowed values: none, nano, micro, small, medium, large, xlarge, 2xlarge). This is ignored if controller.resources is set (controller.resources is recommended for production).
+  ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
+  ##
   resourcesPreset: "small"
   ## @param controller.resources Set container requests and limits for different resources like CPU or memory (essential for production workloads)
   ## Example:
@@ -345,6 +350,36 @@ controller:
   ##     memory: 1024Mi
   ##
   ## resources: {}
+  ## Configure extra options for Kafka containers' liveness, readiness and startup probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes
+  ## @param controller.livenessProbe.enabled Enable livenessProbe on Kafka containers
+  ## @param controller.livenessProbe.initialDelaySeconds Initial delay seconds for livenessProbe
+  ## @param controller.livenessProbe.periodSeconds Period seconds for livenessProbe
+  ## @param controller.livenessProbe.timeoutSeconds Timeout seconds for livenessProbe
+  ## @param controller.livenessProbe.failureThreshold Failure threshold for livenessProbe
+  ## @param controller.livenessProbe.successThreshold Success threshold for livenessProbe
+  ##
+  livenessProbe:
+    enabled: false
+    initialDelaySeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    periodSeconds: 10
+    successThreshold: 1
+  ## @param controller.readinessProbe.enabled Enable readinessProbe on Kafka containers
+  ## @param controller.readinessProbe.initialDelaySeconds Initial delay seconds for readinessProbe
+  ## @param controller.readinessProbe.periodSeconds Period seconds for readinessProbe
+  ## @param controller.readinessProbe.timeoutSeconds Timeout seconds for readinessProbe
+  ## @param controller.readinessProbe.failureThreshold Failure threshold for readinessProbe
+  ## @param controller.readinessProbe.successThreshold Success threshold for readinessProbe
+  ##
+  readinessProbe:
+    enabled: false
+    initialDelaySeconds: 5
+    failureThreshold: 6
+    timeoutSeconds: 5
+    periodSeconds: 10
+    successThreshold: 1
   ## Kafka pods' Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
   ## @param controller.podSecurityContext.enabled Enable security context for the pods
