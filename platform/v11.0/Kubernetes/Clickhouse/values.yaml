@@ -77,7 +77,7 @@ clickhouseConfig:
 
 # Secrets
 kafka:
-  useSasl: false
+  useClientCredentials: true
   validateCertificates: true # If using self signed certificates, set to false
   sasl: 
     username: theUsername

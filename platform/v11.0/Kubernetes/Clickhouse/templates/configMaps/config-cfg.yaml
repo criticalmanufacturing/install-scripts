@@ -39,7 +39,7 @@ data:
                 </invalidCertificateHandler>
             </client>
         </openSSL>
-        {{- if not .Values.kafka.useSasl }}
+        {{- if .Values.kafka.useClientCredentials }}
         <kafka>
             <security_protocol>SSL</security_protocol>
             {{- if .Values.kafka.clientCredentials.isToSetCA }}

@@ -35,7 +35,7 @@ spec:
             mountPath: /var/lib/clickhouse/
           - name: {{ .Values.clickhouseLog.pvcName }}
             mountPath: /var/log/clickhouse-server/
-          {{- if not .Values.kafka.useSasl }}
+          {{- if .Values.kafka.useClientCredentials }}
           - name: kafkasecrets
             mountPath: {{ .Values.kafka.clientCredentials.credentialsLocation }}
           {{- end }}
@@ -60,7 +60,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-      {{- if not .Values.kafka.useSasl }}  
+      {{- if .Values.kafka.useClientCredentials }}  
       - secret:
           secretName: {{ .Values.kafka.clientCredentials.secretName }}  
         name: kafkasecrets  
