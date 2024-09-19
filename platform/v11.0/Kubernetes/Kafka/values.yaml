@@ -525,6 +525,36 @@ broker:
   ##     memory: 1024Mi
   ##
   ## resources: {}
+  ## Configure extra options for Kafka containers' liveness, readiness and startup probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes
+  ## @param broker.livenessProbe.enabled Enable livenessProbe on Kafka containers
+  ## @param broker.livenessProbe.initialDelaySeconds Initial delay seconds for livenessProbe
+  ## @param broker.livenessProbe.periodSeconds Period seconds for livenessProbe
+  ## @param broker.livenessProbe.timeoutSeconds Timeout seconds for livenessProbe
+  ## @param broker.livenessProbe.failureThreshold Failure threshold for livenessProbe
+  ## @param broker.livenessProbe.successThreshold Success threshold for livenessProbe
+  ##
+  livenessProbe:
+    enabled: false
+    initialDelaySeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    periodSeconds: 10
+    successThreshold: 1
+  ## @param broker.readinessProbe.enabled Enable readinessProbe on Kafka containers
+  ## @param broker.readinessProbe.initialDelaySeconds Initial delay seconds for readinessProbe
+  ## @param broker.readinessProbe.periodSeconds Period seconds for readinessProbe
+  ## @param broker.readinessProbe.timeoutSeconds Timeout seconds for readinessProbe
+  ## @param broker.readinessProbe.failureThreshold Failure threshold for readinessProbe
+  ## @param broker.readinessProbe.successThreshold Success threshold for readinessProbe
+  ##
+  readinessProbe:
+    enabled: false
+    initialDelaySeconds: 5
+    failureThreshold: 6
+    timeoutSeconds: 5
+    periodSeconds: 10
+    successThreshold: 1
   ## Kafka pods' Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
   ## @param broker.podSecurityContext.enabled Enable security context for the pods
