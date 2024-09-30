@@ -42,13 +42,17 @@ data:
         {{- if .Values.kafka.useClientCredentials }}
         <kafka>
             <security_protocol>SSL</security_protocol>
+            {{- if .Values.kafka.clientCredentials.useCA }}
             <ssl_ca_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}root.crt</ssl_ca_location>
+            {{- end }}
             <ssl_certificate_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.crt</ssl_certificate_location>
             <ssl_key_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.key</ssl_key_location>
-            {{- if .Values.kafka.clientCredentials.validateCertificates }}
+            {{- if .Values.kafka.validateCertificates }}
             <ssl_endpoint_identification_algorithm>https</ssl_endpoint_identification_algorithm>
+            <enable_ssl_certificate_verification>true</enable_ssl_certificate_verification>
             {{- else }}
             <ssl_endpoint_identification_algorithm>none</ssl_endpoint_identification_algorithm>
+            <enable_ssl_certificate_verification>false</enable_ssl_certificate_verification>
             {{- end }}
         </kafka>
         {{- else }}
@@ -57,6 +61,13 @@ data:
             <sasl_mechanism>PLAIN</sasl_mechanism>
             <sasl_username>{{ .Values.kafka.sasl.username }}</sasl_username>
             <sasl_password>{{ .Values.kafka.sasl.password }}</sasl_password>
+            {{- if .Values.kafka.validateCertificates }}
+            <ssl_endpoint_identification_algorithm>https</ssl_endpoint_identification_algorithm>
+            <enable_ssl_certificate_verification>true</enable_ssl_certificate_verification>
+            {{- else }}
+            <ssl_endpoint_identification_algorithm>none</ssl_endpoint_identification_algorithm>
+            <enable_ssl_certificate_verification>false</enable_ssl_certificate_verification>
+            {{- end }}
         </kafka>
         {{- end }}
         <http_port>8123</http_port>
