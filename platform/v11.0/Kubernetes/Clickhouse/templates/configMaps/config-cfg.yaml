@@ -42,7 +42,7 @@ data:
         {{- if .Values.kafka.useClientCredentials }}
         <kafka>
             <security_protocol>SSL</security_protocol>
-            {{- if .Values.kafka.clientCredentials.isToSetCA }}
+            {{- if .Values.kafka.clientCredentials.useCA }}
             <ssl_ca_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}root.crt</ssl_ca_location>
             {{- end }}
             <ssl_certificate_location>{{ .Values.kafka.clientCredentials.credentialsLocation }}client.crt</ssl_certificate_location>

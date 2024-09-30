@@ -84,14 +84,14 @@ kafka:
     password: thePassword
   clientCredentials:    
     credentialsLocation: /tmp/ClickHouseData/Certificates/Kafka/
-    isToSetCA: false # When using self signed certificates, set to true
+    useCA: true # When using self signed certificates, set to true
     # When using existing secrets the must must specify Cluster CA, user private key and user public key
-    # Cluster CA: root.crt Only required when isToSetCA is set to 'true'
+    # Cluster CA: root.crt Only required when useCA is set to 'true'
     # User public key: client.crt Not required when using sasl
     # User private key: client.key Not required when using sasl
     useExistingSecret: true
     secretName: <Secret name with kafka certificates>
-    caCertificate: "" # Only required when isToSetCA is set to 'true'
+    caCertificate: "" # Only required when useCA is set to 'true'
     clientPublicKey: "" # Not required when using sasl
     clientPrivateKey: "" # Not required when using sals
 
