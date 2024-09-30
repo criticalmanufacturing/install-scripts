@@ -86,7 +86,8 @@ extraConfig: ""
 ##
 ## E.g.
 ## extraConfigYaml:
-##   default.replication.factor: 3
+##     default.replication.factor: 1
+##     offsets.topic.replication.factor: 1
 ##
 extraConfigYaml: {}
 ## @param secretConfig Additional configuration to be appended at the end of the generated Kafka configuration file.
@@ -183,7 +184,7 @@ sasl:
   ## @param sasl.enabledMechanisms Comma-separated list of allowed SASL mechanisms when SASL listeners are configured. Allowed types: `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`, `OAUTHBEARER`
   ## NOTE: At the moment, Kafka Raft mode does not support SCRAM, that is why only PLAIN is configured.
   ##
-  enabledMechanisms: PLAIN,SCRAM-SHA-256,SCRAM-SHA-512
+  enabledMechanisms: PLAIN
   ## @param sasl.interBrokerMechanism SASL mechanism for inter broker communication.
   ##
   interBrokerMechanism: PLAIN
