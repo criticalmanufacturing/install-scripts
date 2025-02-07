@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.clickhouseConfig.name }}
+  labels:
+    {{- include "clickhouse.labels" . | nindent 4 }}
+data:
+  config: |
+    <?xml version="1.0"?>
+    <clickhouse>
+        <openSSL>
+            <server>
+                <loadDefaultCAFile>false</loadDefaultCAFile>
+                <caConfig>/tmp/ClickHouseData/Certificates/Generic/root.crt</caConfig>
+                <privateKeyFile>/tmp/ClickHouseData/Certificates/Generic/server.key</privateKeyFile>
+                <certificateFile>/tmp/ClickHouseData/Certificates/Generic/server.crt</certificateFile>
+                {{- if .Values.clickhouseConfig.openSSL.validateCertificates }}
+                <verificationMode>strict</verificationMode>
+                {{- else }}
+                <verificationMode>none</verificationMode>
+                {{- end }}
+                <cacheSessions>true</cacheSessions>
+                <disableProtocols>sslv2,sslv3</disableProtocols>
+                <preferServerCiphers>true</preferServerCiphers>
+            </server>
+            <client>
+                <loadDefaultCAFile>false</loadDefaultCAFile>
+                <caConfig>/tmp/ClickHouseData/Certificates/Generic/root.crt</caConfig>
+                <cacheSessions>true</cacheSessions>
+                <disableProtocols>sslv2,sslv3</disableProtocols>
+                <preferServerCiphers>true</preferServerCiphers>
+                {{- if .Values.clickhouseConfig.openSSL.validateCertificates }}
+                <verificationMode>strict</verificationMode>
+                {{- else }}
+                <verificationMode>none</verificationMode>
+                {{- end }}
+                <invalidCertificateHandler>
+                    <name>{{ .Values.clickhouseConfig.openSSL.invalidCertificateHandler }}</name>
+                </invalidCertificateHandler>
+            </client>
+        </openSSL>
+        <http_port>8123</http_port>
+        <https_port>{{ .Values.service.https.port }}</https_port>
+        <tcp_port>9000</tcp_port>
+        <tcp_port_secure>{{ .Values.service.nativetls.port }}</tcp_port_secure>
+        <logger>
+            <level>Warning</level>
+            <console>1</console>
+        </logger>
+    </clickhouse>
