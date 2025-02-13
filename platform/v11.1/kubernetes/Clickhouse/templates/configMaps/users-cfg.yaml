@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.usersConfig.name }}
+  labels:
+    {{- include "clickhouse.labels" . | nindent 4 }}
+data:
+  users: |
+    <clickhouse>
+        <users>
+            <default>
+                <password>{{ .Values.usersConfig.defaultPassword }}</password>
+            </default>
+        </users>
+    </clickhouse>

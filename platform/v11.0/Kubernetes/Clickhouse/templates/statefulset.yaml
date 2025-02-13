@@ -6,8 +6,7 @@ metadata:
     {{- include "clickhouse.labels" . | nindent 4 }}
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: {{ .Values.service.name }}
   selector:
     matchLabels:
       {{- include "clickhouse.selectorLabels" . | nindent 6 }}
