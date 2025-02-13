@@ -10,7 +10,6 @@ Before deploying this Helm chart, ensure you replace the following placeholders 
 - `<storage class for data>`
 - `<storage class for logs>`
 - `<default user password>`
-- `<Secret name with kafka certificates>`
 
 Additionally, increase the volume sizes if necessary.
 
