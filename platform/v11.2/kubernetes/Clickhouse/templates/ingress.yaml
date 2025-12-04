@@ -1,0 +1,20 @@
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ .Values.ingress.name }}
+  labels:
+    {{- include "clickhouse.labels" . | nindent 4 }}
+  annotations:
+    route.openshift.io/termination: "passthrough"
+spec:
+  rules:
+    - host: {{ .Values.ingress.name }}{{ .Values.ingress.hostSuffix }}
+      http:
+        paths:
+          - path: ''
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Values.service.name }}
+                port:
+                  number: {{ .Values.service.nativetls.port }}
