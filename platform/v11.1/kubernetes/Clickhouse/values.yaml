@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 image:
-  repository: clickhouse/clickhouse-server:24.2
+  repository: clickhouse/clickhouse-server:25.3
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
