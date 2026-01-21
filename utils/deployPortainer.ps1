@@ -1,5 +1,5 @@
 param (
-       [String]$RepositoryUrl = "https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main",
+       [String]$RepositoryUrl = "https://raw.githubusercontent.com/joaoopereira/install-scripts/development-add-sles-scripts",
        [String]$PortainerPassword = "",
        [Int]$PortainerPasswordLength = 18
       )

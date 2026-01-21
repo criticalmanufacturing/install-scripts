@@ -7,6 +7,12 @@ Critical Manufacturing Installation Scripts
 curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/install.bash | sudo bash
 ```
 
+## Prepare single server SLES environment
+
+```
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/development-add-sles-scripts/sles/install.bash | sudo bash
+```
+
 ## Prepare Windows environment
 
 The installation assumes that docker is installed and running.
