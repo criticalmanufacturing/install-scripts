@@ -1,0 +1,13 @@
+{{- /*
+One certificate for ClickHouse and Keeper (both run inside this chart and trust the same CA):
+native TLS 9440, HTTPS 8443, interserver HTTPS 9010, Keeper client 9281 and Keeper Raft 9234.
+*/ -}}
+{{- $docs := list -}}
+{{- $docs = append $docs (include "common.tls.caSecret" (dict "ctx" . "component" "clickhouse")) -}}
+{{- $docs = append $docs (include "common.tls.certificate" (dict "ctx" . "component" "clickhouse" "name" (include "clickhouse.tlsSecret" .) "cn" (include "clickhouse.fullname" .) "dnsNames" (include "clickhouse.tls.dnsNames" . | fromYamlArray) "ips" (list "127.0.0.1" "::1"))) -}}
+{{- range $docs }}
+{{- if trim . }}
+---
+{{ trim . }}
+{{- end }}
+{{- end }}

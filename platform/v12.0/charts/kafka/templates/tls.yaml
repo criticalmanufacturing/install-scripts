@@ -1,0 +1,43 @@
+{{- $mode := include "common.tls.mode" . -}}
+{{- $auth := include "kafka.authMethod" . -}}
+{{- $docs := list -}}
+{{- /* Chart-owned CA (auto mode, only when the shared "<prefix>-ca" does not exist). */ -}}
+{{- $docs = append $docs (include "common.tls.caSecret" (dict "ctx" . "component" "kafka")) -}}
+{{- /* Broker certificate (all listeners). */ -}}
+{{- $docs = append $docs (include "kafka.tls.brokerCertificate" .) -}}
+{{- if ne $mode "existing" -}}
+{{- if eq $auth "mtls" -}}
+{{- /* MES client certificate, CN=mes (principal User:mes). */ -}}
+{{- $docs = append $docs (include "common.tls.certificate" (dict "ctx" . "component" "kafka-client" "name" (include "kafka.tls.clientSecret" .) "cn" "mes" "pkcs8" true)) -}}
+{{- /* Monitor client certificate, CN=monitor, mounted by charts/otel ("<prefix>-kafka-monitor-tls"). */ -}}
+{{- $docs = append $docs (include "common.tls.certificate" (dict "ctx" . "component" "kafka-monitor" "name" (include "kafka.tls.monitorSecret" .) "cn" "monitor" "pkcs8" true)) -}}
+{{- end -}}
+{{- else -}}
+{{- /*
+Existing mode: Kafka reads only PKCS#8 keys. When the admin's Secret holds an RSA
+PKCS#1 key, a converted copy "<secret>-pkcs8" is created and mounted instead.
+The copy is refreshed on every "helm upgrade".
+*/ -}}
+{{- $sources := list .Values.kafka.tls.existingSecret -}}
+{{- if eq $auth "mtls" -}}
+{{- $sources = append $sources (required "global.tls.mode=existing with kafka.auth.method=mtls requires kafka.tls.existingClientSecret (MES client certificate, CN=mes)" .Values.kafka.tls.existingClientSecret) -}}
+{{- end -}}
+{{- range $name := $sources -}}
+{{- if include "kafka.tls.needsPkcs8" (dict "ctx" $ "name" $name) -}}
+{{- $s := lookup "v1" "Secret" $.Release.Namespace $name -}}
+{{- $key := include "common.tls.pkcs8" (index $s.data "tls.key" | b64dec) -}}
+{{- $doc := dict "apiVersion" "v1" "kind" "Secret" "type" "kubernetes.io/tls"
+      "metadata" (dict "name" (printf "%s-pkcs8" $name | trunc 63 | trimSuffix "-") "namespace" $.Release.Namespace
+                        "labels" (include "common.labels" (dict "ctx" $ "component" "kafka") | fromYaml)
+                        "annotations" (dict "cmf.criticalmanufacturing.com/source-secret" $name))
+      "data" (dict "tls.crt" (index $s.data "tls.crt") "tls.key" ($key | b64enc) "ca.crt" (index $s.data "ca.crt")) -}}
+{{- $docs = append $docs (toYaml $doc) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- range $docs }}
+{{- if trim . }}
+---
+{{ trim . }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,152 @@
+{{- include "clickhouse.validate" . -}}
+{{- $ch := .Values.clickhouse -}}
+{{- $uid := int (include "clickhouse.uid" .) -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+spec:
+  serviceName: {{ include "clickhouse.headless" . }}
+  replicas: {{ int $ch.replicas }}
+  # Replicas start together: each one fetches missing data from the others.
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" (dict "ctx" . "component" "clickhouse") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "clickhouse") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-clickhouse.yaml") . | sha256sum }}
+        checksum/users: {{ include (print $.Template.BasePath "/secret-users.yaml") . | sha256sum }}
+    spec:
+      {{- include "common.imagePullSecrets" . | nindent 6 }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 6 }}
+      {{- include "common.affinity" (dict "ctx" . "component" "clickhouse" "affinity" $ch.affinity) | nindent 6 }}
+      {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $ch.nodeSelector "tolerations" $ch.tolerations) | nindent 6 }}
+      terminationGracePeriodSeconds: {{ int $ch.terminationGracePeriodSeconds }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: clickhouse
+          image: {{ include "common.image" (dict "ctx" . "image" $ch.image) }}
+          imagePullPolicy: {{ $ch.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          # The server is started by this script, not by the image entrypoint (which chowns
+          # directories as root and writes into users.d). It first checks the TLS files and
+          # waits for Keeper.
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              {{- include "clickhouse.tlsCheck" (dict "ctx" . "dir" "/etc/clickhouse-server/tls") | nindent 14 }}
+              {{- include "clickhouse.waitForKeeper" . | nindent 14 }}
+              exec /usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # {replica} macro and the name other replicas use to fetch data from this one.
+            - name: CLICKHOUSE_REPLICA
+              value: $(POD_NAME)
+            - name: CLICKHOUSE_INTERSERVER_HOST
+              value: $(POD_NAME).{{ include "common.svcFqdn" (dict "ctx" . "name" (include "clickhouse.headless" .)) }}
+            - name: CLICKHOUSE_WATCHDOG_ENABLE
+              value: "0"
+            - name: TZ
+              value: UTC
+            {{- include "clickhouse.secretEnv" . | trim | nindent 12 }}
+          ports:
+            - name: tcp-secure
+              containerPort: 9440
+            - name: https
+              containerPort: 8443
+            - name: interserver
+              containerPort: 9010
+            - name: metrics
+              containerPort: 9363
+          # Loading the tables of a large database can take a while: up to 10 minutes.
+          startupProbe:
+            {{- include "clickhouse.probe" . | nindent 12 }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            {{- include "clickhouse.probe" . | nindent 12 }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            {{- include "clickhouse.probe" . | nindent 12 }}
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
+          {{- with $ch.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            - name: config
+              mountPath: /etc/clickhouse-server/config.d
+              readOnly: true
+            - name: users
+              mountPath: /etc/clickhouse-server/users.d
+              readOnly: true
+            - name: tls
+              mountPath: /etc/clickhouse-server/tls
+              readOnly: true
+            - name: client-config
+              mountPath: /etc/clickhouse-client/config.d
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "clickhouse.configMap" . }}
+            items:
+              - {key: 00-cmmes.xml, path: 00-cmmes.xml}
+              {{- if $ch.extraConfig }}
+              - {key: 90-extra.xml, path: 90-extra.xml}
+              {{- end }}
+        - name: users
+          secret:
+            secretName: {{ include "clickhouse.usersSecret" . }}
+            items:
+              - {key: users.xml, path: 00-cmmes-users.xml}
+        - name: tls
+          secret:
+            secretName: {{ include "clickhouse.tlsSecret" . }}
+            # optional: a missing key is reported by the start command (see clickhouse.tlsCheck).
+            optional: true
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+              - {key: ca.crt, path: ca.crt}
+        - name: client-config
+          configMap:
+            name: {{ include "clickhouse.configMap" . }}
+            items:
+              - {key: client.xml, path: cmmes.xml}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "common.selectorLabels" (dict "ctx" . "component" "clickhouse") | nindent 10 }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- include "common.storageClass" (dict "ctx" . "storageClass" $ch.storage.storageClass) | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ $ch.storage.size }}

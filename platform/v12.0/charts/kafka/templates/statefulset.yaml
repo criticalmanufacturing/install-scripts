@@ -1,0 +1,170 @@
+{{- $k := .Values.kafka -}}
+{{- $uid := int (include "kafka.uid" .) -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "kafka.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "kafka") | nindent 4 }}
+spec:
+  serviceName: {{ include "kafka.headless" . }}
+  replicas: {{ include "kafka.replicas" . }}
+  # All servers start together: a KRaft quorum needs a majority of them.
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" (dict "ctx" . "component" "kafka") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "kafka") | nindent 8 }}
+        {{- with $k.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/users: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        {{- /* No TLS checksum: maintenance.sh reloads renewed certificates without a restart. */}}
+        {{- with $k.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "common.imagePullSecrets" . | nindent 6 }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 6 }}
+      {{- include "common.affinity" (dict "ctx" . "component" "kafka" "affinity" $k.affinity) | nindent 6 }}
+      {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $k.nodeSelector "tolerations" $k.tolerations) | nindent 6 }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # Leaves time for a controlled shutdown (partition leadership moved to other brokers).
+      terminationGracePeriodSeconds: {{ $k.terminationGracePeriodSeconds | default 180 }}
+      containers:
+        - name: kafka
+          image: {{ include "common.image" (dict "ctx" . "image" $k.image) }}
+          imagePullPolicy: {{ $k.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          command: ["/bin/bash", "/cm/scripts/start.sh"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: HEADLESS_SERVICE
+              value: {{ include "kafka.headless" . | quote }}
+            - name: CLUSTER_DOMAIN
+              value: {{ include "common.clusterDomain" . | quote }}
+            - name: KAFKA_CLUSTER_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafka.kraftSecret" . }}
+                  key: cluster-id
+            - name: KAFKA_INITIAL_CONTROLLERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafka.kraftSecret" . }}
+                  key: initial-controllers
+            - name: KAFKA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafka.usersSecret" . }}
+                  key: admin-password
+            - name: KAFKA_MES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafka.usersSecret" . }}
+                  key: mes-password
+            - name: KAFKA_MONITOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafka.usersSecret" . }}
+                  key: monitor-password
+            - name: KAFKA_SERVER_HEAP_OPTS
+              value: {{ $k.heapOpts | default "-Xms2g -Xmx2g" | quote }}
+            - name: KAFKA_QUORUM_BOOTSTRAPPED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "kafka.stateConfigMap" . }}
+                  key: quorum-bootstrapped
+                  optional: true
+            - name: LOG_DIR
+              value: /tmp/kafka-logs
+            {{- with $k.extraJvmOpts }}
+            - name: KAFKA_OPTS
+              value: {{ . | quote }}
+            {{- end }}
+          ports:
+            - name: client
+              containerPort: {{ include "kafka.port.client" . }}
+              protocol: TCP
+            - name: internal
+              containerPort: {{ include "kafka.port.internal" . }}
+              protocol: TCP
+            - name: controller
+              containerPort: {{ include "kafka.port.controller" . }}
+              protocol: TCP
+          # Startup: the broker answers an admin request (it has joined the cluster and
+          # loaded the metadata). Until then the other probes do not run, and a rolling
+          # update does not move on to the next broker.
+          startupProbe:
+            exec:
+              command: ["/bin/bash", "/cm/scripts/probe.sh"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 30
+            failureThreshold: {{ $k.probes.startupFailureThreshold | default 90 }}
+          readinessProbe:
+            tcpSocket:
+              port: client
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: internal
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml $k.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: scripts
+              mountPath: /cm/scripts
+              readOnly: true
+            - name: run
+              mountPath: /cm/run
+            - name: tls
+              mountPath: /cm/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "kafka.configMap" . }}
+        - name: run
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+        {{- include "kafka.tls.volume" (dict "name" "tls" "secret" (include "kafka.tls.brokerSecret" .) "keys" (list "tls.crt" "tls.key")) | nindent 8 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "common.selectorLabels" (dict "ctx" . "component" "kafka") | nindent 10 }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- include "common.storageClass" (dict "ctx" . "storageClass" $k.storage.storageClass) | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ $k.storage.size | default "50Gi" }}

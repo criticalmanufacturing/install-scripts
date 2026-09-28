@@ -1,0 +1,163 @@
+{{- if eq (include "s3.provider" .) "rustfs" }}
+{{- $r := .Values.s3.rustfs }}
+{{- $uid := int (include "s3.uid" .) }}
+{{- $bucket := include "s3.bucket" . }}
+# Creates the MES bucket and, when s3.rustfs.mesUser.enabled, a user that can only use it.
+# Idempotent: runs after every install and upgrade, and waits until RustFS is ready.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "s3-setup") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "s3-setup") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 1200
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "s3-setup") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with (include "common.imagePullSecrets" . | trim) }}{{ . | nindent 6 }}{{- end }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 6 }}
+      {{- with (include "common.scheduling" (dict "ctx" . "nodeSelector" $r.nodeSelector "tolerations" $r.tolerations) | trim) }}{{ . | nindent 6 }}{{- end }}
+      initContainers:
+        # 1. Bucket (aws-cli): wait for the S3 API, create the bucket if missing.
+        - name: bucket
+          image: {{ include "common.image" (dict "ctx" . "image" .Values.s3.awsCli.image) }}
+          imagePullPolicy: {{ .Values.s3.awsCli.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          env:
+            {{- include "s3.awsCliEnv" . | nindent 12 }}
+            - name: VERSIONING
+              value: {{ ternary "true" "false" (and $r.versioning true) | quote }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: root-access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: root-secret-key
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              mkdir -p "$HOME"
+              aws configure set default.s3.addressing_style path
+              echo "Waiting for the S3 API at $AWS_ENDPOINT_URL ..."
+              i=0
+              until aws s3api list-buckets --query 'Buckets[].Name' --output text >/dev/null 2>"$HOME/err"; do
+                i=$((i+1))
+                if [ "$i" -ge 90 ]; then cat "$HOME/err"; echo "RustFS is not ready after 15 minutes"; exit 1; fi
+                sleep 10
+              done
+              if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+                echo "Bucket $BUCKET already exists"
+              else
+                echo "Creating bucket $BUCKET"
+                aws s3api create-bucket --bucket "$BUCKET" || aws s3api head-bucket --bucket "$BUCKET"
+              fi
+              if [ "$VERSIONING" = "true" ]; then
+                echo "Enabling versioning on $BUCKET"
+                aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
+              fi
+          volumeMounts:
+            {{- include "s3.clientVolumeMounts" . | nindent 12 }}
+      containers:
+        {{- if $r.mesUser.enabled }}
+        # 2. MES user (RustFS admin API, signed with curl --aws-sigv4 from the RustFS image):
+        #    canned policy limited to the bucket (everything but deleting the bucket or changing
+        #    its policy), user (created or updated), policy mapping.
+        - name: mes-user
+          image: {{ include "common.image" (dict "ctx" . "image" $r.image) }}
+          imagePullPolicy: {{ $r.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          env:
+            - name: HOME
+              value: /tmp/home
+            - name: ENDPOINT
+              value: {{ include "s3.endpointUrl" . | quote }}
+            - name: REGION
+              value: {{ $r.region | default "us-east-1" | quote }}
+            - name: POLICY
+              value: {{ include "s3.mesPolicyName" . | quote }}
+            - name: BUCKET
+              value: {{ $bucket | quote }}
+            - name: ROOT_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: root-access-key
+            - name: ROOT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: root-secret-key
+            - name: MES_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: mes-access-key
+            - name: MES_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: mes-secret-key
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              mkdir -p "$HOME"
+              cd "$HOME"
+              # Credentials go through a curl config file, not the command line.
+              printf 'user = "%s:%s"\n' "$ROOT_ACCESS_KEY" "$ROOT_SECRET_KEY" > curl.cfg
+              admin() {  # admin <path?query> <body file>
+                n=0
+                until curl -sS --fail-with-body --cacert /etc/s3-tls/ca.crt -K curl.cfg \
+                    --aws-sigv4 "aws:amz:${REGION}:s3" -X PUT \
+                    -H "Content-Type: application/json" --data-binary "@$2" \
+                    -o out.txt -w '%{http_code}\n' "${ENDPOINT}/rustfs/admin/v3/$1"; do
+                  n=$((n+1))
+                  cat out.txt 2>/dev/null || true; echo
+                  if [ "$n" -ge 30 ]; then echo "Admin call $1 failed"; exit 1; fi
+                  sleep 10
+                done
+              }
+              cat > policy.json <<EOF
+              {"Version":"2012-10-17","Statement":[
+                {"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::${BUCKET}","arn:aws:s3:::${BUCKET}/*"]},
+                {"Effect":"Allow","Action":["s3:ListAllMyBuckets","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::*"]},
+                {"Effect":"Deny","Action":["s3:DeleteBucket","s3:PutBucketPolicy","s3:DeleteBucketPolicy"],"Resource":["arn:aws:s3:::${BUCKET}"]}
+              ]}
+              EOF
+              printf '{"secretKey":"%s","status":"enabled"}' "$MES_SECRET_KEY" > user.json
+              : > empty.json
+              echo "Creating policy $POLICY (bucket $BUCKET)"
+              admin "add-canned-policy?name=${POLICY}" policy.json
+              echo "Creating/updating user $MES_ACCESS_KEY"
+              admin "add-user?accessKey=${MES_ACCESS_KEY}" user.json
+              echo "Attaching $POLICY to $MES_ACCESS_KEY"
+              admin "set-user-or-group-policy?policyName=${POLICY}&userOrGroup=${MES_ACCESS_KEY}&isGroup=false" empty.json
+              rm -f curl.cfg user.json
+              echo "MES user ready"
+          volumeMounts:
+            {{- include "s3.clientVolumeMounts" . | nindent 12 }}
+        {{- else }}
+        - name: done
+          image: {{ include "common.image" (dict "ctx" . "image" .Values.s3.awsCli.image) }}
+          imagePullPolicy: {{ .Values.s3.awsCli.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          command: ["/bin/sh", "-c", "echo 'Bucket ready (MES uses the root credentials)'"]
+        {{- end }}
+      volumes:
+        {{- include "s3.clientVolumes" . | nindent 8 }}
+{{- end }}

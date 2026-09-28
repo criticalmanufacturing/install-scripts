@@ -1,0 +1,30 @@
+{{- $ns := .Release.Namespace -}}
+{{- $name := include "s3.fullname" . -}}
+{{- if eq (include "s3.provider" .) "rustfs" -}}
+RustFS ({{ .Values.s3.rustfs.replicas }} pods x {{ .Values.s3.rustfs.volumesPerPod }} volumes, parity {{ .Values.s3.rustfs.parity }}) is starting in namespace {{ $ns }}.
+S3 endpoint: {{ include "s3.endpointUrl" . }}   bucket: {{ include "s3.bucket" . }}
+
+Values to type in the CM MES installer (run ./install.sh to print them and save the CA):
+  kubectl -n {{ $ns }} get secret {{ $name }}-connection -o jsonpath='{.data.mes-installer\.txt}' | base64 -d
+  kubectl -n {{ $ns }} get secret {{ include "s3.tlsSecret" . }} -o jsonpath='{.data.ca\.crt}' | base64 -d > s3-ca.crt
+
+Check it:  helm test {{ .Release.Name }} -n {{ $ns }}
+{{- else -}}
+ObjectBucketClaim {{ $name }} created (StorageClass {{ .Values.s3.rgw.storageClass }}).
+Wait until it is Bound:
+  kubectl -n {{ $ns }} get objectbucketclaim {{ $name }}
+
+Values for the CM MES installer (./install.sh prints them):
+  Address:            kubectl -n {{ $ns }} get configmap {{ $name }} -o jsonpath='{.data.BUCKET_HOST}'
+  Port (443 = HTTPS): kubectl -n {{ $ns }} get configmap {{ $name }} -o jsonpath='{.data.BUCKET_PORT}'
+  Bucket Name:        kubectl -n {{ $ns }} get configmap {{ $name }} -o jsonpath='{.data.BUCKET_NAME}'
+  Region:             kubectl -n {{ $ns }} get configmap {{ $name }} -o jsonpath='{.data.BUCKET_REGION}'
+  AccessKey Id:       kubectl -n {{ $ns }} get secret {{ $name }} -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d
+  Secret Access Key:  kubectl -n {{ $ns }} get secret {{ $name }} -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d
+  Use Path Style:     true
+  Certificate Authority (OpenShift service CA, when the port is 443):
+    kubectl -n {{ $ns }} get configmap {{ .Values.s3.rgw.ca.configMap }} -o jsonpath='{.data.{{ .Values.s3.rgw.ca.key | replace "." "\\." }}}' > s3-ca.crt
+
+The claim is kept on "helm uninstall": deleting it deletes the bucket and all its data.
+Check it:  helm test {{ .Release.Name }} -n {{ $ns }}
+{{- end }}

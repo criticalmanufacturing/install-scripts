@@ -1,0 +1,180 @@
+# =============================================================================
+# Critical Manufacturing MES v12 - external dependencies: configuration
+# =============================================================================
+#
+# This is the only file you need to edit. It is used for every component:
+#   Kafka, ClickHouse, S3 storage and (optionally) the OpenTelemetry collector.
+#
+# How to use it:
+#   - Easiest: run ./install.sh and answer the questions. It writes your answers to
+#     values.generated.yaml (only what differs from this file). Re-run later with
+#       ./install.sh -n <namespace> -f values.generated.yaml
+#   - Or edit this file and run:  ./install.sh -n <namespace> -f values.yaml --yes
+#
+# Rules of thumb:
+#   - Keep the indentation (2 spaces, no tabs). Text after "#" is a comment.
+#   - Sizes use Kubernetes units: Mi, Gi, Ti (e.g. 100Gi).
+#   - Most settings can be changed later and applied by re-running install.sh.
+#     Exceptions are noted below ("cannot be changed after the first install").
+#   - Volume sizes ("size") can only be INCREASED later, and only when the StorageClass
+#     has "allowVolumeExpansion: true": install.sh then resizes the existing volumes
+#     (and asks first). They can never be decreased. The StorageClass of the volumes
+#     ("storageClass") cannot be changed after the first install.
+#
+# Advanced settings (CPU/memory, images, tuning, ...) are in charts/<name>/values.yaml
+# (kafka, clickhouse, s3, otel). To change one, copy the key into the matching section here.
+# =============================================================================
+
+global:
+  # Prefix of every resource name, e.g. "cmmes" gives cmmes-kafka, cmmes-clickhouse, cmmes-s3.
+  # Lowercase letters, digits and "-". Change it only to install a second, separate set in the
+  # same namespace. Cannot be changed after the first install.
+  namePrefix: cmmes
+
+  # StorageClass for all data volumes. "" = the cluster default StorageClass.
+  # Prefer block storage (Ceph RBD, cloud disks, vSphere...). List them with: kubectl get storageclass
+  # Cannot be changed after the first install.
+  storageClass: ""
+
+  # Private registry that mirrors the public images (air-gapped clusters), e.g.
+  # registry.example.com/mirror  ->  registry.example.com/mirror/apache/kafka:4.3.1
+  # "" = pull from the public registries (Docker Hub).
+  imageRegistry: ""
+
+  # Secrets with the credentials of the registry above (type kubernetes.io/dockerconfigjson),
+  # e.g. [my-registry-credentials]. [] = none.
+  imagePullSecrets: []
+
+  # auto (recommended) | openshift | kubernetes. auto detects OpenShift by itself.
+  platform: auto
+
+  # DNS domain of the cluster. Change it only if your cluster does not use the default.
+  clusterDomain: cluster.local
+
+  # How pods of the same component are spread over nodes:
+  #   hard - never two pods on the same node (recommended, needs at least 3 nodes)
+  #   soft - prefer different nodes, but allow sharing (test clusters with fewer nodes)
+  podAntiAffinity: hard
+
+  # Run all pods only on some nodes, e.g. {node-role.kubernetes.io/infra: ""}. {} = any node.
+  nodeSelector: {}
+  # Allow pods on tainted nodes, e.g. [{key: dedicated, operator: Equal, value: mes, effect: NoSchedule}]
+  tolerations: []
+
+  tls:
+    # All connections are encrypted (TLS). Where the certificates come from:
+    #   auto        - generated automatically, signed by one CA created by install.sh (recommended)
+    #   existing    - you provide Secrets with tls.crt, tls.key and ca.crt (set the
+    #                 "existingSecret" keys of each component below)
+    #   certManager - issued by cert-manager (must already be installed in the cluster)
+    mode: auto
+    # Name of the shared CA Secret used in "auto" mode. "" = "<namePrefix>-ca".
+    caSecret: ""
+    # true = create new certificates on the next install.sh run (auto mode). Then set it back to false.
+    regenerate: false
+    # Validity of the generated server certificates, in days (auto mode).
+    validityDays: 1825
+    # certManager mode only: the issuer that signs the certificates.
+    certManager:
+      issuerName: ""               # e.g. my-ca-issuer
+      issuerKind: ClusterIssuer    # ClusterIssuer | Issuer
+      issuerGroup: cert-manager.io
+
+# -----------------------------------------------------------------------------
+# Kafka (message bus)
+# -----------------------------------------------------------------------------
+kafka:
+  # true = install Kafka. false = skip it (e.g. you already have one).
+  enabled: true
+  # Number of Kafka servers. 3 is the minimum for high availability.
+  replicas: 3
+  auth:
+    # How CM MES authenticates to Kafka:
+    #   sasl - user name and password over TLS ("SASL_SSL Plain") (recommended)
+    #   mtls - client certificate (the files are saved by install.sh for the MES installer)
+    method: sasl
+  tls:
+    # tls.mode=existing only: Secret with the Kafka server certificate (tls.crt, tls.key, ca.crt).
+    # The key must be PKCS#8 ("BEGIN PRIVATE KEY").
+    existingSecret: ""
+    # tls.mode=existing and auth.method=mtls only: Secret with the MES client certificate.
+    existingClientSecret: ""
+  storage:
+    size: 50Gi          # data volume per Kafka server. Can only be increased later (see the top of this file).
+    storageClass: ""    # "" = global.storageClass
+
+# -----------------------------------------------------------------------------
+# ClickHouse (analytics database) and ClickHouse Keeper (its coordination service)
+# -----------------------------------------------------------------------------
+clickhouse:
+  enabled: true
+  # Number of ClickHouse servers (copies of the data). 2 is the minimum for high availability.
+  replicas: 2
+  tls:
+    existingSecret: ""  # tls.mode=existing only: ClickHouse server certificate Secret
+  storage:
+    size: 100Gi         # data volume per ClickHouse server
+    storageClass: ""
+  keeper:
+    # Number of Keeper servers. Must be odd; 3 tolerates the loss of one.
+    replicas: 3
+    storage:
+      size: 10Gi
+      storageClass: ""
+
+# -----------------------------------------------------------------------------
+# S3 object storage
+# -----------------------------------------------------------------------------
+s3:
+  enabled: true
+  # Where the S3 storage comes from:
+  #   rustfs - installed here: RustFS, distributed over several pods (recommended)
+  #   rgw    - an existing Ceph RGW (e.g. OpenShift Data Foundation): a bucket is requested
+  #            through an ObjectBucketClaim
+  provider: rustfs
+  # Name of the bucket used by CM MES.
+  bucket: cm-mes
+  rustfs:
+    # Number of RustFS servers. At least 3 (data is spread with erasure coding).
+    # Cannot be changed after the first install.
+    replicas: 3
+    # Data volumes per RustFS server. Cannot be changed after the first install.
+    volumesPerPod: 2
+    tls:
+      existingSecret: ""  # tls.mode=existing only: RustFS server certificate Secret
+    storage:
+      size: 100Gi         # size of EACH volume (total raw = replicas x volumesPerPod x size)
+      # Every volume must be on its own disk: use block storage. local-path, hostPath, NFS, CephFS
+      # and LVM (TopoLVM/LVMS) put the volumes of a pod on one device and RustFS refuses to start
+      # (s3.rustfs.allowSharedDisks: true bypasses this check, for test clusters only).
+      storageClass: ""
+  rgw:
+    # provider=rgw only: the bucket StorageClass of your Ceph RGW (kubectl get storageclass).
+    storageClass: ocs-storagecluster-ceph-rgw
+
+# -----------------------------------------------------------------------------
+# Monitoring (optional, recommended)
+# -----------------------------------------------------------------------------
+# When otlpEndpoint is set, an OpenTelemetry collector is installed. It collects the
+# metrics of the components above and sends them to that endpoint over OTLP/HTTP.
+# We recommend the Critical Manufacturing Observability service:
+#   https://www.criticalmanufacturing.com/observability/
+observability:
+  # OTLP/HTTP address, e.g. https://otlp.example.com:4318. "" = no monitoring.
+  otlpEndpoint: ""
+  # HTTP headers sent with the metrics, usually for authentication, e.g.
+  #   headers: {Authorization: "Bearer <token>"}
+  # They are stored in a Kubernetes Secret. Keep this file private if you put a token here.
+  headers: {}
+  tls:
+    # true = do not check the endpoint certificate (testing only).
+    insecureSkipVerify: false
+    # CA certificate (PEM) of the endpoint, if it uses a private CA. "" = trust public CAs. Example:
+    #   ca: |
+    #     -----BEGIN CERTIFICATE-----
+    #     ...
+    #     -----END CERTIFICATE-----
+    ca: ""
+  # Labels added to every metric, to recognise this installation, e.g.
+  #   {deployment.environment.name: production, site: plant-1}
+  resourceAttributes: {}

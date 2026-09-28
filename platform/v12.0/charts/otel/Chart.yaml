@@ -1,0 +1,17 @@
+apiVersion: v2
+name: otel
+description: >-
+  Optional OpenTelemetry collector for the Critical Manufacturing MES v12 dependencies.
+  It scrapes Kafka and ClickHouse metrics, receives RustFS telemetry over OTLP and
+  pushes everything to an OTLP/HTTP endpoint (CM Observability).
+type: application
+version: 12.0.0
+appVersion: "0.161.0"
+keywords:
+  - opentelemetry
+  - monitoring
+  - critical-manufacturing
+dependencies:
+  - name: common
+    version: 12.0.0
+    repository: file://../common

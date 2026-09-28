@@ -1,0 +1,15 @@
+apiVersion: v2
+name: s3
+description: S3 object storage for Critical Manufacturing MES v12 - a distributed RustFS cluster, or a bucket on an existing Ceph RGW (ObjectBucketClaim)
+type: application
+version: 12.0.0
+appVersion: "1.0.0"
+keywords:
+  - s3
+  - rustfs
+  - ceph
+  - critical-manufacturing
+dependencies:
+  - name: common
+    version: 12.0.0
+    repository: file://../common

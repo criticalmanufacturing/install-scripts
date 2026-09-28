@@ -1,0 +1,13 @@
+apiVersion: v2
+name: kafka
+description: Apache Kafka 4 (KRaft, combined controller+broker) for Critical Manufacturing MES v12
+type: application
+version: 12.0.0
+appVersion: "4.3.1"
+keywords:
+  - kafka
+  - critical-manufacturing
+dependencies:
+  - name: common
+    version: 12.0.0
+    repository: file://../common

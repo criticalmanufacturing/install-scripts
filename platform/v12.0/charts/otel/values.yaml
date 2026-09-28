@@ -1,0 +1,102 @@
+# Default values for the "otel" chart (OpenTelemetry collector).
+#
+# install.sh installs this chart only when observability.otlpEndpoint is set, and passes
+# the same values file as for the other charts. This chart reads "global", "observability"
+# and a few keys of the "kafka", "clickhouse" and "s3" sections to know what to monitor.
+
+global:
+  # Prefix of every resource name ("<prefix>-otel"). Must be the same for all charts.
+  namePrefix: cmmes
+  storageClass: ""            # not used by this chart (no volumes)
+  # Private registry that mirrors the public images, e.g. registry.example.com/mirror
+  imageRegistry: ""
+  # Names of existing Secrets (type kubernetes.io/dockerconfigjson) used to pull images.
+  imagePullSecrets: []
+  # auto | openshift | kubernetes. auto detects OpenShift through the security.openshift.io API.
+  platform: auto
+  clusterDomain: cluster.local
+  podAntiAffinity: hard       # not used by this chart (single replica)
+  nodeSelector: {}
+  tolerations: []
+  tls:
+    mode: auto                # not used by this chart; the collector trusts the Kafka CA from <prefix>-kafka-monitoring
+    caSecret: ""
+    regenerate: false
+    validityDays: 1825
+    certManager: {issuerName: "", issuerKind: ClusterIssuer, issuerGroup: cert-manager.io}
+
+# What to monitor. Only these keys are read here; the defaults match the kafka/clickhouse/s3 charts.
+kafka:
+  enabled: true               # false = do not collect Kafka metrics
+  auth:
+    method: sasl              # sasl | mtls (same value as for the kafka chart)
+  # The collector reads bootstrap/protocol/username/password from the Secret
+  # <prefix>-kafka-monitoring, the CA from the kafka chart's TLS Secret and, for mTLS, the
+  # "monitor" certificate from <prefix>-kafka-monitor-tls (or the existing Secrets below).
+  tls:
+    # Same value as for the kafka chart. tls.mode=existing: broker certificate Secret (for ca.crt).
+    existingSecret: ""
+    # Same value as for the kafka chart. With method=mtls and tls.mode=existing, the collector
+    # uses a client certificate only when this is set, otherwise the "monitor" user (SASL).
+    # The protocol key of the <prefix>-kafka-monitoring Secret wins when that Secret exists.
+    existingMonitorSecret: ""
+clickhouse:
+  enabled: true               # false = do not scrape ClickHouse / Keeper
+  replicas: 2                 # one scrape target per ClickHouse pod
+  keeper:
+    replicas: 3               # one scrape target per Keeper pod
+s3:
+  enabled: true
+  provider: rustfs            # rustfs pushes its telemetry to this collector over OTLP
+
+observability:
+  # OTLP/HTTP base URL of the metrics backend (e.g. CM Observability), e.g. https://otlp.example.com:4318
+  # Required: rendering fails when it is empty. "/v1/metrics" (and so on) is appended by the collector.
+  otlpEndpoint: ""
+  # Extra HTTP headers sent with every request, typically authentication:
+  #   headers: {Authorization: "Bearer <token>"}
+  # The values are stored in a Secret ("<prefix>-otel-headers"), not in the ConfigMap.
+  headers: {}
+  tls:
+    # true = do not verify the endpoint certificate (testing only).
+    insecureSkipVerify: false
+    # PEM of an extra CA that signed the endpoint certificate (private PKI). Empty = system CAs.
+    ca: ""
+  # Extra resource attributes added to every metric, e.g. {deployment.environment.name: production, site: porto}
+  resourceAttributes: {}
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.161.0"
+    pullPolicy: IfNotPresent
+  # Keep 1. The collector scrapes Kafka and ClickHouse itself, so every extra replica would
+  # scrape the same targets again and send duplicated metrics.
+  replicas: 1
+  # How often Kafka and ClickHouse metrics are collected.
+  scrapeInterval: 30s
+  # Kafka protocol version used by the kafka_metrics receiver. Empty = receiver default (2.1.0).
+  kafkaProtocolVersion: ""
+  # Signals accepted on the OTLP receiver (RustFS sends metrics, and can send traces and logs).
+  # Disabled signals are rejected by the collector.
+  otlpSignals:
+    metrics: true
+    traces: true
+    logs: true
+  # The memory_limiter processor refuses data before the container reaches its memory limit.
+  memoryLimiter:
+    limitPercentage: 80
+    spikeLimitPercentage: 20
+  logLevel: info              # debug | info | warn | error
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  nodeSelector: {}            # overrides global.nodeSelector when set
+  tolerations: []             # overrides global.tolerations when set
+  affinity: {}
+  podAnnotations: {}
+  podLabels: {}
+  service:
+    annotations: {}

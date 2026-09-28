@@ -1,0 +1,114 @@
+{{- /*
+helm test: as the MES user, over native TLS (9440) with the chart CA, create a
+ReplicatedMergeTree table ON CLUSTER in a temporary database, insert a row through the
+first replica, check that every replica returns it, then drop the database.
+*/ -}}
+{{- $ch := .Values.clickhouse -}}
+{{- $uid := int (include "clickhouse.uid" .) -}}
+{{- $hosts := list -}}
+{{- range $i := until (int $ch.replicas) -}}
+{{- $hosts = append $hosts (include "clickhouse.podFqdn" (dict "ctx" $ "index" $i)) -}}
+{{- end -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "clickhouse-test") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse-test") | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  {{- include "common.imagePullSecrets" . | nindent 2 }}
+  {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 2 }}
+  {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $ch.nodeSelector "tolerations" $ch.tolerations) | nindent 2 }}
+  containers:
+    - name: test
+      image: {{ include "common.image" (dict "ctx" . "image" $ch.image) }}
+      imagePullPolicy: {{ $ch.image.pullPolicy | default "IfNotPresent" }}
+      {{- include "common.containerSecurityContext" . | nindent 6 }}
+      env:
+        - name: HOME
+          value: /tmp
+        - name: SERVICE
+          value: {{ include "common.svcFqdn" (dict "ctx" . "name" (include "clickhouse.fullname" .)) | quote }}
+        - name: REPLICAS
+          value: {{ join " " $hosts | quote }}
+        - name: CLUSTER
+          value: {{ $ch.clusterName | quote }}
+        - name: CH_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "clickhouse.usersSecret" . }}
+              key: mes-username
+        - name: CH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "clickhouse.usersSecret" . }}
+              key: mes-password
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          q() {
+            local host="$1"; shift
+            clickhouse-client --config-file=/etc/cmmes/client.xml --secure --host "$host" --port 9440 \
+              --user "$CH_USER" --password "$CH_PASSWORD" --query "$*"
+          }
+          db="cmmes_helm_test_$(date +%s)_${RANDOM}"
+          cleanup() {
+            q "$SERVICE" "DROP DATABASE IF EXISTS ${db} ON CLUSTER ${CLUSTER} SYNC" >/dev/null || true
+          }
+          trap cleanup EXIT
+
+          echo "Connecting to ${SERVICE}:9440 (TLS) as ${CH_USER}"
+          q "$SERVICE" "SELECT 'ClickHouse ' || version() || ' on ' || hostName()"
+
+          echo "Creating ${db}.t (ReplicatedMergeTree) ON CLUSTER ${CLUSTER}"
+          q "$SERVICE" "CREATE DATABASE ${db} ON CLUSTER ${CLUSTER}"
+          q "$SERVICE" "CREATE TABLE ${db}.t ON CLUSTER ${CLUSTER} (id UInt64, v String) ENGINE = ReplicatedMergeTree ORDER BY id"
+
+          first="${REPLICAS%% *}"
+          echo "Inserting one row through ${first}"
+          q "$first" "INSERT INTO ${db}.t VALUES (1, 'cmmes')"
+
+          for host in ${REPLICAS}; do
+            q "$host" "SYSTEM SYNC REPLICA ${db}.t"
+            rows="$(q "$host" "SELECT count() FROM ${db}.t WHERE id = 1 AND v = 'cmmes'")"
+            if [ "$rows" != "1" ]; then
+              echo "FAILED: ${host} returned ${rows} rows instead of 1" >&2
+              exit 1
+            fi
+            echo "OK: ${host} has the row"
+          done
+
+          q "$SERVICE" "DROP DATABASE ${db} ON CLUSTER ${CLUSTER} SYNC"
+          trap - EXIT
+          echo "ClickHouse replication test passed"
+      volumeMounts:
+        - name: client-config
+          mountPath: /etc/cmmes
+          readOnly: true
+        - name: ca
+          mountPath: /etc/clickhouse-server/tls
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: client-config
+      configMap:
+        name: {{ include "clickhouse.configMap" . }}
+        items:
+          - {key: client.xml, path: client.xml}
+    - name: ca
+      secret:
+        secretName: {{ include "clickhouse.tlsSecret" . }}
+        items:
+          - {key: ca.crt, path: ca.crt}
+    - name: tmp
+      emptyDir: {}

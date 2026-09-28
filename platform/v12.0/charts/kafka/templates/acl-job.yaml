@@ -1,0 +1,101 @@
+{{- /*
+Creates the ACLs of the "mes" and "monitor" users, as the super user "admin", after
+every install and upgrade. "kafka-acls.sh --add" is idempotent, so running it again is
+harmless. ACLs removed by hand are re-created on the next upgrade.
+*/ -}}
+{{- $k := .Values.kafka -}}
+{{- $uid := int (include "kafka.uid" .) -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "kafka-acls") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "kafka-acls") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "kafka-acls") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- include "common.imagePullSecrets" . | nindent 6 }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 6 }}
+      {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $k.nodeSelector "tolerations" $k.tolerations) | nindent 6 }}
+      containers:
+        - name: acls
+          image: {{ include "common.image" (dict "ctx" . "image" $k.image) }}
+          imagePullPolicy: {{ $k.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          env:
+            - name: BOOTSTRAP
+              value: {{ include "kafka.brokerList" (dict "ctx" . "port" (include "kafka.port.internal" .)) | quote }}
+            - name: KAFKA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafka.usersSecret" . }}
+                  key: admin-password
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx256m"
+            - name: LOG_DIR
+              value: /tmp/kafka-logs
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              umask 077
+              {{- include "kafka.script.checkCA" . | nindent 14 }}
+              {{- include "kafka.script.escapeFns" . | nindent 14 }}
+              cat > /tmp/admin.properties <<EOF
+              security.protocol=SASL_SSL
+              sasl.mechanism=PLAIN
+              sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="$(jaas_escape "$KAFKA_ADMIN_PASSWORD")";
+              ssl.truststore.type=PEM
+              ssl.truststore.location=/cm/tls/ca.crt
+              EOF
+              B=/opt/kafka/bin
+              echo "Waiting for Kafka (${BOOTSTRAP})..."
+              for i in $(seq 1 90); do
+                if timeout 60 "$B/kafka-cluster.sh" cluster-id --bootstrap-server "$BOOTSTRAP" --command-config /tmp/admin.properties; then break; fi
+                if [ "$i" = 90 ]; then echo "Kafka is not reachable" >&2; exit 1; fi
+                sleep 10
+              done
+              acl() { "$B/kafka-acls.sh" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/admin.properties --add "$@" >/dev/null; }
+              echo "ACLs of User:mes (CM MES)"
+              acl --allow-principal User:mes --topic '*' \
+                --operation Alter --operation AlterConfigs --operation Create --operation Delete \
+                --operation Describe --operation DescribeConfigs --operation Read --operation Write
+              acl --allow-principal User:mes --group '*' \
+                --operation Read --operation Delete --operation Describe
+              acl --allow-principal User:mes --cluster \
+                --operation AlterConfigs --operation Create --operation Describe --operation DescribeConfigs
+              acl --allow-principal User:mes --transactional-id '*' --operation Describe --operation Write
+              # IdempotentWrite: implied by Write on a topic since Kafka 3.0; kept for older clients.
+              acl --allow-principal User:mes --cluster --operation IdempotentWrite
+              echo "ACLs of User:monitor (read-only, OpenTelemetry collector)"
+              acl --allow-principal User:monitor --topic '*' --operation Describe --operation DescribeConfigs
+              acl --allow-principal User:monitor --group '*' --operation Describe
+              acl --allow-principal User:monitor --cluster --operation Describe --operation DescribeConfigs
+              "$B/kafka-acls.sh" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/admin.properties --list
+          resources:
+            {{- toYaml $k.aclJob.resources | nindent 12 }}
+          volumeMounts:
+            - name: tls
+              mountPath: /cm/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        {{- include "kafka.tls.volume" (dict "name" "tls" "secret" (include "kafka.tls.brokerSecret" .)) | nindent 8 }}

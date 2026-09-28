@@ -1,0 +1,8 @@
+ClickHouse ({{ .Values.clickhouse.replicas }} replicas, cluster "{{ .Values.clickhouse.clusterName }}") and ClickHouse Keeper ({{ .Values.clickhouse.keeper.replicas }} servers) installed in namespace {{ .Release.Namespace }}.
+
+Values for the CM MES installer (install.sh prints them for you):
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "common.fullname" (dict "ctx" . "component" "clickhouse-connection") }} -o jsonpath='{.data.mes-installer\.txt}' | base64 -d
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "clickhouse.tlsSecret" . }} -o jsonpath='{.data.ca\.crt}' | base64 -d > clickhouse-ca.crt
+
+Check that replication works over TLS with the MES user:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
