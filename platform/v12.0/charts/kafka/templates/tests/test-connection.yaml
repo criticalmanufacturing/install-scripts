@@ -1,0 +1,110 @@
+{{- /*
+helm test: as the MES principal, over TLS on the client listener, create a topic,
+produce and consume one message, then delete the topic and the consumer group.
+*/ -}}
+{{- $k := .Values.kafka -}}
+{{- $uid := int (include "kafka.uid" .) -}}
+{{- $auth := include "kafka.authMethod" . -}}
+{{- $rf := min 3 (int (include "kafka.replicas" .)) -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "kafka-test") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "kafka-test") | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  {{- include "common.imagePullSecrets" . | nindent 2 }}
+  {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 2 }}
+  {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $k.nodeSelector "tolerations" $k.tolerations) | nindent 2 }}
+  containers:
+    - name: test
+      image: {{ include "common.image" (dict "ctx" . "image" $k.image) }}
+      imagePullPolicy: {{ $k.image.pullPolicy | default "IfNotPresent" }}
+      {{- include "common.containerSecurityContext" . | nindent 6 }}
+      env:
+        - name: BOOTSTRAP
+          value: {{ include "kafka.brokerList" (dict "ctx" . "port" (include "kafka.port.client" .)) | quote }}
+        {{- if eq $auth "sasl" }}
+        - name: KAFKA_MES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "kafka.usersSecret" . }}
+              key: mes-password
+        {{- end }}
+        - name: KAFKA_HEAP_OPTS
+          value: "-Xmx256m"
+        - name: LOG_DIR
+          value: /tmp/kafka-logs
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          umask 077
+          {{- include "kafka.script.checkCA" . | nindent 10 }}
+          {{- if eq $auth "sasl" }}
+          {{- include "kafka.script.escapeFns" . | nindent 10 }}
+          cat > /tmp/client.properties <<EOF
+          security.protocol=SASL_SSL
+          sasl.mechanism=PLAIN
+          sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="mes" password="$(jaas_escape "$KAFKA_MES_PASSWORD")";
+          ssl.truststore.type=PEM
+          ssl.truststore.location=/cm/tls/ca.crt
+          EOF
+          {{- else }}
+          { cat /cm/client/tls.key; echo; cat /cm/client/tls.crt; } > /tmp/keystore.pem
+          cat > /tmp/client.properties <<EOF
+          security.protocol=SSL
+          ssl.keystore.type=PEM
+          ssl.keystore.location=/tmp/keystore.pem
+          ssl.truststore.type=PEM
+          ssl.truststore.location=/cm/tls/ca.crt
+          EOF
+          {{- end }}
+          B=/opt/kafka/bin
+          C=(--bootstrap-server "$BOOTSTRAP" --command-config /tmp/client.properties)
+          T="cmmes-helm-test-$(date +%s)"
+          cleanup() {
+            "$B/kafka-consumer-groups.sh" "${C[@]}" --delete --group "$T" >/dev/null 2>&1 || true
+            "$B/kafka-topics.sh" "${C[@]}" --delete --if-exists --topic "$T" || true
+          }
+          trap cleanup EXIT
+          echo "Creating topic $T (replication factor {{ $rf }}) as {{ if eq $auth "sasl" }}User:mes (SASL_SSL){{ else }}CN=mes (mTLS){{ end }}"
+          "$B/kafka-topics.sh" "${C[@]}" --create --topic "$T" --partitions 1 --replication-factor {{ $rf }}
+          MSG="hello from helm test $T"
+          echo "Producing a message"
+          echo "$MSG" | "$B/kafka-console-producer.sh" "${C[@]}" --topic "$T" --command-property acks=all
+          echo "Consuming it"
+          GOT="$("$B/kafka-console-consumer.sh" "${C[@]}" --topic "$T" --group "$T" --from-beginning --max-messages 1 --timeout-ms 60000)"
+          if [ "$GOT" != "$MSG" ]; then echo "FAILED: expected '$MSG', got '$GOT'" >&2; exit 1; fi
+          echo "OK: Kafka accepts the MES credentials over TLS"
+      resources:
+        {{- toYaml $k.test.resources | nindent 8 }}
+      volumeMounts:
+        - name: tls
+          mountPath: /cm/tls
+          readOnly: true
+        {{- if eq $auth "mtls" }}
+        - name: client
+          mountPath: /cm/client
+          readOnly: true
+        {{- end }}
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: tmp
+      emptyDir:
+        sizeLimit: 256Mi
+    {{- include "kafka.tls.volume" (dict "name" "tls" "secret" (include "kafka.tls.brokerSecret" .)) | nindent 4 }}
+    {{- if eq $auth "mtls" }}
+    - name: client
+      secret:
+        secretName: {{ include "kafka.tls.clientSecret" . }}
+    {{- end }}

@@ -1,0 +1,162 @@
+{{- $obs := .Values.observability -}}
+{{- $kafka := include "otel.kafka" . -}}
+{{- $ca := dig "tls" "ca" "" $obs -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "otel.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" $ "component" "otel") | nindent 4 }}
+spec:
+  # Keep 1: each replica scrapes the same Kafka/ClickHouse targets (duplicated metrics).
+  replicas: {{ $obs.replicas | default 1 }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" (dict "ctx" $ "component" "otel") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" $ "component" "otel") | nindent 8 }}
+        {{- with $obs.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include "otel.config" . | sha256sum }}
+        {{- if $kafka }}
+        checksum/kafka-tls: {{ include "otel.kafkaTlsChecksum" . }}
+        {{- end }}
+        checksum/headers: {{ toJson ($obs.headers | default dict) | sha256sum }}
+        checksum/ca: {{ $ca | sha256sum }}
+        {{- with $obs.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with include "common.imagePullSecrets" . }}
+      {{- . | trim | nindent 6 }}
+      {{- end }}
+      {{- include "common.podSecurityContext" (dict "ctx" $ "uid" 10001 "gid" 10001) | nindent 6 }}
+      {{- with include "common.scheduling" (dict "ctx" $ "nodeSelector" $obs.nodeSelector "tolerations" $obs.tolerations) }}
+      {{- . | trim | nindent 6 }}
+      {{- end }}
+      {{- with $obs.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: otel-collector
+          image: {{ include "common.image" (dict "ctx" $ "image" $obs.image) | quote }}
+          imagePullPolicy: {{ $obs.image.pullPolicy | default "IfNotPresent" }}
+          args:
+            - --config=/conf/config.yaml
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          env:
+            {{- if $kafka }}
+            - name: KAFKA_BOOTSTRAP
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "otel.kafkaSecret" . }}
+                  key: bootstrap
+            {{- if eq (include "otel.kafkaAuth" .) "sasl" }}
+            - name: KAFKA_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "otel.kafkaSecret" . }}
+                  key: username
+            - name: KAFKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "otel.kafkaSecret" . }}
+                  key: password
+            {{- end }}
+            {{- end }}
+            {{- $i := 0 }}
+            {{- range $name, $_ := $obs.headers }}
+            - name: {{ include "otel.headerEnv" $i }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "otel.headersSecret" $ }}
+                  key: {{ include "otel.headerEnv" $i }}
+            {{- $i = add1 $i }}
+            {{- end }}
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+              protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
+            - name: health
+              containerPort: 13133
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /
+              port: health
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml $obs.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+              readOnly: true
+            {{- if $kafka }}
+            - name: kafka-ca
+              mountPath: /etc/otel/kafka-ca
+              readOnly: true
+            {{- if eq (include "otel.kafkaAuth" .) "mtls" }}
+            - name: kafka-monitor
+              mountPath: /etc/otel/kafka-monitor
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if and $ca (hasPrefix "https://" (include "otel.endpoint" .)) }}
+            - name: exporter-ca
+              mountPath: /etc/otel/exporter-ca
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "otel.fullname" . }}
+        {{- if $kafka }}
+        # CA of the broker certificates, from the kafka chart's TLS Secret.
+        - name: kafka-ca
+          secret:
+            secretName: {{ include "otel.kafkaCaSecret" . }}
+            items:
+              - key: ca.crt
+                path: ca.crt
+        {{- if eq (include "otel.kafkaAuth" .) "mtls" }}
+        # Client certificate of the "monitor" principal (CN=monitor).
+        - name: kafka-monitor
+          secret:
+            secretName: {{ include "otel.kafkaMonitorSecret" . }}
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        {{- end }}
+        {{- end }}
+        {{- if and $ca (hasPrefix "https://" (include "otel.endpoint" .)) }}
+        - name: exporter-ca
+          configMap:
+            name: {{ include "otel.caConfigMap" . }}
+        {{- end }}

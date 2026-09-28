@@ -1,0 +1,13 @@
+{{- with (dig "tls" "ca" "" .Values.observability) }}
+# Extra CA (PEM) trusted for the OTLP endpoint certificate.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel.caConfigMap" $ }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" $ "component" "otel") | nindent 4 }}
+data:
+  ca.crt: |
+    {{- . | trim | nindent 4 }}
+{{- end }}

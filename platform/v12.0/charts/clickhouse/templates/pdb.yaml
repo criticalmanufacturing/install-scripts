@@ -1,0 +1,3 @@
+{{ include "common.pdb" (dict "ctx" . "component" "clickhouse" "maxUnavailable" 1) }}
+---
+{{ include "common.pdb" (dict "ctx" . "component" "keeper" "maxUnavailable" 1) }}

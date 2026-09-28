@@ -1,0 +1,117 @@
+{{- /*
+OPTIONAL (clickhouse.replicatedDatabases): creates the listed databases with the Replicated
+engine on every replica, so that their DDL is replicated even without ON CLUSTER.
+Idempotent: a database that is already Replicated is left alone; one that exists with another
+engine makes the Job fail (it is never dropped or converted).
+*/ -}}
+{{- $dbs := include "clickhouse.replicatedDatabases" . -}}
+{{- if $dbs }}
+{{- $ch := .Values.clickhouse -}}
+{{- $uid := int (include "clickhouse.uid" .) -}}
+{{- $hosts := list -}}
+{{- range $i := until (int $ch.replicas) -}}
+{{- $hosts = append $hosts (include "clickhouse.podFqdn" (dict "ctx" $ "index" $i)) -}}
+{{- end -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "clickhouse-databases") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse-databases") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "clickhouse-databases") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- include "common.imagePullSecrets" . | nindent 6 }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 6 }}
+      {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $ch.nodeSelector "tolerations" $ch.tolerations) | nindent 6 }}
+      containers:
+        - name: create-databases
+          image: {{ include "common.image" (dict "ctx" . "image" $ch.image) }}
+          imagePullPolicy: {{ $ch.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          env:
+            - name: HOME
+              value: /tmp
+            - name: REPLICAS
+              value: {{ join " " $hosts | quote }}
+            - name: DATABASES
+              value: {{ $dbs | quote }}
+            - name: CH_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "clickhouse.usersSecret" . }}
+                  key: mes-username
+            - name: CH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "clickhouse.usersSecret" . }}
+                  key: mes-password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              q() {
+                local host="$1"; shift
+                clickhouse-client --config-file=/etc/cmmes/client.xml --secure --host "$host" --port 9440 \
+                  --user "$CH_USER" --password "$CH_PASSWORD" --query "$*"
+              }
+              # Every replica must be up: a Replicated database has to be created on each of them.
+              for host in ${REPLICAS}; do
+                for i in $(seq 1 90); do
+                  if q "$host" "SELECT 1" >/dev/null 2>&1; then break; fi
+                  if [ "$i" = 90 ]; then echo "FAILED: ${host}:9440 is not reachable" >&2; exit 1; fi
+                  echo "Waiting for ${host} ..."; sleep 10
+                done
+              done
+              for db in ${DATABASES}; do
+                for host in ${REPLICAS}; do
+                  engine="$(q "$host" "SELECT engine FROM system.databases WHERE name = '${db}'")"
+                  if [ -z "$engine" ]; then
+                    q "$host" "CREATE DATABASE IF NOT EXISTS \`${db}\` ENGINE = Replicated('/clickhouse/databases/${db}', '{shard}', '{replica}')"
+                    echo "${host}: created Replicated database ${db}"
+                  elif [ "$engine" = "Replicated" ]; then
+                    echo "${host}: ${db} is already a Replicated database"
+                  else
+                    echo "FAILED: ${host}: database ${db} already exists with engine ${engine}." >&2
+                    echo "It is not converted automatically; convert it manually or remove it from clickhouse.replicatedDatabases." >&2
+                    exit 1
+                  fi
+                done
+              done
+          volumeMounts:
+            - name: client-config
+              mountPath: /etc/cmmes
+              readOnly: true
+            - name: ca
+              mountPath: /etc/clickhouse-server/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: client-config
+          configMap:
+            name: {{ include "clickhouse.configMap" . }}
+            items:
+              - {key: client.xml, path: client.xml}
+        - name: ca
+          secret:
+            secretName: {{ include "clickhouse.tlsSecret" . }}
+            items:
+              - {key: ca.crt, path: ca.crt}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

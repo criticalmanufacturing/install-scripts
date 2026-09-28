@@ -1,0 +1,22 @@
+{{- $ns := .Release.Namespace -}}
+{{- $sts := include "kafka.fullname" . -}}
+{{- $q := printf "kafka-metadata-quorum.sh --bootstrap-server $(hostname -f):%s --command-config /cm/run/admin.properties" (include "kafka.port.internal" .) -}}
+Kafka {{ .Chart.AppVersion }} ({{ include "kafka.replicas" . }} servers, KRaft) is being deployed as {{ $sts }} in namespace {{ $ns }}.
+
+Values for the CM MES installer (install.sh prints them and saves the certificate files):
+  kubectl -n {{ $ns }} get secret {{ include "common.fullname" (dict "ctx" . "component" "kafka-connection") }} -o jsonpath='{.data.mes-installer\.txt}' | base64 -d
+
+Check the deployment:
+  kubectl -n {{ $ns }} get pods -l app.kubernetes.io/name=kafka
+  helm test {{ .Release.Name }} -n {{ $ns }}
+
+KRaft voters (every server should be listed under CurrentVoters):
+  kubectl -n {{ $ns }} exec {{ $sts }}-0 -- bash -c '/opt/kafka/bin/{{ $q }} describe --status'
+
+A server whose data volume was lost or replaced, or a server added by raising kafka.replicas,
+starts as an observer and adds itself to the voters automatically once it has caught up
+(its log shows "[cm-kafka] ..."). To do it by hand for server <N> (pod {{ $sts }}-<N>):
+  1. Old directory id of <N>: the "directoryId" of "id": <N> in CurrentVoters (command above).
+  2. kubectl -n {{ $ns }} exec {{ $sts }}-<N> -- bash -c '/opt/kafka/bin/{{ $q }} remove-controller --controller-id <N> --controller-directory-id <old directory id>'
+  3. kubectl -n {{ $ns }} exec {{ $sts }}-<N> -- bash -c '/opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server $(hostname -f):{{ include "kafka.port.internal" . }} --command-config /cm/run/controller-admin.properties add-controller'
+Before lowering kafka.replicas, remove the highest servers from the voters with step 2.

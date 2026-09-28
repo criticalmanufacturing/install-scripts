@@ -1,0 +1,138 @@
+{{- include "clickhouse.validate" . -}}
+{{- $keeper := .Values.clickhouse.keeper -}}
+{{- $uid := int (include "clickhouse.uid" .) -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.keeper.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "keeper") | nindent 4 }}
+spec:
+  serviceName: {{ include "clickhouse.keeper.headless" . }}
+  replicas: {{ int $keeper.replicas }}
+  # All servers start together: a Raft quorum needs a majority of them.
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" (dict "ctx" . "component" "keeper") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "keeper") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-keeper.yaml") . | sha256sum }}
+    spec:
+      {{- include "common.imagePullSecrets" . | nindent 6 }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 6 }}
+      {{- include "common.affinity" (dict "ctx" . "component" "keeper" "affinity" $keeper.affinity) | nindent 6 }}
+      {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $keeper.nodeSelector "tolerations" $keeper.tolerations) | nindent 6 }}
+      terminationGracePeriodSeconds: {{ int $keeper.terminationGracePeriodSeconds }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: keeper
+          image: {{ include "common.image" (dict "ctx" . "image" $keeper.image) }}
+          imagePullPolicy: {{ $keeper.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          # The image entrypoint is not used (it expects to chown directories as root).
+          # Raft server ids are 1..N: pod <name>-<i> is server i+1.
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              {{- include "clickhouse.tlsCheck" (dict "ctx" . "dir" "/etc/clickhouse-keeper/tls") | nindent 14 }}
+              ordinal="${POD_NAME##*-}"
+              export KEEPER_SERVER_ID="$((ordinal + 1))"
+              echo "Starting ClickHouse Keeper server_id=${KEEPER_SERVER_ID} (${POD_NAME})"
+              cd /var/lib/clickhouse-keeper
+              exec clickhouse-keeper --config-file=/etc/clickhouse-keeper/config/keeper_config.xml
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KEEPER_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "clickhouse.usersSecret" . }}
+                  key: keeper-password
+            - name: CLICKHOUSE_WATCHDOG_ENABLE
+              value: "0"
+          ports:
+            - name: client-secure
+              containerPort: 9281
+            - name: raft
+              containerPort: 9234
+            - name: http-control
+              containerPort: 9182
+            - name: metrics
+              containerPort: 9363
+          startupProbe:
+            tcpSocket:
+              port: http-control
+            periodSeconds: 5
+            failureThreshold: 60
+          # Ready = member of a quorum with a leader.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http-control
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Alive = process answers; losing the quorum must not restart the pods.
+          livenessProbe:
+            tcpSocket:
+              port: http-control
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          {{- with $keeper.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse-keeper
+            - name: config
+              mountPath: /etc/clickhouse-keeper/config
+              readOnly: true
+            - name: tls
+              mountPath: /etc/clickhouse-keeper/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "clickhouse.keeper.configMap" . }}
+            items:
+              - {key: keeper_config.xml, path: keeper_config.xml}
+              {{- if $keeper.extraConfig }}
+              - {key: 90-extra.xml, path: keeper_config.d/90-extra.xml}
+              {{- end }}
+        - name: tls
+          secret:
+            secretName: {{ include "clickhouse.tlsSecret" . }}
+            # optional: a missing key is reported by the start command (see clickhouse.tlsCheck).
+            optional: true
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+              - {key: ca.crt, path: ca.crt}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "common.selectorLabels" (dict "ctx" . "component" "keeper") | nindent 10 }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- include "common.storageClass" (dict "ctx" . "storageClass" $keeper.storage.storageClass) | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ $keeper.storage.size }}

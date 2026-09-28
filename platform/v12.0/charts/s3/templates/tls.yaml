@@ -1,0 +1,18 @@
+{{- if eq (include "s3.provider" .) "rustfs" }}
+{{- $name := include "s3.fullname" . }}
+{{- $headless := include "s3.headless" . }}
+{{- $console := include "common.fullname" (dict "ctx" . "component" "s3-console") }}
+{{- $ns := .Release.Namespace }}
+{{- $cd := include "common.clusterDomain" . }}
+{{- $dns := list }}
+{{- range $svc := list $name $headless $console }}
+{{- $dns = concat $dns (list $svc (printf "%s.%s" $svc $ns) (printf "%s.%s.svc" $svc $ns) (printf "%s.%s.svc.%s" $svc $ns $cd)) }}
+{{- end }}
+{{- /* Per-pod names, used by RustFS for its peer-to-peer (TLS) traffic. */}}
+{{- $dns = concat $dns (list (printf "*.%s.%s.svc.%s" $headless $ns $cd) (printf "*.%s.%s.svc" $headless $ns) (printf "*.%s.%s" $headless $ns)) }}
+{{- with (include "common.tls.caSecret" (dict "ctx" . "component" "s3")) }}
+{{ . }}
+---
+{{- end }}
+{{ include "common.tls.certificate" (dict "ctx" . "component" "s3" "name" (include "s3.tlsSecret" .) "cn" $name "dnsNames" $dns) }}
+{{- end }}
