@@ -65,6 +65,7 @@ Ssl Certificate Authority                 : kafka-ca.crt
 Address                                   : cmmes-clickhouse.<namespace>.svc.cluster.local
 TCP Port                                  : 9440
 HTTP Port                                 : 8443
+Cluster Name                              : default
 ...
 [S3]
 Address                                   : cmmes-s3.<namespace>.svc.cluster.local
@@ -72,6 +73,8 @@ Bucket Name                               : cm-mes
 ...
 ```
 
+- **ClickHouse Cluster Name**: always fill it in the CM MES installer. Without it, CM MES creates
+  each table on only one of the two ClickHouse servers, and it isn't highly available.
 - `output/connection-info.txt`: all the values above. It contains passwords, so keep it safe.
 - `output/*-ca.crt`: the certificate authorities. Add them in the CM MES installer where it asks for
   certificates (or enable "skip certificate validation", which isn't recommended for production).
@@ -145,8 +148,9 @@ Kafka, ClickHouse and RustFS metrics there. If you leave it empty, nothing is in
 - **Scaling**: the defaults (3 Kafka, 2 ClickHouse + 3 Keeper, 3×2 RustFS disks) are the tested layout.
   Adding Kafka servers later needs extra Kafka steps (see `charts/kafka/templates/NOTES.txt`), and the
   RustFS layout can't be changed after the first install.
-- **Uninstall**: `./install.sh -n <namespace> --uninstall`. **Data volumes are kept** on purpose. To
-  delete the data too (irreversible): `kubectl delete pvc -n <namespace> -l app.kubernetes.io/part-of=cm-mes-dependencies`.
+- **Uninstall**: `./install.sh -n <namespace> --uninstall`. **Data volumes are kept** on purpose, so
+  a reinstall finds the data again. The uninstaller lists them and prints the command that deletes
+  them, if you want the data gone too (irreversible).
 
 ## Troubleshooting
 
