@@ -1665,6 +1665,10 @@ final_message() {
   info "     $OUT_SHOW/connection-info.txt)."
   info "  2. Where a certificate file is named (e.g. kafka-ca.crt), upload that file from $OUT_SHOW/."
   info "     The CM MES installer also lets you add custom CAs or skip the certificate validation."
+  if [[ " $* " == *" clickhouse "* ]]; then
+    info "     For ClickHouse, also fill 'Cluster Name': without it CM MES creates each table on only"
+    info "     one ClickHouse server, and it isn't highly available."
+  fi
   info "  3. Optional: prove that each component accepts the MES credentials:"
   for c in "$@"; do [[ "$c" == otel ]] || info "       $HELM test $p-$c -n $NAMESPACE"; done
   info ""

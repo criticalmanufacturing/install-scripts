@@ -79,6 +79,9 @@ clickhouse:
   # Name of the ClickHouse cluster (remote_servers) that contains all the replicas.
   # Used by "ON CLUSTER" DDL and available as the {cluster} macro. "default" is also the
   # name of the cluster in ClickHouse Cloud. Cannot be changed after the first install.
+  # Type it in the CM MES installer ("Cluster Name", printed by install.sh): CM MES then
+  # creates its tables ON CLUSTER, i.e. on every replica. Left empty there, CM MES creates
+  # each table only on the replica it happens to connect to, and the other one never gets it.
   clusterName: default
 
   auth:
@@ -148,8 +151,8 @@ clickhouse:
     #   /clickhouse/tables/{uuid}/{shard}  (ClickHouse default)
     #     + every table gets a unique path, so drop/re-create is never a problem
     #     - CREATE TABLE ... ReplicatedMergeTree without ON CLUSTER is REJECTED by ClickHouse
-    #       ("{uuid} macro is supported only for ON CLUSTER queries"). It is not known yet
-    #       whether CM MES always uses ON CLUSTER, so this path is not the default.
+    #       ("{uuid} macro is supported only for ON CLUSTER queries"). CM MES uses ON CLUSTER
+    #       only when "Cluster Name" is filled in its installer, so this path is not the default.
     defaultReplicaPath: "/clickhouse/tables/{shard}/{database}/{table}"
     defaultReplicaName: "{replica}"
     # true = database_atomic_wait_for_drop_and_detach_synchronously=1 in the default profile:
@@ -165,7 +168,8 @@ clickhouse:
   # A post-install/post-upgrade Job creates them (as the MES admin user, over TLS) with
   #   CREATE DATABASE IF NOT EXISTS <name> ENGINE = Replicated('/clickhouse/databases/<name>', '{shard}', '{replica}')
   # and fails if a database with that name already exists with another engine (convert it
-  # manually). Only use it if CM MES creates its tables without ON CLUSTER; inside these
+  # manually). Not needed when "Cluster Name" is set in the CM MES installer (ON CLUSTER);
+  # use it only if CM MES creates its tables without ON CLUSTER. Inside these
   # databases ReplicatedMergeTree must be used without explicit arguments (ClickHouse rejects
   # explicit Keeper paths there unless database_replicated_allow_replicated_engine_arguments
   # is changed, e.g. with extraUsersConfig). Names: letters, digits and _. [] = none.
