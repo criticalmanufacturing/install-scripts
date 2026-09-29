@@ -1,0 +1,14 @@
+apiVersion: v2
+name: clickhouse
+description: ClickHouse 26.3 LTS (1 shard x N replicas) with ClickHouse Keeper for Critical Manufacturing MES v12
+type: application
+version: 12.0.0
+appVersion: "26.3.35.3"
+keywords:
+  - clickhouse
+  - clickhouse-keeper
+  - critical-manufacturing
+dependencies:
+  - name: common
+    version: 12.0.0
+    repository: file://../common

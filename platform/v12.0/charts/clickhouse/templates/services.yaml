@@ -1,0 +1,78 @@
+{{- $chSelector := include "common.selectorLabels" (dict "ctx" . "component" "clickhouse") -}}
+{{- $keeperSelector := include "common.selectorLabels" (dict "ctx" . "component" "keeper") -}}
+# Used by CM MES: load-balanced over the ready ClickHouse servers.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clickhouse.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- $chSelector | nindent 4 }}
+  ports:
+    - name: tcp-secure
+      port: 9440
+      targetPort: tcp-secure
+      protocol: TCP
+    - name: https
+      port: 8443
+      targetPort: https
+      protocol: TCP
+---
+# Per-pod DNS names (replication, distributed DDL, monitoring). Includes pods that are not
+# ready yet, so that replicas can find each other while starting.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clickhouse.headless" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- $chSelector | nindent 4 }}
+  ports:
+    - name: tcp-secure
+      port: 9440
+      targetPort: tcp-secure
+    - name: https
+      port: 8443
+      targetPort: https
+    - name: interserver
+      port: 9010
+      targetPort: interserver
+    - name: metrics
+      port: 9363
+      targetPort: metrics
+---
+# Per-pod DNS names of the Keeper servers (Raft peers and ClickHouse clients).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clickhouse.keeper.headless" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "keeper") | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- $keeperSelector | nindent 4 }}
+  ports:
+    - name: client-secure
+      port: 9281
+      targetPort: client-secure
+    - name: raft
+      port: 9234
+      targetPort: raft
+    - name: http-control
+      port: 9182
+      targetPort: http-control
+    - name: metrics
+      port: 9363
+      targetPort: metrics

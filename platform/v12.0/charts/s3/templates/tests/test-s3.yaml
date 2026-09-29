@@ -1,0 +1,108 @@
+{{- $provider := include "s3.provider" . }}
+{{- $uid := int (include "s3.uid" .) }}
+# helm test: put, list, get and delete an object with the credentials given to MES,
+# over TLS with certificate verification (rgw: TLS when the gateway port is 443/8443).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "s3-test") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "s3-test") | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  {{- with (include "common.imagePullSecrets" . | trim) }}{{ . | nindent 2 }}{{- end }}
+  {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 2 }}
+  {{- with (include "common.scheduling" (dict "ctx" . "nodeSelector" .Values.s3.rustfs.nodeSelector "tolerations" .Values.s3.rustfs.tolerations) | trim) }}{{ . | nindent 2 }}{{- end }}
+  containers:
+    - name: test
+      image: {{ include "common.image" (dict "ctx" . "image" .Values.s3.awsCli.image) }}
+      imagePullPolicy: {{ .Values.s3.awsCli.image.pullPolicy | default "IfNotPresent" }}
+      {{- include "common.containerSecurityContext" . | nindent 6 }}
+      env:
+        {{- if eq $provider "rustfs" }}
+        {{- include "s3.awsCliEnv" . | nindent 8 }}
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "s3.credentialsSecret" . }}
+              key: {{ ternary "mes-access-key" "root-access-key" (and .Values.s3.rustfs.mesUser.enabled true) }}
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "s3.credentialsSecret" . }}
+              key: {{ ternary "mes-secret-key" "root-secret-key" (and .Values.s3.rustfs.mesUser.enabled true) }}
+        {{- else }}
+        - name: HOME
+          value: /tmp/home
+        - name: AWS_REQUEST_CHECKSUM_CALCULATION
+          value: when_required
+        - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+          value: when_required
+        - name: AWS_PAGER
+          value: ""
+        {{- end }}
+      {{- if eq $provider "rgw" }}
+      # Everything comes from the ConfigMap and Secret created by the bucket provisioner.
+      envFrom:
+        - configMapRef:
+            name: {{ include "s3.fullname" . }}
+        - secretRef:
+            name: {{ include "s3.fullname" . }}
+      {{- end }}
+      command: ["/bin/sh", "-ec"]
+      args:
+        - |
+          mkdir -p "$HOME"
+          aws configure set default.s3.addressing_style path
+          {{- if eq $provider "rgw" }}
+          BUCKET="$BUCKET_NAME"
+          export AWS_DEFAULT_REGION="${BUCKET_REGION:-us-east-1}"
+          case "$BUCKET_PORT" in
+            443|8443)
+              export AWS_ENDPOINT_URL="https://${BUCKET_HOST}:${BUCKET_PORT}"
+              if [ -s /etc/s3-ca/ca.crt ]; then export AWS_CA_BUNDLE=/etc/s3-ca/ca.crt; fi ;;
+            *)
+              export AWS_ENDPOINT_URL="http://${BUCKET_HOST}:${BUCKET_PORT}" ;;
+          esac
+          {{- end }}
+          echo "Endpoint $AWS_ENDPOINT_URL, bucket $BUCKET"
+          KEY="helm-test/$(date +%s)-$$.txt"
+          echo "CM MES S3 test $(date)" > "$HOME/put.txt"
+          aws s3api put-object --bucket "$BUCKET" --key "$KEY" --body "$HOME/put.txt" >/dev/null
+          aws s3api list-objects-v2 --bucket "$BUCKET" --prefix "$KEY" --query 'Contents[].Key' --output text | grep -q "$KEY"
+          aws s3api get-object --bucket "$BUCKET" --key "$KEY" "$HOME/get.txt" >/dev/null
+          [ "$(cat "$HOME/put.txt")" = "$(cat "$HOME/get.txt")" ] || { echo "Downloaded object differs"; exit 1; }
+          aws s3api delete-object --bucket "$BUCKET" --key "$KEY" >/dev/null
+          echo "OK: put, list, get and delete succeeded"
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        {{- if eq $provider "rustfs" }}
+        - name: tls
+          mountPath: /etc/s3-tls
+          readOnly: true
+        {{- else }}
+        - name: ca
+          mountPath: /etc/s3-ca
+          readOnly: true
+        {{- end }}
+  volumes:
+    {{- if eq $provider "rustfs" }}
+    {{- include "s3.clientVolumes" . | nindent 4 }}
+    {{- else }}
+    - name: tmp
+      emptyDir: {}
+    - name: ca
+      configMap:
+        name: {{ .Values.s3.rgw.ca.configMap | default "openshift-service-ca.crt" }}
+        optional: true
+        items:
+          - key: {{ .Values.s3.rgw.ca.key | default "service-ca.crt" }}
+            path: ca.crt
+    {{- end }}

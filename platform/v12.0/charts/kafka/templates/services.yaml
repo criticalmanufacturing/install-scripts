@@ -1,0 +1,47 @@
+# Bootstrap Service: clients connect here first, then directly to each broker
+# through its advertised per-pod name (headless Service).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafka.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "kafka") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "kafka") | nindent 4 }}
+  ports:
+    - name: tcp-client
+      port: {{ include "kafka.port.client" . }}
+      targetPort: client
+      protocol: TCP
+---
+# Headless Service: stable DNS names <prefix>-kafka-<i>.<prefix>-kafka-headless for every
+# broker, published before the pods are ready so that the KRaft quorum can form.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafka.headless" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "kafka") | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "kafka") | nindent 4 }}
+  ports:
+    - name: tcp-client
+      port: {{ include "kafka.port.client" . }}
+      targetPort: client
+      protocol: TCP
+    - name: tcp-internal
+      port: {{ include "kafka.port.internal" . }}
+      targetPort: internal
+      protocol: TCP
+    - name: tcp-controller
+      port: {{ include "kafka.port.controller" . }}
+      targetPort: controller
+      protocol: TCP

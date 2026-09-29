@@ -1,0 +1,351 @@
+{{- $replicas := int (include "kafka.replicas" .) -}}
+{{- $auth := include "kafka.authMethod" . -}}
+{{- $client := include "kafka.port.client" . -}}
+{{- $internal := include "kafka.port.internal" . -}}
+{{- $controller := include "kafka.port.controller" . -}}
+{{- $config := .Values.kafka.config | default dict -}}
+{{- /* Settings owned by the chart cannot be overridden through kafka.config. */ -}}
+{{- $managed := list "process.roles" "node.id" "listeners" "advertised.listeners" "listener.security.protocol.map" "inter.broker.listener.name" "authorizer.class.name" "super.users" "allow.everyone.if.no.acl.found" "log.dirs" "log.dir" "metadata.log.dir" -}}
+{{- range $k, $_ := $config -}}
+{{- if or (has $k $managed) (hasPrefix "controller." $k) (hasPrefix "sasl." $k) (hasPrefix "ssl." $k) (hasPrefix "listener.name." $k) -}}
+{{- fail (printf "kafka.config.%s is managed by the chart and cannot be set" $k) -}}
+{{- end -}}
+{{- end -}}
+{{- range $k := list "default.replication.factor" "offsets.topic.replication.factor" "transaction.state.log.replication.factor" -}}
+{{- if and (hasKey $config $k) (gt (int (index $config $k)) $replicas) -}}
+{{- fail (printf "kafka.config.%s (%v) is larger than kafka.replicas (%d)" $k (index $config $k) $replicas) -}}
+{{- end -}}
+{{- end -}}
+{{- if and (hasKey $config "min.insync.replicas") (hasKey $config "default.replication.factor") (gt (int (index $config "min.insync.replicas")) (int (index $config "default.replication.factor"))) -}}
+{{- fail "kafka.config.min.insync.replicas must not be larger than kafka.config.default.replication.factor" -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kafka.configMap" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "kafka") | nindent 4 }}
+data:
+  # Template of the server configuration. start.sh replaces @NODE_ID@ and @POD_FQDN@
+  # and appends the JAAS settings (passwords come from the Secret, not from here).
+  server.properties: |
+    # ---- KRaft: every server is a broker and a controller (combined mode) ----
+    process.roles=broker,controller
+    node.id=@NODE_ID@
+    controller.listener.names=CONTROLLER
+    controller.quorum.bootstrap.servers={{ include "kafka.brokerList" (dict "ctx" . "port" $controller) }}
+
+    # ---- Listeners (all encrypted) ----
+    #   CLIENT     {{ $client }}  MES and other clients ({{ if eq $auth "sasl" }}SASL_SSL, PLAIN{{ else }}mutual TLS{{ end }})
+    #   INTERNAL   {{ $internal }}  broker-to-broker replication and administration (SASL_SSL, PLAIN)
+    #   CONTROLLER {{ $controller }}  KRaft quorum (SASL_SSL, PLAIN)
+    listeners=CLIENT://:{{ $client }},INTERNAL://:{{ $internal }},CONTROLLER://:{{ $controller }}
+    advertised.listeners=CLIENT://@POD_FQDN@:{{ $client }},INTERNAL://@POD_FQDN@:{{ $internal }},CONTROLLER://@POD_FQDN@:{{ $controller }}
+    listener.security.protocol.map=CLIENT:{{ if eq $auth "sasl" }}SASL_SSL{{ else }}SSL{{ end }},INTERNAL:SASL_SSL,CONTROLLER:SASL_SSL
+    inter.broker.listener.name=INTERNAL
+    sasl.enabled.mechanisms=PLAIN
+    sasl.mechanism.inter.broker.protocol=PLAIN
+    sasl.mechanism.controller.protocol=PLAIN
+
+    # ---- TLS: PEM keystore (key + certificate chain) and truststore (CA) ----
+    ssl.keystore.type=PEM
+    ssl.keystore.location=/cm/run/keystore.pem
+    ssl.truststore.type=PEM
+    ssl.truststore.location=/cm/tls/ca.crt
+    ssl.endpoint.identification.algorithm=https
+    ssl.client.auth=none
+    # Renewed certificates are reloaded at runtime (maintenance.sh); allow a renewed
+    # certificate to have a different subject or SANs.
+    ssl.allow.dn.changes=true
+    ssl.allow.san.changes=true
+    {{- if eq $auth "mtls" }}
+    listener.name.client.ssl.client.auth=required
+    {{- end }}
+    # Client certificate "CN=mes,..." becomes the principal User:mes.
+    ssl.principal.mapping.rules=RULE:^CN=([^,]+).*$/$1/,RULE:^.*[Cc][Nn]=([^,]+).*$/$1/,DEFAULT
+
+    # ---- Authorization ----
+    authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer
+    super.users=User:admin
+    allow.everyone.if.no.acl.found=false
+
+    # ---- Storage ----
+    log.dirs=/var/lib/kafka/data/logs
+
+    # ---- Tunables (kafka.config) ----
+    {{- range $k, $v := $config }}
+    {{ $k }}={{ $v }}
+    {{- end }}
+
+  # Log only to the console (kubectl logs); nothing is written to files.
+  log4j2.yaml: |
+    Configuration:
+      Properties:
+        Property:
+          - name: "logPattern"
+            value: "[%d] %p %m (%c)%n"
+      Appenders:
+        Console:
+          name: STDOUT
+          PatternLayout:
+            pattern: "${logPattern}"
+      Loggers:
+        Root:
+          level: INFO
+          AppenderRef:
+            - ref: STDOUT
+        Logger:
+          - name: kafka.request.logger
+            level: WARN
+          - name: kafka.network.RequestChannel$
+            level: WARN
+          - name: kafka.authorizer.logger
+            level: WARN
+
+  # Shared shell settings of the scripts below.
+  common.sh: |
+    RUN=/cm/run
+    DATA=/var/lib/kafka/data
+    LOGS="$DATA/logs"
+    # Marker on the data volume: this server must be (re)added to the KRaft voter set.
+    JOIN_MARKER="$DATA/cm-join-voter"
+    NODE_ID="${POD_NAME##*-}"
+    POD_FQDN="${POD_NAME}.${HEADLESS_SERVICE}.${POD_NAMESPACE}.svc.${CLUSTER_DOMAIN}"
+    SELF="${POD_FQDN}:{{ $internal }}"
+    ALL_CONTROLLERS="{{ include "kafka.brokerList" (dict "ctx" . "port" $controller) }}"
+    # The other servers' controller endpoints.
+    OTHER_CONTROLLERS=""
+    IFS=, read -ra _all <<<"$ALL_CONTROLLERS"
+    for _c in "${_all[@]}"; do [[ "$_c" == "${POD_FQDN}:"* ]] || OTHER_CONTROLLERS+="${OTHER_CONTROLLERS:+,}${_c}"; done
+    export RUN DATA LOGS JOIN_MARKER NODE_ID POD_FQDN SELF OTHER_CONTROLLERS
+    log() { echo "[cm-kafka] $*"; }
+    # Kafka command-line tools: small heap, console logging, nothing written to the image.
+    # Usage: tool <script> <args...>
+    tool() {
+      local cmd="/opt/kafka/bin/$1"; shift
+      ( unset KAFKA_OPTS KAFKA_LOG4J_OPTS; export KAFKA_HEAP_OPTS="-Xmx192m" LOG_DIR=/tmp/kafka-logs
+        exec timeout "${TOOL_TIMEOUT:-60}" "$cmd" "$@" )
+    }
+    my_directory_id() { sed -n 's/^directory.id=//p' "$LOGS/meta.properties" 2>/dev/null; }
+
+  # Builds the per-pod configuration in /cm/run (emptyDir), formats the storage on the
+  # first start, starts maintenance.sh in the background and runs Kafka.
+  # Nothing is written to the image filesystem.
+  start.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    umask 077
+    source /cm/scripts/common.sh
+    case "$NODE_ID" in ''|*[!0-9]*) echo "Cannot derive node.id from pod name ${POD_NAME}" >&2; exit 1;; esac
+    {{- include "kafka.script.checkCA" . | nindent 4 }}
+
+    {{- include "kafka.script.escapeFns" . | nindent 4 }}
+    ADMIN="$(jaas_escape "$KAFKA_ADMIN_PASSWORD")"
+    MONITOR="$(jaas_escape "$KAFKA_MONITOR_PASSWORD")"
+    PLAIN="org.apache.kafka.common.security.plain.PlainLoginModule required"
+
+    # PEM keystore: private key (PKCS#8) followed by the certificate chain.
+    bash /cm/scripts/keystore.sh
+
+    sed -e "s|@NODE_ID@|${NODE_ID}|g" -e "s|@POD_FQDN@|${POD_FQDN}|g" /cm/scripts/server.properties > "$RUN/server.properties"
+    {
+      echo
+      echo "# ---- SASL/PLAIN users (added by start.sh) ----"
+      echo "listener.name.internal.plain.sasl.jaas.config=${PLAIN} username=\"admin\" password=\"${ADMIN}\" user_admin=\"${ADMIN}\" user_monitor=\"${MONITOR}\";"
+      echo "listener.name.controller.plain.sasl.jaas.config=${PLAIN} username=\"admin\" password=\"${ADMIN}\" user_admin=\"${ADMIN}\";"
+      {{- if eq $auth "sasl" }}
+      MES="$(jaas_escape "$KAFKA_MES_PASSWORD")"
+      echo "listener.name.client.plain.sasl.jaas.config=${PLAIN} user_mes=\"${MES}\" user_monitor=\"${MONITOR}\";"
+      {{- end }}
+    } >> "$RUN/server.properties"
+
+    # Client configuration of the admin user, for the probes, maintenance.sh and operators:
+    #   kubectl exec <pod> -- bash -c '/opt/kafka/bin/kafka-topics.sh --bootstrap-server $(hostname -f):{{ $internal }} \
+    #     --command-config /cm/run/admin.properties --list'
+    cat > "$RUN/admin.properties" <<EOF
+    security.protocol=SASL_SSL
+    sasl.mechanism=PLAIN
+    sasl.jaas.config=${PLAIN} username="admin" password="${ADMIN}";
+    ssl.truststore.type=PEM
+    ssl.truststore.location=/cm/tls/ca.crt
+    EOF
+    # For "kafka-metadata-quorum.sh add-controller": the server settings plus the admin login.
+    cat "$RUN/server.properties" "$RUN/admin.properties" > "$RUN/controller-admin.properties"
+
+    # Wait (up to 2 minutes) until the pod's own DNS name resolves: Kafka refuses to
+    # start when none of the controller.quorum.bootstrap.servers can be resolved.
+    if command -v getent >/dev/null 2>&1; then RESOLVE=(getent hosts)
+    elif command -v nslookup >/dev/null 2>&1; then RESOLVE=(nslookup)
+    else RESOLVE=(); fi
+    if [ ${#RESOLVE[@]} -gt 0 ]; then
+      for _ in $(seq 1 60); do
+        if "${RESOLVE[@]}" "$POD_FQDN" >/dev/null 2>&1; then break; fi
+        sleep 2
+      done
+    fi
+
+    # ---- Storage format (only when the data volume is empty) ----
+    # --initial-controllers (this server becomes a voter of a NEW quorum) is only used
+    # while the cluster is bootstrapped for the first time. Otherwise, e.g. after a disk
+    # was lost or replaced, the server joins as an observer and maintenance.sh swaps its
+    # stale voter entry for the new one (remove-controller + add-controller). Reusing the
+    # stored directory id with an empty log would make it a voter without data.
+    mkdir -p "$LOGS"
+    if [ -f "$LOGS/meta.properties" ]; then
+      log "Data volume already formatted (directory.id $(my_directory_id))"
+    else
+      MODE=voter
+      if [[ ",${KAFKA_INITIAL_CONTROLLERS}," != *",${NODE_ID}@"* ]]; then
+        MODE=observer
+        log "Node ${NODE_ID} is not in the initial controller set (kafka.replicas was raised): joining as observer"
+      elif [ "${KAFKA_QUORUM_BOOTSTRAPPED:-false}" = "true" ]; then
+        MODE=observer
+        log "WARNING: empty data volume, but the quorum was bootstrapped before (disk lost or replaced?): joining as observer"
+      elif [ -n "$OTHER_CONTROLLERS" ] && TOOL_TIMEOUT=20 tool kafka-metadata-quorum.sh --bootstrap-controller "$OTHER_CONTROLLERS" \
+             --command-config "$RUN/admin.properties" describe --status >/dev/null 2>&1; then
+        MODE=observer
+        log "WARNING: empty data volume, but the other controllers already run a quorum: joining as observer"
+      fi
+      FORMAT=(--config "$RUN/server.properties" --cluster-id "$KAFKA_CLUSTER_ID" --ignore-formatted)
+      if [ "$MODE" = voter ]; then
+        log "First bootstrap of the KRaft quorum: formatting node ${NODE_ID} as initial voter"
+        FORMAT+=(--initial-controllers "$KAFKA_INITIAL_CONTROLLERS")
+      else
+        FORMAT+=(--no-initial-controllers)
+      fi
+      TOOL_TIMEOUT=300 tool kafka-storage.sh format "${FORMAT[@]}"
+      if [ "$MODE" = observer ]; then
+        touch "$JOIN_MARKER"
+        log "Node ${NODE_ID} (directory.id $(my_directory_id)) will be added to the voter set automatically once it has caught up (see NOTES.txt)"
+      fi
+    fi
+
+    # Certificate reload and voter membership run next to Kafka (same container).
+    export KAFKA_PID=$$
+    bash /cm/scripts/maintenance.sh &
+
+    export KAFKA_HEAP_OPTS="${KAFKA_SERVER_HEAP_OPTS}"
+    export KAFKA_LOG4J_OPTS="-Dlog4j2.configurationFile=/cm/scripts/log4j2.yaml"
+    export LOG_DIR=/tmp/kafka-logs
+    # No "-loggc": GC logs would be written to files.
+    export EXTRA_ARGS="-name kafkaServer"
+    log "Starting Kafka node ${NODE_ID} (${POD_FQDN})"
+    exec /opt/kafka/bin/kafka-server-start.sh "$RUN/server.properties"
+
+  # (Re)builds /cm/run/keystore.pem atomically from the mounted Secret and records the
+  # checksums of the files it was built from.
+  keystore.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    umask 077
+    RUN=/cm/run
+    { cat /cm/tls/tls.key; echo; cat /cm/tls/tls.crt; } > "$RUN/keystore.pem.new"
+    mv -f "$RUN/keystore.pem.new" "$RUN/keystore.pem"
+    cat /cm/tls/tls.crt /cm/tls/tls.key | sha256sum | cut -d' ' -f1 > "$RUN/cert.sum"
+    sha256sum < /cm/tls/ca.crt | cut -d' ' -f1 > "$RUN/ca.sum"
+
+  # Background loop next to Kafka:
+  #  1. Certificate renewal (cert-manager, or a rotated Secret in existing/auto mode).
+  #     When tls.crt/tls.key change, the keystore is rebuilt and all listeners reload it:
+  #     a per-node dynamic config update makes both the broker and the KRaft controller
+  #     reload changed keystore files. When ca.crt changes, or the reload keeps failing,
+  #     the server restarts itself, staggered by node id ({{ int .Values.kafka.tls.renewal.restartStaggerMinutes }} minutes apart), so
+  #     the servers never restart together.
+  #  2. Voter membership: a server formatted as observer (empty disk after the first
+  #     bootstrap, or kafka.replicas raised) is added to the KRaft voter set once caught up.
+  maintenance.sh: |
+    #!/bin/bash
+    set -uo pipefail
+    source /cm/scripts/common.sh
+    INTERVAL={{ int .Values.kafka.tls.renewal.checkIntervalSeconds }}
+    STAGGER_MINUTES={{ int .Values.kafka.tls.renewal.restartStaggerMinutes }}
+    DYNAMIC_RELOAD={{ .Values.kafka.tls.renewal.dynamicReload }}
+    reload_failures=0
+
+    staggered_restart() {
+      local delay=$(( NODE_ID * STAGGER_MINUTES * 60 ))
+      log "$1: restarting this server in ${delay}s (staggered by node id)"
+      sleep "$delay"
+      # Do not restart while partitions are under-replicated (wait up to 30 minutes).
+      for _ in $(seq 1 60); do
+        urp="$(tool kafka-topics.sh --bootstrap-server "$SELF" --command-config "$RUN/admin.properties" \
+               --describe --under-replicated-partitions 2>/dev/null)" && [ -z "$urp" ] && break
+        sleep 30
+      done
+      log "Restarting Kafka (controlled shutdown)"
+      kill -TERM "$KAFKA_PID"
+      exit 0
+    }
+
+    reload_keystore() {
+      bash /cm/scripts/keystore.sh || return 1
+      # Setting a per-node config (even to its current value) makes the broker and the
+      # controller reload every listener keystore file that has changed.
+      tool kafka-configs.sh --bootstrap-server "$SELF" --command-config "$RUN/admin.properties" \
+        --entity-type brokers --entity-name "$NODE_ID" --alter \
+        --add-config "listener.name.client.ssl.keystore.location=$RUN/keystore.pem" >/dev/null
+    }
+
+    # Idempotent: removes a stale voter entry of this node id (old directory id), then
+    # adds this node (current directory id) once caught up. Returns 0 when done.
+    join_voter() {
+      local status voter_dir mine lag
+      mine="$(my_directory_id)"
+      [ -n "$mine" ] || return 1
+      status="$(tool kafka-metadata-quorum.sh --bootstrap-server "$SELF" --command-config "$RUN/admin.properties" describe --status 2>/dev/null)" || return 1
+      voter_dir="$(grep '^CurrentVoters' <<<"$status" | grep -o "\"id\": ${NODE_ID}, \"directoryId\": \"[^\"]*\"" | sed 's/.*"directoryId": "//; s/"$//' || true)"
+      if [ "$voter_dir" = "$mine" ]; then
+        log "Node ${NODE_ID} is a KRaft voter (directory.id ${mine})"
+        rm -f "$JOIN_MARKER"
+        return 0
+      fi
+      if [ -n "$voter_dir" ]; then
+        log "Removing stale voter ${NODE_ID} (old directory.id ${voter_dir})"
+        tool kafka-metadata-quorum.sh --bootstrap-server "$SELF" --command-config "$RUN/admin.properties" \
+          remove-controller --controller-id "$NODE_ID" --controller-directory-id "$voter_dir"
+        return 1
+      fi
+      lag="$(tool kafka-metadata-quorum.sh --bootstrap-server "$SELF" --command-config "$RUN/admin.properties" describe --replication 2>/dev/null \
+             | awk -v id="$NODE_ID" -v dir="$mine" '$1==id && $2==dir {print $4}')"
+      case "$lag" in ''|*[!0-9]*) lag=-1;; esac
+      if [ "$lag" -lt 0 ] || [ "$lag" -gt 1000 ]; then
+        log "Waiting for node ${NODE_ID} to catch up before adding it as voter (lag: ${lag})"
+        return 1
+      fi
+      log "Adding node ${NODE_ID} (directory.id ${mine}) to the voter set"
+      tool kafka-metadata-quorum.sh --bootstrap-server "$SELF" --command-config "$RUN/controller-admin.properties" add-controller
+      return 1
+    }
+
+    sleep 60
+    while true; do
+      if [ -f "$JOIN_MARKER" ]; then join_voter || true; fi
+
+      if [ -s /cm/tls/ca.crt ] && [ -s /cm/tls/tls.crt ] && [ -s /cm/tls/tls.key ]; then
+        ca_now="$(sha256sum < /cm/tls/ca.crt | cut -d' ' -f1)"
+        cert_now="$(cat /cm/tls/tls.crt /cm/tls/tls.key | sha256sum | cut -d' ' -f1)"
+        if [ "$ca_now" != "$(cat "$RUN/ca.sum")" ]; then
+          staggered_restart "The CA certificate (ca.crt) changed"
+        elif [ "$cert_now" != "$(cat "$RUN/cert.sum")" ]; then
+          if [ "$DYNAMIC_RELOAD" != "true" ]; then
+            staggered_restart "The server certificate changed"
+          elif reload_keystore; then
+            log "Server certificate renewed: keystore reloaded on all listeners"
+            reload_failures=0
+          else
+            reload_failures=$(( reload_failures + 1 ))
+            log "WARNING: keystore reload failed (${reload_failures}/10)"
+            echo retry > "$RUN/cert.sum"
+            if [ "$reload_failures" -ge 10 ]; then staggered_restart "The keystore could not be reloaded"; fi
+          fi
+        fi
+      fi
+      sleep "$INTERVAL"
+    done
+
+  # Startup probe: the broker answers an admin request on its own INTERNAL listener.
+  probe.sh: |
+    #!/bin/bash
+    source /cm/scripts/common.sh
+    TOOL_TIMEOUT=25 tool kafka-cluster.sh cluster-id --bootstrap-server "$SELF" --command-config "$RUN/admin.properties"

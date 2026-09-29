@@ -1,0 +1,200 @@
+{{- if eq (include "s3.provider" .) "rustfs" }}
+{{- include "s3.rustfs.validate" . }}
+{{- $r := .Values.s3.rustfs }}
+{{- $name := include "s3.fullname" . }}
+{{- $uid := int (include "s3.uid" .) }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "s3") | nindent 4 }}
+spec:
+  serviceName: {{ include "s3.headless" . }}
+  replicas: {{ $r.replicas }}
+  # All pods start together: RustFS needs a quorum of its peers before it serves requests.
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" (dict "ctx" . "component" "s3") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "s3") | nindent 8 }}
+      {{- with $r.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with (include "common.imagePullSecrets" . | trim) }}{{ . | nindent 6 }}{{- end }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ $r.terminationGracePeriodSeconds | default 60 }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 6 }}
+      {{- include "common.affinity" (dict "ctx" . "component" "s3" "affinity" $r.affinity) | nindent 6 }}
+      {{- if and (not $r.affinity) (eq (.Values.global.podAntiAffinity | default "hard") "soft") }}
+      {{- include "common.topologySpread" (dict "ctx" . "component" "s3") | nindent 6 }}
+      {{- end }}
+      {{- with (include "common.scheduling" (dict "ctx" . "nodeSelector" $r.nodeSelector "tolerations" $r.tolerations) | trim) }}{{ . | nindent 6 }}{{- end }}
+      containers:
+        - name: rustfs
+          image: {{ include "common.image" (dict "ctx" . "image" $r.image) }}
+          imagePullPolicy: {{ $r.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          ports:
+            - name: api
+              containerPort: {{ include "s3.apiPort" . }}
+              protocol: TCP
+            {{- if $r.console.enabled }}
+            - name: console
+              containerPort: {{ include "s3.consolePort" . }}
+              protocol: TCP
+            {{- end }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # Every drive of every pod (one erasure set), reached over HTTPS.
+            - name: RUSTFS_VOLUMES
+              value: {{ include "s3.rustfs.volumes" . | quote }}
+            # This pod's own host name in RUSTFS_VOLUMES (no DNS guessing).
+            - name: RUSTFS_LOCAL_ENDPOINT_HOST
+              value: {{ printf "$(POD_NAME).%s.%s.svc.%s" (include "s3.headless" .) .Release.Namespace (include "common.clusterDomain" .) | quote }}
+            - name: RUSTFS_ADDRESS
+              value: {{ printf ":%s" (include "s3.apiPort" .) | quote }}
+            - name: RUSTFS_CONSOLE_ENABLE
+              value: {{ ternary "true" "false" (and $r.console.enabled true) | quote }}
+            - name: RUSTFS_CONSOLE_ADDRESS
+              value: {{ printf ":%s" (include "s3.consolePort" .) | quote }}
+            - name: RUSTFS_REGION
+              value: {{ $r.region | default "us-east-1" | quote }}
+            # Erasure coding: <parity> parity shards per object (see values.yaml).
+            - name: RUSTFS_STORAGE_CLASS_STANDARD
+              value: {{ printf "EC:%d" (int $r.parity) | quote }}
+            # TLS: rustfs_cert.pem / rustfs_key.pem serve HTTPS, ca.crt is trusted for the
+            # connections to the other pods. Reloaded when the Secret changes (cert-manager).
+            - name: RUSTFS_TLS_PATH
+              value: /opt/tls
+            - name: RUSTFS_TLS_RELOAD_ENABLE
+              value: "true"
+            - name: RUSTFS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: root-access-key
+            - name: RUSTFS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: root-secret-key
+            {{- if $r.allowSharedDisks }}
+            - name: RUSTFS_UNSAFE_BYPASS_DISK_CHECK
+              value: "true"
+            {{- end }}
+            # Logs go to the container output (the image default writes files to /logs).
+            - name: RUSTFS_OBS_LOG_DIRECTORY
+              value: ""
+            - name: RUSTFS_OBS_LOG_STDOUT_ENABLED
+              value: "true"
+            - name: RUSTFS_OBS_LOGGER_LEVEL
+              value: {{ $r.logLevel | default "info" | quote }}
+            - name: RUSTFS_OBS_ENVIRONMENT
+              value: production
+            {{- if include "s3.otlpEnabled" . }}
+            # Telemetry to the local OpenTelemetry collector (OTLP/HTTP).
+            - name: RUSTFS_OBS_ENDPOINT
+              value: {{ include "s3.otlpCollector" . | quote }}
+            - name: RUSTFS_OBS_METRICS_EXPORT_ENABLED
+              value: {{ ternary "true" "false" (and $r.telemetry.metrics true) | quote }}
+            - name: RUSTFS_OBS_TRACES_EXPORT_ENABLED
+              value: {{ ternary "true" "false" (and $r.telemetry.traces true) | quote }}
+            - name: RUSTFS_OBS_LOGS_EXPORT_ENABLED
+              value: {{ ternary "true" "false" (and $r.telemetry.logs true) | quote }}
+            # The collector has no profiles pipeline (and the image has no Pyroscope support).
+            - name: RUSTFS_OBS_PROFILING_EXPORT_ENABLED
+              value: "false"
+            - name: RUSTFS_OBS_USE_STDOUT
+              value: "false"
+            - name: RUSTFS_OBS_METER_INTERVAL
+              value: {{ $r.telemetry.interval | default 30 | quote }}
+            - name: RUSTFS_OBS_SERVICE_NAME
+              value: rustfs
+            {{- end }}
+            {{- with $r.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # /health/live = process up; /health/ready = storage write quorum, IAM and locks ready.
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: api
+              scheme: HTTPS
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 90
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: api
+              scheme: HTTPS
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: api
+              scheme: HTTPS
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml $r.resources | nindent 12 }}
+          volumeMounts:
+            {{- range $i := until (int $r.volumesPerPod) }}
+            - name: data-{{ $i }}
+              mountPath: /mnt/data{{ $i }}
+            {{- end }}
+            - name: tls
+              mountPath: /opt/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            # Default queue directory of event/audit targets (unused unless configured).
+            - name: state
+              mountPath: /opt/rustfs
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ include "s3.tlsSecret" . }}
+            items:
+              - key: tls.crt
+                path: rustfs_cert.pem
+              - key: tls.key
+                path: rustfs_key.pem
+              - key: ca.crt
+                path: ca.crt
+        - name: tmp
+          emptyDir: {}
+        - name: state
+          emptyDir: {}
+  volumeClaimTemplates:
+    {{- range $i := until (int $r.volumesPerPod) }}
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data-{{ $i }}
+        labels:
+          {{- include "common.selectorLabels" (dict "ctx" $ "component" "s3") | nindent 10 }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with (include "common.storageClass" (dict "ctx" $ "storageClass" $r.storage.storageClass) | trim) }}{{ . | nindent 8 }}{{- end }}
+        resources:
+          requests:
+            storage: {{ $r.storage.size | quote }}
+    {{- end }}
+{{- end }}
