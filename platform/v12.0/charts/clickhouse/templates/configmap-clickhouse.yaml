@@ -29,6 +29,13 @@ data:
 
         <timezone>UTC</timezone>
 
+        <!-- On stop (pod deleted, rolling update, node drain): stop accepting connections, then
+             let the running queries finish (half of terminationGracePeriodSeconds) instead of
+             cancelling them at once. A cancelled INSERT can already be written, and a client
+             that retries it would insert it twice. -->
+        <shutdown_wait_unfinished_queries>1</shutdown_wait_unfinished_queries>
+        <shutdown_wait_unfinished>{{ div (int $ch.terminationGracePeriodSeconds) 2 }}</shutdown_wait_unfinished>
+
         <!-- Listen on all addresses, IPv6 and IPv4. listen_try: a missing address family
              (e.g. IPv6 disabled on the node) is not an error. -->
         <listen_host>::</listen_host>
@@ -147,12 +154,15 @@ data:
 
         <!-- Users, roles, grants, settings profiles and quotas created with SQL (e.g. the
              users that CM MES provisions) are stored in Keeper, so every replica has them.
-             Users from users.xml/users.d (the MES admin user) are read-only. -->
+             Users from users.xml/users.d (the MES admin user) are read-only.
+             The storage keeps the name of the default SQL storage, "local_directory": CM MES
+             refers to it by that name (e.g. CREATE ROW POLICY ... IN local_directory). -->
         <user_directories replace="replace">
             <users_xml>
                 <path>users.xml</path>
             </users_xml>
             <replicated>
+                <name>local_directory</name>
                 <zookeeper_path>/clickhouse/access</zookeeper_path>
             </replicated>
         </user_directories>

@@ -4,5 +4,12 @@ Values for the CM MES installer (install.sh prints them for you):
   kubectl -n {{ .Release.Namespace }} get secret {{ include "common.fullname" (dict "ctx" . "component" "clickhouse-connection") }} -o jsonpath='{.data.mes-installer\.txt}' | base64 -d
   kubectl -n {{ .Release.Namespace }} get secret {{ include "clickhouse.tlsSecret" . }} -o jsonpath='{.data.ca\.crt}' | base64 -d > clickhouse-ca.crt
 
+{{- if include "clickhouse.ro.enabled" . }}
+
+Reporting / BI tools (read-only workloads, HTTPS only, same CA): connect them to
+  https://{{ include "common.svcFqdn" (dict "ctx" . "name" (include "clickhouse.ro.fullname" .)) }}:8443
+It prefers the ClickHouse server that CM MES does not use. Use a user with read-only grants.
+{{- end }}
+
 Check that replication works over TLS with the MES user:
   helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

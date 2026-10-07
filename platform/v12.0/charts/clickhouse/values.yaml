@@ -7,8 +7,10 @@
 # What is installed:
 #   - ClickHouse Keeper: <prefix>-keeper (StatefulSet, odd number of pods, Raft quorum)
 #   - ClickHouse server: <prefix>-clickhouse (StatefulSet, 1 shard x N replicas)
-#   - Services: <prefix>-clickhouse (native TLS 9440, HTTPS 8443) used by CM MES,
-#     <prefix>-clickhouse-headless and <prefix>-keeper-headless (per-pod DNS names)
+#   - Load balancer: <prefix>-clickhouse-lb (HAProxy Deployment, failover between the servers)
+#   - Services: <prefix>-clickhouse (HTTPS 8443, native TLS 9440) used by CM MES, through the
+#     load balancer; <prefix>-clickhouse-ro (HTTPS 8443) for reporting/BI, through the load
+#     balancer; <prefix>-clickhouse-headless and <prefix>-keeper-headless (per-pod DNS names)
 #   - Secret <prefix>-clickhouse-connection with the values for the CM MES installer
 
 # ---------------------------------------------------------------------------------
@@ -99,7 +101,8 @@ clickhouse:
   tls:
     # tls.mode=existing only: name of a Secret with tls.crt, tls.key and ca.crt, used by
     # both ClickHouse and Keeper. Its certificate must be valid for:
-    #   <prefix>-clickhouse, <prefix>-clickhouse-headless, <prefix>-keeper-headless
+    #   <prefix>-clickhouse, <prefix>-clickhouse-ro, <prefix>-clickhouse-headless,
+    #   <prefix>-keeper-headless
     #   (short, .<ns>, .<ns>.svc and .<ns>.svc.<clusterDomain> names), plus
     #   *.<prefix>-clickhouse-headless.<ns>.svc.<clusterDomain> and
     #   *.<prefix>-keeper-headless.<ns>.svc.<clusterDomain>
@@ -192,6 +195,74 @@ clickhouse:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
+  # -------------------------------------------------------------------------------
+  # Load balancer in front of the ClickHouse servers (Service <prefix>-clickhouse)
+  # -------------------------------------------------------------------------------
+  # CM MES connects to ONE address. CM recommends a failover load balancer: every request
+  # goes to the primary replica, and the next replica takes over only while the primary is
+  # down. That way CM MES always reads what it has just written (the Aggregation Engine/dbt
+  # writes and reads back immediately; replicas copy data asynchronously).
+  #
+  #   enabled: true  (recommended) HAProxy, 2 pods. Priority chain: <prefix>-clickhouse-0,
+  #                  then -1, then -2... Health check: /replicas_status of each server
+  #                  (fails when the server is down, or lags the other replicas by more than
+  #                  5 minutes of inserts). TLS is terminated with the ClickHouse certificate and
+  #                  re-encrypted to the servers. Clients keep their connections on failover
+  #                  and failback; only the requests running on a failed server are lost.
+  #   enabled: false Plain Kubernetes Service over all servers with sticky sessions
+  #                  (sessionAffinity: ClientIP): each client pod stays on one server, but
+  #                  different MES pods can use different servers. No extra image.
+  loadBalancer:
+    enabled: true
+
+    image:
+      repository: library/haproxy
+      tag: "3.4.6"
+      pullPolicy: IfNotPresent
+
+    # 2 pods: one can be down (node drain, upgrade) without interrupting CM MES.
+    replicas: 2
+
+    healthCheck:
+      # Seconds between checks of each ClickHouse server.
+      intervalSeconds: 2
+      # Failed checks before a server is taken out (failover after about 3 x 2 = 6 s).
+      fall: 3
+      # Successful checks before a server is used again. Gives a restarted primary
+      # 15 x 2 = 30 s to catch up with the inserts it missed before it gets traffic back.
+      rise: 15
+
+    # Longest time a request can wait for ClickHouse without receiving any data (e.g. a long
+    # SELECT or INSERT ... SELECT). Requests that need longer are cut by the load balancer.
+    queryTimeout: 1h
+
+    # Maximum number of client connections per load balancer pod.
+    maxConnections: 2000
+
+    # Second address, <prefix>-clickhouse-ro (HTTPS 8443 only, same certificate), for
+    # reporting, BI tools and ad-hoc queries. It uses the failover chain in reverse order: the
+    # last ClickHouse server first (the one CM MES does not use), then the others while it is
+    # down. Heavy reads then do not slow down CM MES. Not used by CM MES.
+    # Reads can lag the data CM MES has just written by a few seconds (replication is
+    # asynchronous). The load balancer does not block writes: connect with a ClickHouse user
+    # that has only SELECT grants (or a readonly settings profile). DDL without ON CLUSTER sent
+    # here would only reach one server.
+    readOnly:
+      enabled: true
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+    # Scheduling. Empty values use the global ones. A non-empty affinity replaces the default
+    # anti-affinity (one load balancer pod per node).
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
 
   # -------------------------------------------------------------------------------
   # ClickHouse Keeper (coordination service used for replication and distributed DDL)

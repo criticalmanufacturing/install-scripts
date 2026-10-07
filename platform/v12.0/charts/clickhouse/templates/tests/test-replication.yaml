@@ -1,5 +1,7 @@
 {{- /*
-helm test: as the MES user, over native TLS (9440) with the chart CA, create a
+helm test: as the MES user, query the Service over HTTPS (8443) a few times (with the load
+balancer they must all reach the same server) and the read-only endpoint (it must reach another
+server); then, over native TLS (9440) with the chart CA, create a
 ReplicatedMergeTree table ON CLUSTER in a temporary database, insert a row through the
 first replica, check that every replica returns it, then drop the database.
 */ -}}
@@ -38,6 +40,10 @@ spec:
           value: {{ include "common.svcFqdn" (dict "ctx" . "name" (include "clickhouse.fullname" .)) | quote }}
         - name: REPLICAS
           value: {{ join " " $hosts | quote }}
+        {{- if include "clickhouse.ro.enabled" . }}
+        - name: RO_SERVICE
+          value: {{ include "common.svcFqdn" (dict "ctx" . "name" (include "clickhouse.ro.fullname" .)) | quote }}
+        {{- end }}
         - name: CLUSTER
           value: {{ $ch.clusterName | quote }}
         - name: CH_USER
@@ -66,7 +72,46 @@ spec:
           }
           trap cleanup EXIT
 
-          echo "Connecting to ${SERVICE}:9440 (TLS) as ${CH_USER}"
+          # HTTPS through the Service, verifying its certificate against the chart CA.
+          cat >/tmp/local.xml <<'EOF'
+          <clickhouse><openSSL><client>
+            <caConfig>/etc/clickhouse-server/tls/ca.crt</caConfig>
+            <verificationMode>strict</verificationMode>
+            <loadDefaultCAFile>false</loadDefaultCAFile>
+            <invalidCertificateHandler><name>RejectCertificateHandler</name></invalidCertificateHandler>
+          </client></openSSL></clickhouse>
+          EOF
+          https_host() {
+            clickhouse local --config-file=/tmp/local.xml --query "SELECT * FROM url(
+              'https://${1:-$SERVICE}:8443/?query=SELECT%20hostName()', 'TSV', 'h String',
+              headers('X-ClickHouse-User' = '${CH_USER}', 'X-ClickHouse-Key' = '${CH_PASSWORD//\'/\\\'}'))"
+          }
+          echo "Connecting to ${SERVICE}:8443 (HTTPS) as ${CH_USER}"
+          servers=""
+          for i in 1 2 3 4 5; do servers="${servers} $(https_host)"; done
+          echo "Answered by:${servers}"
+          {{- if $ch.loadBalancer.enabled }}
+          # Failover load balancer: every request goes to the same server.
+          if [ "$(printf '%s\n' ${servers} | sort -u | wc -l)" != "1" ]; then
+            echo "FAILED: the load balancer sent the requests to different servers" >&2
+            exit 1
+          fi
+          {{- end }}
+          {{- if include "clickhouse.ro.enabled" . }}
+
+          # Read-only endpoint: reverse order, so it uses another server than CM MES.
+          echo "Connecting to ${RO_SERVICE}:8443 (HTTPS, read-only endpoint) as ${CH_USER}"
+          ro="$(https_host "$RO_SERVICE")"
+          echo "Answered by: ${ro}"
+          {{- if gt (int $ch.replicas) 1 }}
+          if [ "$ro" = "$(https_host)" ]; then
+            echo "FAILED: the read-only endpoint uses the same server as CM MES (${ro})" >&2
+            exit 1
+          fi
+          {{- end }}
+          {{- end }}
+
+          echo "Connecting to ${SERVICE}:9440 (native TLS) as ${CH_USER}"
           q "$SERVICE" "SELECT 'ClickHouse ' || version() || ' on ' || hostName()"
 
           echo "Creating ${db}.t (ReplicatedMergeTree) ON CLUSTER ${CLUSTER}"

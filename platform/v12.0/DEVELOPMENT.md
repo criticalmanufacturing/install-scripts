@@ -22,7 +22,7 @@ platform/v12.0/
   values.yaml       the single configuration file that admins edit (all sections)
   charts/common     library chart shared by all charts (see "common helpers")
   charts/kafka      Kafka (KRaft, combined controller+broker StatefulSet)
-  charts/clickhouse ClickHouse server StatefulSet + ClickHouse Keeper StatefulSet
+  charts/clickhouse ClickHouse server StatefulSet + ClickHouse Keeper StatefulSet + HAProxy load balancer
   charts/s3         RustFS distributed StatefulSet, or an ObjectBucketClaim for Ceph RGW
   charts/otel       optional OpenTelemetry collector, pushing metrics to an OTLP/HTTP endpoint
 ```
@@ -39,7 +39,7 @@ restart pods. Every other resource uses `common.labels`.
 | Chart | Release name | Main resource names |
 |---|---|---|
 | kafka | `<prefix>-kafka` | `<prefix>-kafka` (bootstrap Service, StatefulSet), `<prefix>-kafka-headless` |
-| clickhouse | `<prefix>-clickhouse` | `<prefix>-clickhouse`, `<prefix>-clickhouse-headless`, `<prefix>-keeper`, `<prefix>-keeper-headless` |
+| clickhouse | `<prefix>-clickhouse` | `<prefix>-clickhouse`, `<prefix>-clickhouse-ro` (read-only/BI), `<prefix>-clickhouse-lb`, `<prefix>-clickhouse-headless`, `<prefix>-keeper`, `<prefix>-keeper-headless` |
 | s3 | `<prefix>-s3` | `<prefix>-s3` (S3 API Service), `<prefix>-s3-headless` |
 | otel | `<prefix>-otel` | `<prefix>-otel` (Deployment, Service with OTLP 4317/4318) |
 
@@ -87,6 +87,9 @@ clickhouse:
   replicas: 2
   tls: {existingSecret: ""}
   storage: {size: 100Gi, storageClass: ""}
+  loadBalancer:                     # false = plain Service with sticky sessions (no HAProxy)
+    enabled: true
+    readOnly: {enabled: true}       # <prefix>-clickhouse-ro for BI, reverse failover order
   keeper:
     replicas: 3
     storage: {size: 10Gi, storageClass: ""}
@@ -121,6 +124,7 @@ Charts may add more keys to their own section (resources, image, tuning, and so 
   - `rustfs/rustfs:1.0.0`
   - `amazon/aws-cli:2.37.4`
   - `otel/opentelemetry-collector-contrib:0.161.0`
+  - `library/haproxy:3.4.6` (ClickHouse failover load balancer; optional, `clickhouse.loadBalancer.enabled`)
 
   Don't add other images unless it's unavoidable (air-gapped customers must mirror every one).
 - **Security**: `common.podSecurityContext` (pass the image's numeric UID/GID) and
@@ -149,7 +153,8 @@ Charts may add more keys to their own section (resources, image, tuning, and so 
   values are configured in CM MES or protect data (users/passwords, KRaft identity, CA) carry
   `helm.sh/resource-policy: keep`, so an uninstall + reinstall keeps them.
 - **Certificate renewal never restarts pods**: no TLS checksum annotations. Kafka (maintenance.sh),
-  ClickHouse, Keeper and RustFS reload renewed certificates from the mounted Secret.
+  ClickHouse, Keeper and RustFS reload renewed certificates from the mounted Secret; the ClickHouse
+  load balancer (HAProxy) start script checks the Secret every 30 s and reloads HAProxy gracefully.
 - **Startup order**: a pod that needs a peer at startup waits for it in its start script instead
   of crashing (e.g. ClickHouse waits for a Keeper quorum). Helm 4 `--wait` fails the release on
   the first container crash.

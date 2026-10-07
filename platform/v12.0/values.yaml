@@ -115,6 +115,15 @@ clickhouse:
   storage:
     size: 100Gi         # data volume per ClickHouse server
     storageClass: ""
+  # CM MES connects through a failover load balancer (HAProxy, image library/haproxy): all
+  # requests go to one server, the next one takes over when it fails (CM recommendation).
+  # false = no extra image, a plain Service with sticky sessions instead.
+  loadBalancer:
+    enabled: true
+    # Read-only address <prefix>-clickhouse-ro (HTTPS) for reporting/BI tools: it prefers the
+    # server that CM MES does not use. Needs the load balancer.
+    readOnly:
+      enabled: true
   keeper:
     # Number of Keeper servers. Must be odd; 3 tolerates the loss of one.
     replicas: 3
