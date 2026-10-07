@@ -1134,6 +1134,11 @@ EOF
           -config "$d/ca.cnf" -keyout "$d/ca.key" -out "$d/ca.crt") 2>&1)"; then
     err "openssl failed:"; printf '%s\n' "$out" | sed 's/^/         /' >&2; exit 1
   fi
+  # The OpenSSL of Git for Windows writes CRLF line endings: store LF-only PEM files.
+  local f
+  for f in ca.crt ca.key; do
+    (umask 077; tr -d '\r' <"$d/$f" >"$d/$f.lf") && mv -f "$d/$f.lf" "$d/$f"
+  done
   if ! out="$(kcn create secret tls "$name" --cert "$d/ca.crt" --key "$d/ca.key" 2>&1)"; then
     err "Could not create the CA Secret '$name':"; printf '%s\n' "$out" | sed 's/^/         /' >&2; exit 1
   fi
