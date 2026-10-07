@@ -1,6 +1,13 @@
 {{- $chSelector := include "common.selectorLabels" (dict "ctx" . "component" "clickhouse") -}}
 {{- $keeperSelector := include "common.selectorLabels" (dict "ctx" . "component" "keeper") -}}
-# Used by CM MES: load-balanced over the ready ClickHouse servers.
+{{- $lbEnabled := .Values.clickhouse.loadBalancer.enabled -}}
+# Used by CM MES.
+{{- if $lbEnabled }}
+# Points to the load balancer (HAProxy), which sends every request to the primary ClickHouse
+# server and fails over to the next one (see clickhouse.loadBalancer).
+{{- else }}
+# Points directly to the ready ClickHouse servers, with sticky sessions.
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -10,8 +17,20 @@ metadata:
     {{- include "common.labels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
 spec:
   type: ClusterIP
+  # Each client pod keeps talking to the same backend pod (default timeout: 3 hours).
+  # With the load balancer: all its pods route to the same server, but during a failover they
+  # can disagree for a few seconds; affinity keeps each MES pod on one of them.
+  # Without it: each MES pod stays on one server, so it reads what it has just written. The
+  # CM MES installer also relies on it: it runs some statements without ON CLUSTER (e.g.
+  # RESTORE DATABASE) and uses the result in its next connection. Different MES pods can still
+  # use different servers. A failed pod is skipped.
+  sessionAffinity: ClientIP
   selector:
+    {{- if $lbEnabled }}
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "clickhouse-lb") | nindent 4 }}
+    {{- else }}
     {{- $chSelector | nindent 4 }}
+    {{- end }}
   ports:
     - name: tcp-secure
       port: 9440
@@ -21,6 +40,30 @@ spec:
       port: 8443
       targetPort: https
       protocol: TCP
+{{- if include "clickhouse.ro.enabled" . }}
+---
+# Read-only endpoint for reporting, BI and ad-hoc queries (HTTPS only), through the load
+# balancer: it prefers the server that CM MES does not use. Not used by CM MES.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clickhouse.ro.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+spec:
+  type: ClusterIP
+  # While the load balancer pods briefly disagree on a server's health (failover, failback),
+  # each client stays on one of them, so it doesn't alternate between ClickHouse servers.
+  sessionAffinity: ClientIP
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "clickhouse-lb") | nindent 4 }}
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https-ro
+      protocol: TCP
+{{- end }}
 ---
 # Per-pod DNS names (replication, distributed DDL, monitoring). Includes pods that are not
 # ready yet, so that replicas can find each other while starting.

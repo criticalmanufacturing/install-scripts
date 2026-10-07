@@ -287,7 +287,7 @@ VALUE_KEYS=(
   kafka.enabled kafka.replicas kafka.auth.method kafka.tls.existingSecret
   kafka.tls.existingClientSecret kafka.storage.size
   clickhouse.enabled clickhouse.replicas clickhouse.tls.existingSecret clickhouse.storage.size
-  clickhouse.keeper.replicas clickhouse.keeper.storage.size
+  clickhouse.keeper.replicas clickhouse.keeper.storage.size clickhouse.loadBalancer.enabled
   s3.enabled s3.provider s3.bucket s3.rustfs.replicas s3.rustfs.volumesPerPod
   s3.rustfs.tls.existingSecret s3.rustfs.storage.size s3.rgw.storageClass
   kafka.storage.storageClass clickhouse.storage.storageClass clickhouse.keeper.storage.storageClass
@@ -1005,7 +1005,9 @@ show_summary() {
     printf '  %-22s %s\n' "Kafka:" "${V[kafka.replicas]:-3} brokers, ${V[kafka.storage.size]:-?} each, auth ${V[kafka.auth.method]} (release $p-kafka)"
   else printf '  %-22s %s\n' "Kafka:" "not installed"; fi
   if enabled clickhouse; then
-    printf '  %-22s %s\n' "ClickHouse:" "${V[clickhouse.replicas]:-2} servers x ${V[clickhouse.storage.size]:-?}, ${V[clickhouse.keeper.replicas]:-3} keepers x ${V[clickhouse.keeper.storage.size]:-?} (release $p-clickhouse)"
+    local lb="failover load balancer"
+    [[ "${V[clickhouse.loadBalancer.enabled]:-true}" == false ]] && lb="no load balancer (sticky Service)"
+    printf '  %-22s %s\n' "ClickHouse:" "${V[clickhouse.replicas]:-2} servers x ${V[clickhouse.storage.size]:-?}, ${V[clickhouse.keeper.replicas]:-3} keepers x ${V[clickhouse.keeper.storage.size]:-?}, $lb (release $p-clickhouse)"
   else printf '  %-22s %s\n' "ClickHouse:" "not installed"; fi
   if enabled s3; then
     if [[ "${V[s3.provider]}" == rgw ]]; then

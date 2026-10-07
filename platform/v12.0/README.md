@@ -6,7 +6,7 @@ Kubernetes or OpenShift cluster, set up for production (highly available, encryp
 | Component | What is installed | Survives the loss of |
 |---|---|---|
 | **Kafka 4.3** | 3 Kafka servers (KRaft, no ZooKeeper) | 1 node |
-| **ClickHouse 26.3 LTS** | 2 ClickHouse servers (replicated) + 3 ClickHouse Keeper | 1 node |
+| **ClickHouse 26.3 LTS** | 2 ClickHouse servers (replicated) + 3 ClickHouse Keeper + a failover load balancer (2 HAProxy pods) | 1 node |
 | **S3 storage** | RustFS 1.0: 3 servers × 2 disks (erasure coded), **or** a bucket on your existing Ceph RGW (e.g. OpenShift Data Foundation) | 1 node |
 
 You can install all three or only the ones you need. At the end, the installer prints the values to
@@ -75,6 +75,19 @@ Bucket Name                               : cm-mes
 
 - **ClickHouse Cluster Name**: always fill it in the CM MES installer. Without it, CM MES creates
   each table on only one of the two ClickHouse servers, and it isn't highly available.
+- **ClickHouse Address** is a failover load balancer: every request goes to `cmmes-clickhouse-0`,
+  and `cmmes-clickhouse-1` takes over only while it is down (CM recommendation: CM MES always reads
+  what it has just written). When a server stops or its node fails, new requests move to the other
+  server within about 10 seconds. On a normal stop (upgrade, node drain) the queries running on it
+  can finish; if its node fails, they get an error after about 30 seconds and must be retried.
+  Set `clickhouse.loadBalancer.enabled: false` for a plain Service with
+  sticky sessions instead (one image less to mirror; different MES pods can then use different servers).
+- **Reporting / BI tools** (Power BI, Grafana, DBeaver, ...): connect them to
+  `https://cmmes-clickhouse-ro.<namespace>.svc.cluster.local:8443` (HTTPS only, same CA), not to
+  the CM MES address. It prefers `cmmes-clickhouse-1`, the server CM MES doesn't use, so heavy
+  queries don't slow down CM MES; it falls back to `cmmes-clickhouse-0` while that server is down.
+  Use a ClickHouse user with read-only grants: the endpoint routes reads, but doesn't block writes.
+  Turn it off with `clickhouse.loadBalancer.readOnly.enabled: false`.
 - `output/connection-info.txt`: all the values above. It contains passwords, so keep it safe.
 - `output/*-ca.crt`: the certificate authorities. Add them in the CM MES installer where it asks for
   certificates (or enable "skip certificate validation", which isn't recommended for production).
@@ -122,7 +135,8 @@ and prints its address and keys. The bucket name gets a random suffix, e.g. `cm-
 **Private registry / air-gapped clusters** (`global.imageRegistry`, `global.imagePullSecrets`).
 Mirror these images, keeping their names:
 `apache/kafka:4.3.1`, `clickhouse/clickhouse-server:26.3.35.3`, `clickhouse/clickhouse-keeper:26.3.35.3`,
-`rustfs/rustfs:1.0.0`, `amazon/aws-cli:2.37.4`, and `otel/opentelemetry-collector-contrib:0.161.0` (monitoring only).
+`library/haproxy:3.4.6` (ClickHouse load balancer), `rustfs/rustfs:1.0.0`, `amazon/aws-cli:2.37.4`, and
+`otel/opentelemetry-collector-contrib:0.161.0` (monitoring only).
 
 **Advanced settings** (CPU, memory, tuning) are documented in `charts/<name>/values.yaml`. Copy a
 key into the same section of your values file to change it.

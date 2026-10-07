@@ -23,6 +23,13 @@ Components (app.kubernetes.io/name): "clickhouse" (servers) and "keeper" (ClickH
 {{- if eq (toString $ch.auth.username) "default" -}}
 {{- fail "clickhouse.auth.username must not be \"default\": the built-in default user is restricted to localhost" -}}
 {{- end -}}
+{{- $lb := $ch.loadBalancer -}}
+{{- if and $lb.enabled (lt (int $lb.replicas) 1) -}}
+{{- fail (printf "clickhouse.loadBalancer.replicas must be at least 1 (2 for high availability), got %d" (int $lb.replicas)) -}}
+{{- end -}}
+{{- if and $lb.enabled (not (regexMatch "^[0-9]+(ms|s|m|h)$" (toString $lb.queryTimeout))) -}}
+{{- fail (printf "clickhouse.loadBalancer.queryTimeout must be a number followed by ms, s, m or h (e.g. 1h), got %q" (toString $lb.queryTimeout)) -}}
+{{- end -}}
 {{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" (toString $ch.clusterName)) -}}
 {{- fail (printf "clickhouse.clusterName must contain only letters, digits and _, got %q" (toString $ch.clusterName)) -}}
 {{- end -}}
@@ -41,6 +48,13 @@ Components (app.kubernetes.io/name): "clickhouse" (servers) and "keeper" (ClickH
 {{- define "clickhouse.usersSecret" -}}{{ include "common.fullname" (dict "ctx" . "component" "clickhouse-users") }}{{- end -}}
 {{- define "clickhouse.configMap" -}}{{ include "common.fullname" (dict "ctx" . "component" "clickhouse-config") }}{{- end -}}
 {{- define "clickhouse.keeper.configMap" -}}{{ include "common.fullname" (dict "ctx" . "component" "keeper-config") }}{{- end -}}
+{{- define "clickhouse.lb.fullname" -}}{{ include "common.fullname" (dict "ctx" . "component" "clickhouse-lb") }}{{- end -}}
+{{- define "clickhouse.ro.fullname" -}}{{ include "common.fullname" (dict "ctx" . "component" "clickhouse-ro") }}{{- end -}}
+{{/* true when the read-only endpoint (Service <prefix>-clickhouse-ro) is deployed. */}}
+{{- define "clickhouse.ro.enabled" -}}
+{{- $lb := .Values.clickhouse.loadBalancer -}}
+{{- if and $lb.enabled ($lb.readOnly | default dict).enabled }}true{{ end -}}
+{{- end -}}
 {{- define "clickhouse.tlsSecret" -}}{{ include "common.tls.secretName" (dict "ctx" . "component" "clickhouse" "existingSecret" .Values.clickhouse.tls.existingSecret) }}{{- end -}}
 
 {{/* Per-pod DNS names. */}}
@@ -54,13 +68,14 @@ Components (app.kubernetes.io/name): "clickhouse" (servers) and "keeper" (ClickH
 {{/*
 DNS SANs of the certificate shared by ClickHouse and Keeper: short, <svc>.<ns>, <svc>.<ns>.svc
 and FQDN names of every Service, wildcards for the headless Services, and localhost
-(clickhouse-client inside a pod).
+(clickhouse-client inside a pod). The read-only Service is always included, so that it can be
+enabled later without a new certificate (auto mode keeps the certificate across upgrades).
 */}}
 {{- define "clickhouse.tls.dnsNames" -}}
 {{- $ns := .Release.Namespace -}}
 {{- $domain := include "common.clusterDomain" . -}}
 {{- $names := list -}}
-{{- range $svc := list (include "clickhouse.fullname" .) (include "clickhouse.headless" .) (include "clickhouse.keeper.headless" .) -}}
+{{- range $svc := list (include "clickhouse.fullname" .) (include "clickhouse.ro.fullname" .) (include "clickhouse.headless" .) (include "clickhouse.keeper.headless" .) -}}
 {{- $names = concat $names (list $svc (printf "%s.%s" $svc $ns) (printf "%s.%s.svc" $svc $ns) (printf "%s.%s.svc.%s" $svc $ns $domain)) -}}
 {{- end -}}
 {{- range $svc := list (include "clickhouse.headless" .) (include "clickhouse.keeper.headless" .) -}}
