@@ -70,17 +70,21 @@ spec:
                 sleep 10
               done
               acl() { "$B/kafka-acls.sh" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/admin.properties --add "$@" >/dev/null; }
+              # The ACLs that the CM MES documentation requires, and nothing more: no cluster
+              # ACLs. Topic Create covers topic creation and Write covers idempotent producers.
               echo "ACLs of User:mes (CM MES)"
               acl --allow-principal User:mes --topic '*' \
                 --operation Alter --operation AlterConfigs --operation Create --operation Delete \
                 --operation Describe --operation DescribeConfigs --operation Read --operation Write
               acl --allow-principal User:mes --group '*' \
                 --operation Read --operation Delete --operation Describe
-              acl --allow-principal User:mes --cluster \
-                --operation AlterConfigs --operation Create --operation Describe --operation DescribeConfigs
-              acl --allow-principal User:mes --transactional-id '*' --operation Describe --operation Write
-              # IdempotentWrite: implied by Write on a topic since Kafka 3.0; kept for older clients.
-              acl --allow-principal User:mes --cluster --operation IdempotentWrite
+              # Earlier chart versions also granted these. Remove them on upgrade (no-op otherwise).
+              "$B/kafka-acls.sh" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/admin.properties --remove --force \
+                --allow-principal User:mes --cluster \
+                --operation AlterConfigs --operation Create --operation Describe --operation DescribeConfigs \
+                --operation IdempotentWrite >/dev/null
+              "$B/kafka-acls.sh" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/admin.properties --remove --force \
+                --allow-principal User:mes --transactional-id '*' --operation Describe --operation Write >/dev/null
               echo "ACLs of User:monitor (read-only, OpenTelemetry collector)"
               acl --allow-principal User:monitor --topic '*' --operation Describe --operation DescribeConfigs
               acl --allow-principal User:monitor --group '*' --operation Describe
