@@ -2,7 +2,8 @@
 {{- $r := .Values.s3.rustfs }}
 {{- $uid := int (include "s3.uid" .) }}
 {{- $bucket := include "s3.bucket" . }}
-# Creates the MES bucket and, when s3.rustfs.mesUser.enabled, a user that can only use it.
+# Creates the MES bucket and, when s3.rustfs.mesUser.enabled, a user that can only use it,
+# then waits until every RustFS pod serves the bucket to those credentials.
 # Idempotent: runs after every install and upgrade, and waits until RustFS is ready.
 apiVersion: batch/v1
 kind: Job
@@ -73,7 +74,6 @@ spec:
               fi
           volumeMounts:
             {{- include "s3.clientVolumeMounts" . | nindent 12 }}
-      containers:
         {{- if $r.mesUser.enabled }}
         # 2. MES user (RustFS admin API, signed with curl --aws-sigv4 from the RustFS image):
         #    canned policy limited to the bucket (everything but deleting the bucket or changing
@@ -151,13 +151,71 @@ spec:
               echo "MES user ready"
           volumeMounts:
             {{- include "s3.clientVolumeMounts" . | nindent 12 }}
-        {{- else }}
-        - name: done
-          image: {{ include "common.image" (dict "ctx" . "image" .Values.s3.awsCli.image) }}
-          imagePullPolicy: {{ .Values.s3.awsCli.image.pullPolicy | default "IfNotPresent" }}
-          {{- include "common.containerSecurityContext" . | nindent 10 }}
-          command: ["/bin/sh", "-c", "echo 'Bucket ready (MES uses the root credentials)'"]
         {{- end }}
+      containers:
+        # 3. Check, with the credentials MES uses, that EVERY RustFS pod accepts writes to the bucket.
+        #    Right after a fresh install, a pod can answer NoSuchBucket to PUT/GET/DELETE for several
+        #    seconds while it already answers HEAD bucket and LIST (RustFS 1.0.1), so the check
+        #    writes and deletes a small object on each pod, until all pods pass 3 rounds in a row.
+        - name: verify
+          image: {{ include "common.image" (dict "ctx" . "image" $r.image) }}
+          imagePullPolicy: {{ $r.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          env:
+            - name: HOME
+              value: /tmp/home
+            - name: REGION
+              value: {{ $r.region | default "us-east-1" | quote }}
+            - name: BUCKET
+              value: {{ $bucket | quote }}
+            - name: PODS
+              value: {{ include "s3.podHosts" . | quote }}
+            - name: ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: {{ ternary "mes-access-key" "root-access-key" (and $r.mesUser.enabled true) }}
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s3.credentialsSecret" . }}
+                  key: {{ ternary "mes-secret-key" "root-secret-key" (and $r.mesUser.enabled true) }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              mkdir -p "$HOME"
+              cd "$HOME"
+              printf 'user = "%s:%s"\ncacert = "/etc/s3-tls/ca.crt"\nsilent\nmax-time = 10\naws-sigv4 = "aws:amz:%s:s3"\n' \
+                "$ACCESS_KEY" "$SECRET_KEY" "$REGION" > curl.cfg
+              echo "install check" > probe.txt
+              check() {  # check <host:port>: PUT then DELETE a probe object; prints what failed
+                url="https://${1}/${BUCKET}/cm-install-check/${1%%.*}"
+                code=$(curl -K curl.cfg -T probe.txt -D put.hdr -o out.txt -w '%{http_code}' "$url" || true)
+                if [ "$code" != 200 ]; then echo "PUT HTTP $code"; return; fi
+                # Versioned bucket: delete that exact version, so no delete marker is left behind.
+                vid=$(grep -i '^x-amz-version-id:' put.hdr | cut -d: -f2 | tr -d ' \r')
+                q=""; if [ -n "$vid" ] && [ "$vid" != null ]; then q="?versionId=$vid"; fi
+                code=$(curl -K curl.cfg -X DELETE -o out.txt -w '%{http_code}' "$url$q" || true)
+                if [ "$code" != 204 ]; then echo "DELETE HTTP $code"; fi
+              }
+              echo "Checking that every RustFS pod accepts writes to bucket $BUCKET ..."
+              i=0; good=0
+              while [ "$good" -lt 3 ]; do
+                failed=""
+                for h in $PODS; do
+                  r=$(check "$h")
+                  if [ -n "$r" ]; then failed="$failed ${h%%.*}($r)"; fi
+                done
+                if [ -z "$failed" ]; then good=$((good+1)); else good=0; fi
+                i=$((i+1))
+                if [ "$i" -ge 150 ]; then echo "Still failing after 5 minutes:$failed"; exit 1; fi
+                if [ -n "$failed" ] && [ $((i % 5)) -eq 1 ]; then echo "  waiting for:$failed"; fi
+                sleep 2
+              done
+              rm -f curl.cfg
+              echo "Bucket $BUCKET ready on every RustFS pod (after $i rounds)"
+          volumeMounts:
+            {{- include "s3.clientVolumeMounts" . | nindent 12 }}
       volumes:
         {{- include "s3.clientVolumes" . | nindent 8 }}
 {{- end }}

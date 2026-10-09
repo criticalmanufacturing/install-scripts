@@ -81,7 +81,7 @@ s3:
     image:
       # Repository without registry host (global.imageRegistry is put in front of it).
       repository: rustfs/rustfs
-      tag: "1.0.0"
+      tag: "1.0.1"
       pullPolicy: IfNotPresent
 
     # Number of RustFS pods (one per node with podAntiAffinity=hard) and number of
@@ -178,6 +178,11 @@ s3:
 
     # Time given to RustFS to finish in-flight requests on shutdown.
     terminationGracePeriodSeconds: 60
+
+    # During an upgrade or restart, wait this long after a RustFS pod is Ready before
+    # restarting the next one. Its peers need a moment to reconnect to it; restarting pods
+    # back-to-back gives a few seconds of HTTP 503 errors. 0 = no wait.
+    minReadySeconds: 60
 
     # Scheduling. Empty = use the global values.
     nodeSelector: {}

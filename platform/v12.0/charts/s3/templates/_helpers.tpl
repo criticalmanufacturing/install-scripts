@@ -103,6 +103,15 @@ https://cmmes-s3-{0...2}.cmmes-s3-headless.ns.svc.cluster.local:9000/mnt/data{0.
 {{- printf "https://%s:%s%s" $hosts (include "s3.apiPort" .) $drives -}}
 {{- end -}}
 
+{{/* Space-separated host:port of every RustFS pod (headless DNS), e.g. for per-pod checks. */}}
+{{- define "s3.podHosts" -}}
+{{- $hosts := list -}}
+{{- range $i := until (int .Values.s3.rustfs.replicas) -}}
+{{- $hosts = append $hosts (printf "%s-%d.%s.%s.svc.%s:%s" (include "s3.fullname" $) $i (include "s3.headless" $) $.Release.Namespace (include "common.clusterDomain" $) (include "s3.apiPort" $)) -}}
+{{- end -}}
+{{- join " " $hosts -}}
+{{- end -}}
+
 {{/* Generated credentials (stable across upgrades, identical in every template). */}}
 {{- define "s3.rootAccessKey" -}}
 {{- include "common.secretValue" (dict "ctx" . "secret" (include "s3.credentialsSecret" .) "key" "root-access-key" "value" .Values.s3.rustfs.auth.rootUser "length" 20) -}}
