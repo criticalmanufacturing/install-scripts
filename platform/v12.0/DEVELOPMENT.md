@@ -121,7 +121,7 @@ Charts may add more keys to their own section (resources, image, tuning, and so 
   - `apache/kafka:4.3.1`
   - `clickhouse/clickhouse-server:26.3.35.3`
   - `clickhouse/clickhouse-keeper:26.3.35.3`
-  - `rustfs/rustfs:1.0.0`
+  - `rustfs/rustfs:1.0.1`
   - `amazon/aws-cli:2.37.4`
   - `otel/opentelemetry-collector-contrib:0.161.0`
   - `library/haproxy:3.4.6` (ClickHouse failover load balancer; optional, `clickhouse.loadBalancer.enabled`)
@@ -137,6 +137,12 @@ Charts may add more keys to their own section (resources, image, tuning, and so 
   - `common.pdb` with `maxUnavailable: 1`.
   - `podManagementPolicy: Parallel` where the software needs peers to form a quorum.
   - Readiness, liveness and startup probes.
+  - RustFS: `minReadySeconds` (default 60) spaces the pod restarts of a rolling update. Back-to-back
+    restarts gave a few seconds of HTTP 503 while the peers reconnected (1.0.0 and 1.0.1).
+- **Setup Jobs finish only when the whole cluster is usable**: the S3 setup Job writes and deletes a
+  probe object on every RustFS pod with the MES credentials (3 clean rounds in a row). Right after a
+  fresh install, RustFS 1.0.1 pods can answer NoSuchBucket to PUT/GET/DELETE for ~15 s while HEAD
+  bucket and LIST already succeed, so a HEAD-only check isn't enough.
 - **Storage**: `volumeClaimTemplates` with `common.storageClass`. Never delete PVCs from templates.
 - **Scheduling**: `common.scheduling` (nodeSelector/tolerations, component values win over global).
 - **TLS**: all client traffic is encrypted.

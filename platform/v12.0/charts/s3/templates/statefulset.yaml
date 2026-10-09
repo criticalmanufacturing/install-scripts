@@ -17,6 +17,8 @@ spec:
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
+  # Rolling updates wait this long after each pod is Ready (peers reconnect to it).
+  minReadySeconds: {{ int $r.minReadySeconds }}
   selector:
     matchLabels:
       {{- include "common.selectorLabels" (dict "ctx" . "component" "s3") | nindent 6 }}
@@ -104,6 +106,9 @@ spec:
               value: {{ $r.logLevel | default "info" | quote }}
             - name: RUSTFS_OBS_ENVIRONMENT
               value: production
+            # No profiles pipeline anywhere (and the image has no Pyroscope support).
+            - name: RUSTFS_OBS_PROFILING_EXPORT_ENABLED
+              value: "false"
             {{- if include "s3.otlpEnabled" . }}
             # Telemetry to the local OpenTelemetry collector (OTLP/HTTP).
             - name: RUSTFS_OBS_ENDPOINT
@@ -114,9 +119,6 @@ spec:
               value: {{ ternary "true" "false" (and $r.telemetry.traces true) | quote }}
             - name: RUSTFS_OBS_LOGS_EXPORT_ENABLED
               value: {{ ternary "true" "false" (and $r.telemetry.logs true) | quote }}
-            # The collector has no profiles pipeline (and the image has no Pyroscope support).
-            - name: RUSTFS_OBS_PROFILING_EXPORT_ENABLED
-              value: "false"
             - name: RUSTFS_OBS_USE_STDOUT
               value: "false"
             - name: RUSTFS_OBS_METER_INTERVAL

@@ -135,7 +135,7 @@ and prints its address and keys. The bucket name gets a random suffix, e.g. `cm-
 **Private registry / air-gapped clusters** (`global.imageRegistry`, `global.imagePullSecrets`).
 Mirror these images, keeping their names:
 `apache/kafka:4.3.1`, `clickhouse/clickhouse-server:26.3.35.3`, `clickhouse/clickhouse-keeper:26.3.35.3`,
-`library/haproxy:3.4.6` (ClickHouse load balancer), `rustfs/rustfs:1.0.0`, `amazon/aws-cli:2.37.4`, and
+`library/haproxy:3.4.6` (ClickHouse load balancer), `rustfs/rustfs:1.0.1`, `amazon/aws-cli:2.37.4`, and
 `otel/opentelemetry-collector-contrib:0.161.0` (monitoring only).
 
 **Advanced settings** (CPU, memory, tuning) are documented in `charts/<name>/values.yaml`. Copy a
@@ -182,8 +182,4 @@ After fixing the cause, run the installer again with the same options: it contin
 To look inside ClickHouse (no password needed from inside the pod):
 `kubectl -n <namespace> exec -it cmmes-clickhouse-0 -- clickhouse-client`.
 
-**Known issue (RustFS 1.0.0):** after RustFS servers restart, the logs may repeat
-`Heal object recovery failed` for the internal object `.rustfs.sys/scanner/durable-dirty-producer-replay.json`.
-It doesn't affect your data or MES. It's a RustFS bug ([rustfs#7997](https://github.com/rustfs/rustfs/issues/7997)),
-fixed in RustFS 1.0.1: this installer will move to 1.0.1 once it's released as stable.
 Maintainers: see [DEVELOPMENT.md](DEVELOPMENT.md).
