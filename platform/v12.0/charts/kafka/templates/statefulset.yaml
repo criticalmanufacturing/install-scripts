@@ -74,11 +74,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "kafka.usersSecret" . }}
                   key: admin-password
-            - name: KAFKA_MES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "kafka.usersSecret" . }}
-                  key: mes-password
             - name: KAFKA_MONITOR_PASSWORD
               valueFrom:
                 secretKeyRef:

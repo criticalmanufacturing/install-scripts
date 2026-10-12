@@ -76,11 +76,9 @@ global:
 kafka:
   enabled: true
   replicas: 3
-  auth:
-    method: sasl                    # sasl (SASL_SSL Plain) | mtls
-  tls:
+  tls:                              # CM MES always authenticates with a client certificate (mTLS)
     existingSecret: ""              # tls.mode=existing: broker certificate Secret
-    existingClientSecret: ""        # tls.mode=existing + mtls: MES client certificate Secret
+    existingClientSecret: ""        # tls.mode=existing: MES client certificate Secret (CN=mes)
   storage: {size: 50Gi, storageClass: ""}
 clickhouse:
   enabled: true
@@ -176,12 +174,12 @@ Charts may add more keys to their own section (resources, image, tuning, and so 
 
   | Component | order | Fields (label: value) |
   |---|---|---|
-  | Kafka | 10 | Bootstrap Servers (all brokers, `host:port`, comma separated), Authentication Method (`SASL_SSL Plain` / `mTLS`), Kafka Username, Kafka Password (SASL), Ssl Certificate Authority (`kafka-ca.crt`), Ssl Certificate / Ssl Key (mTLS: `kafka-tls.crt` / `kafka-tls.key`), Validate certificates (`true`) |
+  | Kafka | 10 | Bootstrap Servers (all brokers, `host:port`, comma separated), Authentication Method (`mTLS`), Ssl Certificate Authority (`kafka-ca.crt`), Ssl Certificate / Ssl Key (`kafka-tls.crt` / `kafka-tls.key`), Validate certificates (`true`) |
   | ClickHouse | 20 | Address, TCP Port (native TLS, 9440), HTTP Port (HTTPS, 8443), Username, Password, Encrypt (`true`), Certificate Authority (`clickhouse-ca.crt`), Automatically provision additional users (`true`) |
   | S3 | 30 | Address, Bucket Name, AccessKey Id, Secret Access Key, Use Path Style (`true`), Certificate Authority (`s3-ca.crt`) |
 
-  Files that the admin must upload (e.g. the Kafka mTLS client certificate and key) are listed in
-  the `files` argument and saved by install.sh as `<component>-<key>`. The Kafka mTLS files are
+  Files that the admin must upload (e.g. the Kafka client certificate and key) are listed in
+  the `files` argument and saved by install.sh as `<component>-<key>`. The Kafka files are
   therefore `kafka-tls.crt` / `kafka-tls.key`.
 
   Exceptions:
@@ -215,11 +213,11 @@ and sends them over OTLP/HTTP to that endpoint (CM Observability).
   Secrets, using `common.tls.secretName` on the shared values, so renewals are picked up:
   - CA (`ca.crt`): component `kafka`, existingSecret `kafka.tls.existingSecret`
     (i.e. `<prefix>-kafka-tls` in auto/certManager mode)
-  - mTLS monitor certificate (`tls.crt`/`tls.key`): component `kafka-monitor`, existingSecret
+  - monitor client certificate (`tls.crt`/`tls.key`): component `kafka-monitor`, existingSecret
     `kafka.tls.existingMonitorSecret` (i.e. `<prefix>-kafka-monitor-tls`)
 
   The collector uses the `kafka_metrics` receiver and reloads its client certificate hourly. A CA
-  change restarts it on upgrade (checksum annotation). With mTLS in `existing` TLS mode and no
+  change restarts it on upgrade (checksum annotation). In `existing` TLS mode with no
   `kafka.tls.existingMonitorSecret`, the monitor principal falls back to SASL_SSL on the INTERNAL
   listener (9092). The otel chart follows the same rule.
 - **RustFS** exports its telemetry itself over OTLP to the local collector

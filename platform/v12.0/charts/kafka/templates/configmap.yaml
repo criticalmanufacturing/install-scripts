@@ -1,5 +1,4 @@
 {{- $replicas := int (include "kafka.replicas" .) -}}
-{{- $auth := include "kafka.authMethod" . -}}
 {{- $client := include "kafka.port.client" . -}}
 {{- $internal := include "kafka.port.internal" . -}}
 {{- $controller := include "kafka.port.controller" . -}}
@@ -37,12 +36,12 @@ data:
     controller.quorum.bootstrap.servers={{ include "kafka.brokerList" (dict "ctx" . "port" $controller) }}
 
     # ---- Listeners (all encrypted) ----
-    #   CLIENT     {{ $client }}  MES and other clients ({{ if eq $auth "sasl" }}SASL_SSL, PLAIN{{ else }}mutual TLS{{ end }})
+    #   CLIENT     {{ $client }}  MES and other clients (mutual TLS: client certificate required)
     #   INTERNAL   {{ $internal }}  broker-to-broker replication and administration (SASL_SSL, PLAIN)
     #   CONTROLLER {{ $controller }}  KRaft quorum (SASL_SSL, PLAIN)
     listeners=CLIENT://:{{ $client }},INTERNAL://:{{ $internal }},CONTROLLER://:{{ $controller }}
     advertised.listeners=CLIENT://@POD_FQDN@:{{ $client }},INTERNAL://@POD_FQDN@:{{ $internal }},CONTROLLER://@POD_FQDN@:{{ $controller }}
-    listener.security.protocol.map=CLIENT:{{ if eq $auth "sasl" }}SASL_SSL{{ else }}SSL{{ end }},INTERNAL:SASL_SSL,CONTROLLER:SASL_SSL
+    listener.security.protocol.map=CLIENT:SSL,INTERNAL:SASL_SSL,CONTROLLER:SASL_SSL
     inter.broker.listener.name=INTERNAL
     sasl.enabled.mechanisms=PLAIN
     sasl.mechanism.inter.broker.protocol=PLAIN
@@ -59,9 +58,7 @@ data:
     # certificate to have a different subject or SANs.
     ssl.allow.dn.changes=true
     ssl.allow.san.changes=true
-    {{- if eq $auth "mtls" }}
     listener.name.client.ssl.client.auth=required
-    {{- end }}
     # Client certificate "CN=mes,..." becomes the principal User:mes.
     ssl.principal.mapping.rules=RULE:^CN=([^,]+).*$/$1/,RULE:^.*[Cc][Nn]=([^,]+).*$/$1/,DEFAULT
 
@@ -154,10 +151,6 @@ data:
       echo "# ---- SASL/PLAIN users (added by start.sh) ----"
       echo "listener.name.internal.plain.sasl.jaas.config=${PLAIN} username=\"admin\" password=\"${ADMIN}\" user_admin=\"${ADMIN}\" user_monitor=\"${MONITOR}\";"
       echo "listener.name.controller.plain.sasl.jaas.config=${PLAIN} username=\"admin\" password=\"${ADMIN}\" user_admin=\"${ADMIN}\";"
-      {{- if eq $auth "sasl" }}
-      MES="$(jaas_escape "$KAFKA_MES_PASSWORD")"
-      echo "listener.name.client.plain.sasl.jaas.config=${PLAIN} user_mes=\"${MES}\" user_monitor=\"${MONITOR}\";"
-      {{- end }}
     } >> "$RUN/server.properties"
 
     # Client configuration of the admin user, for the probes, maintenance.sh and operators:

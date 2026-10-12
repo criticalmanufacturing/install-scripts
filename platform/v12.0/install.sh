@@ -354,7 +354,6 @@ read_values() {
   : "${V[global.tls.mode]:=auto}"; [[ -n "${V[global.tls.mode]}" ]] || V[global.tls.mode]=auto
   : "${V[global.podAntiAffinity]:=hard}"
   : "${V[global.platform]:=auto}"
-  : "${V[kafka.auth.method]:=sasl}"; [[ -n "${V[kafka.auth.method]}" ]] || V[kafka.auth.method]=sasl
   : "${V[s3.provider]:=rustfs}"; [[ -n "${V[s3.provider]}" ]] || V[s3.provider]=rustfs
   local c
   for c in "${COMPONENTS[@]}"; do
@@ -370,8 +369,12 @@ validate_values() {
   is_dns_label "$p" && [[ ${#p} -le 20 ]] || die "global.namePrefix '$p' is invalid: use at most 20 lowercase letters, digits and '-'."
   case "${V[global.tls.mode]}" in auto|existing|certManager) ;; *)
     die "global.tls.mode must be auto, existing or certManager (got '${V[global.tls.mode]}')." ;; esac
-  case "${V[kafka.auth.method]}" in sasl|mtls) ;; *)
-    die "kafka.auth.method must be sasl or mtls (got '${V[kafka.auth.method]}')." ;; esac
+  # CM MES always authenticates to Kafka with a client certificate (mTLS). The setting is
+  # only read to tell users of older values files that it no longer applies.
+  if [[ -n "${V[kafka.auth.method]:-}" && "${V[kafka.auth.method]}" != mtls ]]; then
+    warn "kafka.auth.method '${V[kafka.auth.method]}' is no longer supported: CM MES always uses a client certificate (mTLS). Remove it from your values file."
+  fi
+  unset 'V[kafka.auth.method]'
   case "${V[s3.provider]}" in rustfs|rgw) ;; *)
     die "s3.provider must be rustfs or rgw (got '${V[s3.provider]}')." ;; esac
   case "${V[global.podAntiAffinity]}" in hard|soft) ;; *)
@@ -391,7 +394,7 @@ validate_values() {
   if [[ "${V[global.tls.mode]}" == existing ]]; then
     local missing=()
     enabled kafka && [[ -z "${V[kafka.tls.existingSecret]:-}" ]] && missing+=(kafka.tls.existingSecret)
-    enabled kafka && [[ "${V[kafka.auth.method]}" == mtls && -z "${V[kafka.tls.existingClientSecret]:-}" ]] && missing+=(kafka.tls.existingClientSecret)
+    enabled kafka && [[ -z "${V[kafka.tls.existingClientSecret]:-}" ]] && missing+=(kafka.tls.existingClientSecret)
     enabled clickhouse && [[ -z "${V[clickhouse.tls.existingSecret]:-}" ]] && missing+=(clickhouse.tls.existingSecret)
     enabled s3 && [[ "${V[s3.provider]}" == rustfs && -z "${V[s3.rustfs.tls.existingSecret]:-}" ]] && missing+=(s3.rustfs.tls.existingSecret)
     ((${#missing[@]} == 0)) || die "global.tls.mode=existing needs these Secret names: ${missing[*]}"
@@ -599,7 +602,7 @@ OV_ORDER=(
   global.namePrefix global.storageClass global.imageRegistry global.imagePullSecrets
   global.podAntiAffinity global.tls.mode global.tls.certManager.issuerName
   global.tls.certManager.issuerKind
-  kafka.enabled kafka.auth.method kafka.tls.existingSecret kafka.tls.existingClientSecret kafka.storage.size
+  kafka.enabled kafka.tls.existingSecret kafka.tls.existingClientSecret kafka.storage.size
   clickhouse.enabled clickhouse.tls.existingSecret clickhouse.storage.size clickhouse.keeper.storage.size
   s3.enabled s3.provider s3.rustfs.tls.existingSecret s3.rustfs.storage.size s3.rustfs.storage.storageClass
   s3.rustfs.allowSharedDisks s3.rgw.storageClass
@@ -652,7 +655,7 @@ write_generated() {
 }
 
 wizard_components() {
-  heading "Step 3/9 - Components"
+  heading "Step 3/8 - Components"
   note "CM MES v12 needs Kafka, ClickHouse and S3 storage. Skip one only if you already have it."
   local c ans any=false
   while true; do
@@ -668,7 +671,7 @@ wizard_components() {
 }
 
 wizard_tls() {
-  heading "Step 4/9 - Certificates (TLS)"
+  heading "Step 4/8 - Certificates (TLS)"
   note "All connections are encrypted. Choose where the certificates come from:"
   local -a opts=("auto|generated automatically, signed by one CA created now (recommended)"
                  "existing|you already created Secrets with tls.crt, tls.key and ca.crt")
@@ -683,7 +686,10 @@ wizard_tls() {
     existing)
       note "Each Secret must have tls.crt, tls.key and ca.crt, and the certificate must be valid for the"
       note "service names (<prefix>-<component>.$NAMESPACE.svc and *.<prefix>-<component>-headless...)."
-      [[ "${W[kafka.enabled]}" == true ]] && ask_existing_secret kafka.tls.existingSecret "Kafka server certificate Secret"
+      if [[ "${W[kafka.enabled]}" == true ]]; then
+        ask_existing_secret kafka.tls.existingSecret "Kafka server certificate Secret"
+        ask_existing_secret kafka.tls.existingClientSecret "Kafka client (CM MES, CN=mes) certificate Secret"
+      fi
       [[ "${W[clickhouse.enabled]}" == true ]] && ask_existing_secret clickhouse.tls.existingSecret "ClickHouse server certificate Secret"
       true ;;
     certManager)
@@ -726,21 +732,9 @@ check_tls_secret() {
   done
 }
 
-wizard_kafka() {
-  [[ "${W[kafka.enabled]}" == true ]] || return 0
-  heading "Step 5/9 - Kafka authentication"
-  note "How CM MES logs in to Kafka."
-  ask_choice "W[kafka.auth.method]" "Kafka authentication" "${V[kafka.auth.method]}" \
-    "sasl|SASL_SSL Plain: user name and password over TLS (recommended)" \
-    "mtls|mutual TLS: a client certificate (files are saved for the MES installer)"
-  if [[ "${W[kafka.auth.method]}" == mtls && "${W[global.tls.mode]}" == existing ]]; then
-    ask_existing_secret kafka.tls.existingClientSecret "Kafka client (CM MES) certificate Secret"
-  fi
-}
-
 wizard_s3() {
   [[ "${W[s3.enabled]}" == true ]] || return 0
-  heading "Step 6/9 - S3 storage"
+  heading "Step 5/8 - S3 storage"
   if $HAS_OBC && ((${#RGW_CLASSES[@]} > 0)); then
     note "A Ceph RGW object store was found in this cluster. You can use it instead of installing RustFS."
     ask_choice "W[s3.provider]" "S3 provider" "${V[s3.provider]}" \
@@ -815,7 +809,7 @@ wizard_rustfs_disks() {
 }
 
 wizard_storage() {
-  heading "Step 7/9 - Storage and images"
+  heading "Step 6/8 - Storage and images"
   local -a opts=() s
   local def="" name prov isdef
   if ((${#STORAGE_CLASSES[@]} > 0)); then
@@ -897,7 +891,7 @@ ask_size() {
 }
 
 wizard_observability() {
-  heading "Step 8/9 - Monitoring (optional)"
+  heading "Step 7/8 - Monitoring (optional)"
   note "An OpenTelemetry collector can send the metrics of these components to an OTLP/HTTP"
   note "endpoint, for example the CM Observability service. Leave empty to skip."
   local ep
@@ -959,7 +953,6 @@ wizard_observability() {
 run_wizard() {
   wizard_components
   wizard_tls
-  wizard_kafka
   wizard_s3
   wizard_storage
   wizard_observability
@@ -975,7 +968,7 @@ run_wizard() {
   fi
   local p
   for p in kafka.tls.existingSecret kafka.tls.existingClientSecret clickhouse.tls.existingSecret s3.rustfs.tls.existingSecret \
-           kafka.auth.method s3.provider s3.rgw.storageClass kafka.storage.size clickhouse.storage.size \
+           s3.provider s3.rgw.storageClass kafka.storage.size clickhouse.storage.size \
            clickhouse.keeper.storage.size s3.rustfs.storage.size global.podAntiAffinity global.storageClass \
            s3.rustfs.storage.storageClass global.imageRegistry observability.otlpEndpoint; do
     [[ -n "${W[$p]+x}" ]] && set_ov "$p" "$(yaml_str "${W[$p]}")" "${W[$p]}"
@@ -1002,7 +995,7 @@ show_summary() {
   [[ -n "$sc" ]] || sc="cluster default${DEFAULT_SC:+ ($DEFAULT_SC)}"
   printf '  %-22s %s\n' "Namespace:" "$NAMESPACE" "Name prefix:" "$p" "TLS certificates:" "${V[global.tls.mode]}"
   if enabled kafka; then
-    printf '  %-22s %s\n' "Kafka:" "${V[kafka.replicas]:-3} brokers, ${V[kafka.storage.size]:-?} each, auth ${V[kafka.auth.method]} (release $p-kafka)"
+    printf '  %-22s %s\n' "Kafka:" "${V[kafka.replicas]:-3} brokers, ${V[kafka.storage.size]:-?} each, CM MES logs in with a client certificate (release $p-kafka)"
   else printf '  %-22s %s\n' "Kafka:" "not installed"; fi
   if enabled clickhouse; then
     local lb="failover load balancer"
@@ -1452,7 +1445,7 @@ live_checks() {
   # 2. Settings that change how CM MES connects.
   local -a changes=()
   save_V
-  local new_tls=${V[global.tls.mode]} new_auth=${V[kafka.auth.method]} new_s3=${V[s3.provider]}
+  local new_tls=${V[global.tls.mode]} new_s3=${V[s3.provider]}
   for c in "${comps[@]}"; do
     rel="$(release_name "$c")"
     release_exists "$rel" || continue
@@ -1462,8 +1455,8 @@ live_checks() {
     if [[ "$c" != otel && "${V[global.tls.mode]}" != "$new_tls" ]]; then
       changes+=("$(component_title "$c"): TLS mode ${V[global.tls.mode]} -> $new_tls. All its certificates change; CM MES must trust the new CA ($c-ca.crt).")
     fi
-    if [[ "$c" == kafka && "${V[kafka.auth.method]}" != "$new_auth" ]]; then
-      changes+=("Kafka: authentication ${V[kafka.auth.method]} -> $new_auth. Supported, but CM MES must then use the new values printed at the end.")
+    if [[ "$c" == kafka && "${V[kafka.auth.method]:-}" == sasl ]]; then
+      changes+=("Kafka: CM MES authentication changes from user name and password (SASL_SSL) to a client certificate (mTLS). CM MES can't connect until it uses the new values printed at the end.")
     fi
     if [[ "$c" == s3 && "${V[s3.provider]}" != "$new_s3" ]]; then
       changes+=("S3: provider ${V[s3.provider]} -> $new_s3. The data is NOT copied; CM MES starts with an empty bucket.")
@@ -1807,7 +1800,7 @@ main() {
   fi
 
   if $INTERACTIVE; then
-    heading "Step 1/9 - Prerequisites"
+    heading "Step 1/8 - Prerequisites"
     note "Answer each question, or press Enter to accept the value in [brackets]."
   else
     heading "Checking prerequisites"
@@ -1817,7 +1810,7 @@ main() {
   choose_namespace
   check_namespace
 
-  if $INTERACTIVE; then heading "Step 2/9 - Looking at the cluster"; else heading "Looking at the cluster"; fi
+  if $INTERACTIVE; then heading "Step 2/8 - Looking at the cluster"; else heading "Looking at the cluster"; fi
   if $CLUSTER_OK; then detect_cluster; else note "Skipped (no cluster)."; fi
 
   if $INTERACTIVE; then
@@ -1831,7 +1824,7 @@ main() {
 
   if $INTERACTIVE; then
     run_wizard
-    heading "Step 9/9 - Confirm"
+    heading "Step 8/8 - Confirm"
     # Show the result of the answers: write them to a temporary file and read the merge back.
     make_tmp
     local tmpv="$TMP_DIR/answers.yaml"

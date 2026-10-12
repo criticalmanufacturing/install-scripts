@@ -88,16 +88,13 @@ kafka:
   enabled: true
   # Number of Kafka servers. 3 is the minimum for high availability.
   replicas: 3
-  auth:
-    # How CM MES authenticates to Kafka:
-    #   sasl - user name and password over TLS ("SASL_SSL Plain") (recommended)
-    #   mtls - client certificate (the files are saved by install.sh for the MES installer)
-    method: sasl
+  # CM MES logs in to Kafka with a client certificate (mutual TLS, CN=mes). install.sh saves the
+  # certificate and key (kafka-tls.crt, kafka-tls.key) for the CM MES installer.
   tls:
     # tls.mode=existing only: Secret with the Kafka server certificate (tls.crt, tls.key, ca.crt).
     # The key must be PKCS#8 ("BEGIN PRIVATE KEY").
     existingSecret: ""
-    # tls.mode=existing and auth.method=mtls only: Secret with the MES client certificate.
+    # tls.mode=existing only: Secret with the MES client certificate (CN=mes): tls.crt, tls.key, ca.crt.
     existingClientSecret: ""
   storage:
     size: 50Gi          # data volume per Kafka server. Can only be increased later (see the top of this file).
