@@ -1,0 +1,7 @@
+{{ include "common.pdb" (dict "ctx" . "component" "clickhouse" "maxUnavailable" 1) }}
+---
+{{ include "common.pdb" (dict "ctx" . "component" "keeper" "maxUnavailable" 1) }}
+{{- if .Values.clickhouse.loadBalancer.enabled }}
+---
+{{ include "common.pdb" (dict "ctx" . "component" "clickhouse-lb" "maxUnavailable" 1) }}
+{{- end }}

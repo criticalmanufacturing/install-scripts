@@ -1,0 +1,24 @@
+{{- if eq (include "s3.provider" .) "rgw" }}
+# Bucket on the existing Ceph Object Gateway. The provisioner creates the bucket "<s3.bucket>-<uuid>"
+# and, with the same name as this claim, a ConfigMap (BUCKET_HOST, BUCKET_PORT, BUCKET_NAME,
+# BUCKET_REGION, BUCKET_SUBREGION) and a Secret (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY).
+# Kept on uninstall: deleting the claim deletes the bucket and its data (reclaimPolicy Delete).
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: {{ include "s3.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "s3") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  storageClassName: {{ required "s3.rgw.storageClass is required with s3.provider=rgw" .Values.s3.rgw.storageClass | quote }}
+  generateBucketName: {{ include "s3.bucket" . | trunc 26 | trimSuffix "-" | trimSuffix "." | quote }}
+  {{- with .Values.s3.rgw.additionalConfig }}
+  additionalConfig:
+    {{- range $k, $v := . }}
+    {{ $k }}: {{ $v | toString | quote }}
+    {{- end }}
+  {{- end }}
+{{- end }}
