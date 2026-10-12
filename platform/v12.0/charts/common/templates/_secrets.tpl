@@ -17,7 +17,7 @@ A secret value that is stable across upgrades. The first match wins:
   1. an explicit value (from values.yaml)
   2. the value already stored in the existing Secret (upgrade)
   3. a new random alphanumeric string
-Usage: include "common.secretValue" (dict "ctx" $ "secret" "cmmes-kafka-users" "key" "mes-password" "value" .Values.kafka.auth.sasl.password "length" 24)
+Usage: include "common.secretValue" (dict "ctx" $ "secret" "cmmes-kafka-users" "key" "admin-password" "value" .Values.kafka.auth.passwords.admin "length" 24)
 */}}
 {{- define "common.secretValue" -}}
 {{- include "common.cache" .ctx -}}

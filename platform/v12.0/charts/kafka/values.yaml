@@ -75,18 +75,14 @@ kafka:
   clusterId: ""
 
   auth:
-    # How MES authenticates on the client listener (port 9093, always TLS):
-    #   sasl - username "mes" and a password (SASL_SSL, mechanism PLAIN).
-    #   mtls - client certificate with CN=mes (mutual TLS).
-    method: sasl
-    # Passwords of the Kafka users. Leave empty to generate random ones, which are kept
-    # in the Secret "<prefix>-kafka-users" across upgrades.
+    # CM MES authenticates on the client listener (port 9093) with a client certificate,
+    # CN=mes (mutual TLS). Passwords are only used on the internal listeners (SASL_SSL,
+    # PLAIN). Leave them empty to generate random ones, which are kept in the Secret
+    # "<prefix>-kafka-users" across upgrades.
     #   admin   - super user: broker-to-broker traffic and operations
-    #   mes     - the CM MES application
-    #   monitor - read-only user of the OpenTelemetry collector
+    #   monitor - read-only user of the OpenTelemetry collector, when it has no certificate
     passwords:
       admin: ""
-      mes: ""
       monitor: ""
 
   tls:
@@ -95,12 +91,12 @@ kafka:
     # be valid for the names shown by "helm template" in the TLS section, including
     # "*.<prefix>-kafka-headless.<namespace>.svc.<clusterDomain>".
     existingSecret: ""
-    # global.tls.mode=existing and auth.method=mtls: Secret with the MES client
-    # certificate (CN=mes): tls.crt, tls.key, ca.crt.
+    # global.tls.mode=existing: Secret with the MES client certificate (CN=mes):
+    # tls.crt, tls.key, ca.crt.
     existingClientSecret: ""
-    # global.tls.mode=existing and auth.method=mtls, optional: Secret with a client
-    # certificate with CN=monitor for the OpenTelemetry collector. When empty, the
-    # collector uses the "monitor" user and password on port 9092 instead.
+    # global.tls.mode=existing, optional: Secret with a client certificate with CN=monitor
+    # for the OpenTelemetry collector. When empty, the collector uses the "monitor" user
+    # and password on port 9092 instead.
     existingMonitorSecret: ""
     # Certificate renewal (cert-manager renews every year; admins may rotate existing
     # Secrets). Each Kafka server checks its mounted certificate regularly.

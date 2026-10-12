@@ -32,19 +32,13 @@ Helpers for the OpenTelemetry collector chart.
 How the collector authenticates to Kafka (the "monitor" principal): sasl | mtls.
 1. The "protocol" key of the <prefix>-kafka-monitoring Secret, when it already exists
    (SASL_SSL = sasl, SSL = mtls). install.sh installs Kafka before this chart.
-2. Otherwise the same rule as the kafka chart: SASL when kafka.auth.method=sasl, and also
-   with mtls in tls.mode=existing when no kafka.tls.existingMonitorSecret is given.
+2. Otherwise the same rule as the kafka chart: mtls, except SASL in tls.mode=existing when
+   no kafka.tls.existingMonitorSecret is given.
 */}}
 {{- define "otel.kafkaAuth" -}}
-{{- $method := dig "auth" "method" "sasl" .Values.kafka | toString -}}
-{{- if not (has $method (list "sasl" "mtls")) -}}
-{{- fail (printf "kafka.auth.method must be sasl or mtls (got %q)" $method) -}}
-{{- end -}}
 {{- $s := lookup "v1" "Secret" .Release.Namespace (include "otel.kafkaSecret" .) -}}
 {{- if and $s $s.data (hasKey $s.data "protocol") -}}
 {{- ternary "mtls" "sasl" (eq (index $s.data "protocol" | b64dec) "SSL") -}}
-{{- else if eq $method "sasl" -}}
-sasl
 {{- else if and (eq (include "common.tls.mode" .) "existing") (not (dig "tls" "existingMonitorSecret" "" .Values.kafka)) -}}
 sasl
 {{- else -}}

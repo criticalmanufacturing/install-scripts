@@ -4,7 +4,6 @@ produce and consume one message, then delete the topic and the consumer group.
 */ -}}
 {{- $k := .Values.kafka -}}
 {{- $uid := int (include "kafka.uid" .) -}}
-{{- $auth := include "kafka.authMethod" . -}}
 {{- $rf := min 3 (int (include "kafka.replicas" .)) -}}
 apiVersion: v1
 kind: Pod
@@ -31,13 +30,6 @@ spec:
       env:
         - name: BOOTSTRAP
           value: {{ include "kafka.brokerList" (dict "ctx" . "port" (include "kafka.port.client" .)) | quote }}
-        {{- if eq $auth "sasl" }}
-        - name: KAFKA_MES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "kafka.usersSecret" . }}
-              key: mes-password
-        {{- end }}
         - name: KAFKA_HEAP_OPTS
           value: "-Xmx256m"
         - name: LOG_DIR
@@ -49,16 +41,6 @@ spec:
           set -euo pipefail
           umask 077
           {{- include "kafka.script.checkCA" . | nindent 10 }}
-          {{- if eq $auth "sasl" }}
-          {{- include "kafka.script.escapeFns" . | nindent 10 }}
-          cat > /tmp/client.properties <<EOF
-          security.protocol=SASL_SSL
-          sasl.mechanism=PLAIN
-          sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="mes" password="$(jaas_escape "$KAFKA_MES_PASSWORD")";
-          ssl.truststore.type=PEM
-          ssl.truststore.location=/cm/tls/ca.crt
-          EOF
-          {{- else }}
           { cat /cm/client/tls.key; echo; cat /cm/client/tls.crt; } > /tmp/keystore.pem
           cat > /tmp/client.properties <<EOF
           security.protocol=SSL
@@ -67,7 +49,6 @@ spec:
           ssl.truststore.type=PEM
           ssl.truststore.location=/cm/tls/ca.crt
           EOF
-          {{- end }}
           B=/opt/kafka/bin
           C=(--bootstrap-server "$BOOTSTRAP" --command-config /tmp/client.properties)
           T="cmmes-helm-test-$(date +%s)"
@@ -76,7 +57,7 @@ spec:
             "$B/kafka-topics.sh" "${C[@]}" --delete --if-exists --topic "$T" || true
           }
           trap cleanup EXIT
-          echo "Creating topic $T (replication factor {{ $rf }}) as {{ if eq $auth "sasl" }}User:mes (SASL_SSL){{ else }}CN=mes (mTLS){{ end }}"
+          echo "Creating topic $T (replication factor {{ $rf }}) as CN=mes (mTLS)"
           "$B/kafka-topics.sh" "${C[@]}" --create --topic "$T" --partitions 1 --replication-factor {{ $rf }}
           MSG="hello from helm test $T"
           echo "Producing a message"
@@ -91,11 +72,9 @@ spec:
         - name: tls
           mountPath: /cm/tls
           readOnly: true
-        {{- if eq $auth "mtls" }}
         - name: client
           mountPath: /cm/client
           readOnly: true
-        {{- end }}
         - name: tmp
           mountPath: /tmp
   volumes:
@@ -103,8 +82,6 @@ spec:
       emptyDir:
         sizeLimit: 256Mi
     {{- include "kafka.tls.volume" (dict "name" "tls" "secret" (include "kafka.tls.brokerSecret" .)) | nindent 4 }}
-    {{- if eq $auth "mtls" }}
     - name: client
       secret:
         secretName: {{ include "kafka.tls.clientSecret" . }}
-    {{- end }}

@@ -28,16 +28,14 @@ global:
 # What to monitor. Only these keys are read here; the defaults match the kafka/clickhouse/s3 charts.
 kafka:
   enabled: true               # false = do not collect Kafka metrics
-  auth:
-    method: sasl              # sasl | mtls (same value as for the kafka chart)
   # The collector reads bootstrap/protocol/username/password from the Secret
-  # <prefix>-kafka-monitoring, the CA from the kafka chart's TLS Secret and, for mTLS, the
-  # "monitor" certificate from <prefix>-kafka-monitor-tls (or the existing Secrets below).
+  # <prefix>-kafka-monitoring, the CA from the kafka chart's TLS Secret and the "monitor"
+  # client certificate from <prefix>-kafka-monitor-tls (or the existing Secrets below).
   tls:
     # Same value as for the kafka chart. tls.mode=existing: broker certificate Secret (for ca.crt).
     existingSecret: ""
-    # Same value as for the kafka chart. With method=mtls and tls.mode=existing, the collector
-    # uses a client certificate only when this is set, otherwise the "monitor" user (SASL).
+    # Same value as for the kafka chart. With tls.mode=existing, the collector uses a client
+    # certificate only when this is set, otherwise the "monitor" user (SASL).
     # The protocol key of the <prefix>-kafka-monitoring Secret wins when that Secret exists.
     existingMonitorSecret: ""
 clickhouse:

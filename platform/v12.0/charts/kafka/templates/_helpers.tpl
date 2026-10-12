@@ -64,15 +64,6 @@ false
 {{- $r -}}
 {{- end -}}
 
-{{/* sasl | mtls */}}
-{{- define "kafka.authMethod" -}}
-{{- $m := .Values.kafka.auth.method | default "sasl" -}}
-{{- if not (has $m (list "sasl" "mtls")) -}}
-{{- fail (printf "kafka.auth.method must be sasl or mtls (got %q)" $m) -}}
-{{- end -}}
-{{- $m -}}
-{{- end -}}
-
 {{/*
 FQDN of one broker pod.
 Usage: include "kafka.podFqdn" (dict "ctx" $ "index" 0)
@@ -110,8 +101,8 @@ plus a wildcard for the per-pod names of the headless Service. Returned as JSON.
 {{- end -}}
 
 {{/*
-Stable password of a Kafka user (admin | mes | monitor), stored in "<prefix>-kafka-users".
-Usage: include "kafka.password" (dict "ctx" $ "user" "mes")
+Stable password of a Kafka user (admin | monitor), stored in "<prefix>-kafka-users".
+Usage: include "kafka.password" (dict "ctx" $ "user" "admin")
 */}}
 {{- define "kafka.password" -}}
 {{- $explicit := index (.ctx.Values.kafka.auth.passwords | default dict) .user | default "" -}}
@@ -228,7 +219,7 @@ never converted: the collector (Go) reads PKCS#1 and PKCS#8 keys.
 {{- include "common.tls.secretName" (dict "ctx" . "component" "kafka-monitor" "existingSecret" .Values.kafka.tls.existingMonitorSecret) -}}
 {{- end -}}
 
-{{/* MES client certificate Secret (mTLS only), CN=mes. */}}
+{{/* MES client certificate Secret, CN=mes. */}}
 {{- define "kafka.tls.clientSecret" -}}
 {{- include "kafka.tls.mountName" (dict "ctx" . "component" "kafka-client" "existingSecret" .Values.kafka.tls.existingClientSecret) -}}
 {{- end -}}
@@ -252,14 +243,12 @@ rendered once and cached so that every template sees the same generated certific
 
 {{/*
 Monitor principal: "tls" (client certificate CN=monitor on the CLIENT listener) or
-"sasl" (username/password). In mtls mode with tls.mode=existing and no
-kafka.tls.existingMonitorSecret, the monitor principal falls back to SASL on the
-INTERNAL listener (9092), which always accepts SASL_SSL.
+"sasl" (username/password). With tls.mode=existing and no kafka.tls.existingMonitorSecret,
+the monitor principal falls back to SASL on the INTERNAL listener (9092), which always
+accepts SASL_SSL.
 */}}
 {{- define "kafka.monitor.auth" -}}
-{{- if eq (include "kafka.authMethod" .) "sasl" -}}
-sasl
-{{- else if and (eq (include "common.tls.mode" .) "existing") (not .Values.kafka.tls.existingMonitorSecret) -}}
+{{- if and (eq (include "common.tls.mode" .) "existing") (not .Values.kafka.tls.existingMonitorSecret) -}}
 sasl
 {{- else -}}
 tls

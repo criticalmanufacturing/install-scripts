@@ -42,10 +42,12 @@ The installer checks your cluster, then asks you, step by step:
 1. which namespace to use, and it confirms the cluster you're connected to
 2. which components to install
 3. how certificates are created: **automatically** (recommended), from your own certificates, or by cert-manager
-4. how MES logs in to Kafka: username/password (SASL_SSL Plain, recommended) or client certificates (mTLS)
-5. for S3: install RustFS, or use your existing Ceph RGW (only offered when it's detected)
-6. storage sizes, and an optional private image registry
-7. an optional monitoring endpoint (see [Monitoring](#monitoring))
+4. for S3: install RustFS, or use your existing Ceph RGW (only offered when it's detected)
+5. storage sizes, and an optional private image registry
+6. an optional monitoring endpoint (see [Monitoring](#monitoring))
+
+CM MES always logs in to Kafka with a client certificate (mutual TLS). The installer creates it for
+you (or uses your own Secret in `existing` certificate mode).
 
 Your answers are saved in `values.generated.yaml`. Installing takes about 5 to 15 minutes.
 
@@ -56,10 +58,10 @@ The installer prints one block per component and saves everything in `./output/`
 ```
 [Kafka]
 Bootstrap Servers                         : cmmes-kafka-0.cmmes-kafka-headless.<namespace>.svc.cluster.local:9093,...
-Authentication Method                     : SASL_SSL Plain
-Kafka Username                            : mes
-Kafka Password                            : ********
+Authentication Method                     : mTLS
 Ssl Certificate Authority                 : kafka-ca.crt
+Ssl Certificate                           : kafka-tls.crt
+Ssl Key                                   : kafka-tls.key
 ...
 [ClickHouse]
 Address                                   : cmmes-clickhouse.<namespace>.svc.cluster.local
@@ -91,7 +93,8 @@ Bucket Name                               : cm-mes
 - `output/connection-info.txt`: all the values above. It contains passwords, so keep it safe.
 - `output/*-ca.crt`: the certificate authorities. Add them in the CM MES installer where it asks for
   certificates (or enable "skip certificate validation", which isn't recommended for production).
-- `output/kafka-tls.crt` and `kafka-tls.key`: only when Kafka uses client certificates (mTLS).
+- `output/kafka-tls.crt` and `kafka-tls.key`: the CM MES client certificate and key for Kafka. The key is a
+  secret: keep it as safe as the passwords.
 
 To print them again later: `./install.sh -n <namespace> --print`.
 
