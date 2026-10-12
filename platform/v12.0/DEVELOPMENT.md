@@ -139,6 +139,10 @@ Charts may add more keys to their own section (resources, image, tuning, and so 
   - Readiness, liveness and startup probes.
   - RustFS: `minReadySeconds` (default 60) spaces the pod restarts of a rolling update. Back-to-back
     restarts gave a few seconds of HTTP 503 while the peers reconnected (1.0.0 and 1.0.1).
+  - RustFS: `lockAcquireTimeout` (default 30 s, RustFS default 5 s). DeleteObjects takes the write
+    lock of each of its keys one after the other and fails every key with 503 ServiceUnavailable if
+    one lock is late. With 5 s, MES lost a whole 1000-key batch (0 deleted) when it deleted a 6666-object
+    ClickHouse restore payload as concurrent batches; under load PUTs also hit the 5 s limit.
 - **Setup Jobs finish only when the whole cluster is usable**: the S3 setup Job writes and deletes a
   probe object on every RustFS pod with the MES credentials (3 clean rounds in a row). Right after a
   fresh install, RustFS 1.0.1 pods can answer NoSuchBucket to PUT/GET/DELETE for ~15 s while HEAD
