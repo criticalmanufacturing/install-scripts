@@ -166,6 +166,13 @@ s3:
       # Metrics export interval, in seconds.
       interval: 30
 
+    # How long, in seconds, RustFS waits for an object lock before failing the request with
+    # 503 ServiceUnavailable (RUSTFS_OBJECT_LOCK_ACQUIRE_TIMEOUT). The RustFS default (5)
+    # is too short under load: a DeleteObjects request locks each of its up to 1000 keys
+    # and fails for all of them if one lock is late, which happened when MES deleted a
+    # ClickHouse restore payload as several batches at once.
+    lockAcquireTimeout: 30
+
     # Log level: error, warn, info, debug.
     logLevel: info
 

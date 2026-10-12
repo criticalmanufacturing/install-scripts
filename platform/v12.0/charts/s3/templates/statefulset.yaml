@@ -93,6 +93,9 @@ spec:
                 secretKeyRef:
                   name: {{ include "s3.credentialsSecret" . }}
                   key: root-secret-key
+            # Lock wait before a request fails with 503 (RustFS default 5 s, see values.yaml).
+            - name: RUSTFS_OBJECT_LOCK_ACQUIRE_TIMEOUT
+              value: {{ int $r.lockAcquireTimeout | default 30 | quote }}
             {{- if $r.allowSharedDisks }}
             - name: RUSTFS_UNSAFE_BYPASS_DISK_CHECK
               value: "true"
