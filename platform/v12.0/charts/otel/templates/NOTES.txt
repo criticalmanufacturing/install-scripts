@@ -1,0 +1,13 @@
+OpenTelemetry collector {{ include "otel.fullname" . }} installed in namespace {{ .Release.Namespace }}.
+
+It sends metrics to: {{ .Values.observability.otlpEndpoint }}
+{{- if eq (include "otel.kafka" .) "true" }}
+  - Kafka metrics (kafka_metrics receiver, Secret {{ include "otel.kafkaSecret" . }})
+{{- end }}
+{{- if eq (include "otel.clickhouse" .) "true" }}
+  - ClickHouse and Keeper metrics (Prometheus, port 9363)
+{{- end }}
+  - anything pushed over OTLP to {{ include "common.svcFqdn" (dict "ctx" $ "name" (include "otel.fullname" .)) }}:4317 (gRPC) / :4318 (HTTP), e.g. RustFS
+
+Check that it runs and exports without errors:
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "otel.fullname" . }}

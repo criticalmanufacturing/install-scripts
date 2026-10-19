@@ -1,6 +1,18 @@
 # install-scripts
 Critical Manufacturing Installation Scripts
 
+## CM MES v12 external dependencies (Kubernetes / OpenShift)
+
+Production-ready, highly available Kafka, ClickHouse and S3 storage for CM MES v12, installed into an existing namespace:
+
+```
+git clone https://github.com/criticalmanufacturing/install-scripts.git
+cd install-scripts/platform/v12.0
+./install.sh
+```
+
+See [platform/v12.0/README.md](platform/v12.0/README.md).
+
 ## Prepare single server Ubuntu environment
 
 ```

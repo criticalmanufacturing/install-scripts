@@ -1,0 +1,15 @@
+# Runtime state, read by the pods when they start (not part of the pod template, so a
+# change restarts nothing). Kept on uninstall, like the data volumes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kafka.stateConfigMap" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "kafka") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+data:
+  # "true" once the KRaft quorum has formed: a server with an empty data volume then
+  # joins as observer instead of bootstrapping a new quorum (see start.sh).
+  quorum-bootstrapped: {{ include "kafka.quorumBootstrapped" . | quote }}

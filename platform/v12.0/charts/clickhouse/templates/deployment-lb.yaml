@@ -1,0 +1,123 @@
+{{- if .Values.clickhouse.loadBalancer.enabled -}}
+{{- include "clickhouse.validate" . -}}
+{{- $lb := .Values.clickhouse.loadBalancer -}}
+{{- $tls := "/etc/haproxy/tls" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "clickhouse.lb.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse-lb") | nindent 4 }}
+spec:
+  replicas: {{ int $lb.replicas }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" (dict "ctx" . "component" "clickhouse-lb") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.podLabels" (dict "ctx" . "component" "clickhouse-lb") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-lb.yaml") . | sha256sum }}
+    spec:
+      {{- include "common.imagePullSecrets" . | nindent 6 }}
+      {{- include "common.podSecurityContext" (dict "ctx" . "uid" 99 "gid" 99) | nindent 6 }}
+      {{- include "common.affinity" (dict "ctx" . "component" "clickhouse-lb" "affinity" $lb.affinity) | nindent 6 }}
+      {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $lb.nodeSelector "tolerations" $lb.tolerations) | nindent 6 }}
+      # hard-stop-after (50 s) + the preStop delay.
+      terminationGracePeriodSeconds: 60
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: haproxy
+          image: {{ include "common.image" (dict "ctx" . "image" $lb.image) }}
+          imagePullPolicy: {{ $lb.image.pullPolicy | default "IfNotPresent" }}
+          {{- include "common.containerSecurityContext" . | nindent 10 }}
+          # HAProxy reads its certificate only at start: this script reloads it (graceful, no
+          # connection is lost) when the TLS Secret changes, e.g. when cert-manager renews it.
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              {{- include "clickhouse.tlsCheck" (dict "ctx" . "dir" $tls) | nindent 14 }}
+              tls_sum() { cat {{ $tls }}/tls.crt {{ $tls }}/tls.key {{ $tls }}/ca.crt | sha256sum; }
+              # An invalid configuration or certificate stops the container here, with the
+              # error in its log (in master-worker mode the master would keep running).
+              haproxy -c -q -f /usr/local/etc/haproxy/haproxy.cfg
+              haproxy -W -db -f /usr/local/etc/haproxy/haproxy.cfg &
+              pid=$!
+              stopping=""
+              # Pod stop (SIGUSR1 is the stop signal of the image): soft stop, running requests
+              # finish (up to hard-stop-after).
+              trap 'stopping=1; kill -USR1 "$pid" 2>/dev/null || true' TERM INT USR1
+              last="$(tls_sum)"
+              while [ -z "$stopping" ] && kill -0 "$pid" 2>/dev/null; do
+                sleep 30 & wait $! || true
+                now="$(tls_sum)"
+                if [ -z "$stopping" ] && [ "$now" != "$last" ]; then
+                  echo "The TLS certificate changed: reloading HAProxy."
+                  kill -USR2 "$pid"
+                  last="$now"
+                fi
+              done
+              wait "$pid"
+          ports:
+            - name: https
+              containerPort: 8443
+            {{- if include "clickhouse.ro.enabled" . }}
+            - name: https-ro
+              containerPort: 8444
+            {{- end }}
+            - name: tcp-secure
+              containerPort: 9440
+            - name: metrics
+              containerPort: 9363
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            # Leave time for the Service to stop sending new connections to this pod.
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          {{- with $lb.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /usr/local/etc/haproxy
+              readOnly: true
+            - name: tls
+              mountPath: {{ $tls }}
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "clickhouse.lb.fullname" . }}
+        - name: tls
+          secret:
+            secretName: {{ include "clickhouse.tlsSecret" . }}
+            # optional: a missing key is reported by the start command (see clickhouse.tlsCheck).
+            optional: true
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+              - {key: ca.crt, path: ca.crt}
+{{- end }}
