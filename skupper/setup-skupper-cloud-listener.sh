@@ -41,18 +41,16 @@ def arguments():
     parser.add_argument('--install-controller', action='store_true', help='Install a namespace-scoped controller if no controller covers this namespace; never upgrade.')
     args = parser.parse_args()
     args.site_name = args.site_name or args.namespace
-    for key in ('namespace', 'site_name', 'listener_name', 'client_id'):
+    for key, limit in (('namespace', 63), ('site_name', 58), ('listener_name', 63), ('client_id', 56), ('routing_key', 63)):
         value = getattr(args, key)
-        if len(value) > 50 or not re.fullmatch(r'[a-z0-9](?:[-a-z0-9]*[a-z0-9])?', value):
-            fail(f'--{key.replace("_", "-")} must be a DNS label of at most 50 characters.')
+        if len(value) > limit or not re.fullmatch(r'[a-z0-9](?:[-a-z0-9]*[a-z0-9])?', value):
+            fail(f'--{key.replace("_", "-")} must be a lowercase DNS label of at most {limit} characters.')
     if not args.context.strip() or args.context.startswith('-'):
         fail('--context must name a kubeconfig context.')
     for key in ('listener_port', 'cloud_port'):
         value = getattr(args, key)
         if not value.isascii() or not value.isdigit() or not 1 <= int(value) <= 65535:
             fail(f'--{key.replace("_", "-")} must be an integer from 1 to 65535.')
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}', args.routing_key):
-        fail('--routing-key must contain 1–128 letters, digits, dots, underscores, colons, slashes or hyphens.')
     if len(args.cloud_host) > 253 or '.' not in args.cloud_host or any(not re.fullmatch(r'[a-zA-Z0-9](?:[-a-zA-Z0-9]{0,61}[a-zA-Z0-9])?', label) for label in args.cloud_host.split('.')):
         fail('--cloud-host must be a DNS hostname, used for TLS identity and Traefik SNI.')
     if re.fullmatch(r'[0-9.]+', args.cloud_host):
@@ -158,6 +156,7 @@ def controller_coverage():
             options = dict(env)
             tokens = container.get('command', []) + container.get('args', [])
             for index, token in enumerate(tokens):
+                token = '--' + token.lstrip('-') if token.startswith('-') else token
                 for flag, key in (('--watch-namespace', 'WATCH_NAMESPACE'), ('--name', 'CONTROLLER_NAME'), ('--require-explicit-control', 'REQUIRE_EXPLICIT_CONTROL')):
                     if token.startswith(flag + '='):
                         options[key] = token.split('=', 1)[1]
@@ -265,6 +264,11 @@ def main():
     ingress_crd = get('crd', 'ingressroutetcps.traefik.io', namespace=False)
     if not ingress_crd or not any(v.get('name') == 'v1alpha1' and v.get('served') for v in ingress_crd.get('spec', {}).get('versions', [])):
         fail('Existing Traefik IngressRouteTCP v1alpha1 CRDs are required. This installer does not install Traefik.')
+    # Check write privileges before controller installation or the first application apply.
+    for kind in ('sites.skupper.io', 'certificates.skupper.io', 'routeraccesses.skupper.io', 'listeners.skupper.io', 'ingressroutetcps.traefik.io'):
+        for verb in ('create', 'patch'):
+            if kube('auth', 'can-i', verb, kind).strip() != 'yes':
+                fail(f'Missing permission to {verb} {kind} in namespace {A.namespace}.')
     controllers = controller_coverage()
     if not controllers:
         if not A.install_controller:

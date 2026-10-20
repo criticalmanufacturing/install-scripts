@@ -19,7 +19,7 @@ Run on an administrator workstation with Bash, Python 3 + PyYAML, `kubectl`, and
 
 The Kubernetes cluster and namespace must already exist. Existing Traefik must watch the namespace and its `traefik.io/v1alpha1` TCP resources, expose the selected entrypoint publicly, and permit TCP passthrough. Configure the hostname's DNS (or the remote installer's hostname/IP override), public address and firewall separately. Do not put an HTTP proxy or TLS-terminating ingress in this connection path. Cloudflare DNS records, if used, must be DNS-only.
 
-The operator needs cluster-wide read access to Deployments, Skupper CRDs and Traefik TCP routes to detect controller and hostname conflicts; namespace access to Site, Certificate, RouterAccess, Listener, Secret, ConfigMap and Service resources; and permission to apply the installer-owned resources. Explicit controller installation additionally requires Helm's namespace resources and cluster-wide CRD creation rights. Admission policies, registry access and resource quotas must allow the upstream Skupper workloads.
+The installer checks create/patch permission for its custom resources before making changes. The operator needs cluster-wide read access to Deployments, Skupper CRDs and Traefik TCP routes to detect controller and hostname conflicts; namespace access to Site, Certificate, RouterAccess, Listener, Secret, ConfigMap and Service resources; and permission to apply the installer-owned resources. Explicit controller installation additionally requires Helm's namespace resources and cluster-wide CRD creation rights. Admission policies, registry access and resource quotas must allow the upstream Skupper workloads.
 
 The script reuses exactly one compatible controller that actually covers the namespace. It checks `WATCH_NAMESPACE`/controller arguments and the namespace's `ConfigMap/skupper` assignment. Unclear scope, an overlapping controller, an incompatible controller image, or incompatible v2alpha1 CRDs produces an error. Existing controllers and CRDs are **never upgraded**. Install or upgrade shared CRDs separately through your cluster administration process.
 
@@ -33,7 +33,7 @@ bash setup-skupper-cloud-listener.sh \
   --namespace customer-network \
   --listener-name application \
   --listener-port 7990 \
-  --routing-key customer/application \
+  --routing-key customer-application \
   --cloud-host skupper.example.com \
   --client-id customer-vm-01 \
   --link-output "$HOME/customer-vm-01-link.yaml"
@@ -49,7 +49,7 @@ Add `--install-controller` to install a namespace-scoped 2.2.3 controller when n
 | `--ingress-class` | No explicit class; existing Traefik must accept unclassified resources |
 | `--timeout` | `180` seconds per readiness check |
 
-Use a distinct `--client-id` and output file for every remote site. Use distinct routing keys for unrelated customer backends; connectors sharing a routing key may receive traffic for the same listener. The listener port and backend target port can differ. The generated bundle already advertises the supplied public hostname and port; no manual YAML edits are necessary.
+Namespace, listener name and routing key must be lowercase DNS labels of at most 63 characters; the site name is limited to 58 and client ID to 56 so derived resource names fit Kubernetes limits. Use a distinct `--client-id` and output file for every remote site. Use distinct routing keys for unrelated customer backends; connectors sharing a routing key may receive traffic for the same listener. The listener port and backend target port can differ. The generated bundle already advertises the supplied public hostname and port; no manual YAML edits are necessary.
 
 The script creates a Site, server Certificate, local RouterAccess, Traefik TCP route, Listener and client Certificate. Existing objects with these names must carry this installer's ownership annotation; it refuses automatic adoption. Use a dedicated namespace or explicitly review migration of an older manual installation before running it. The fixed ingress resource names are `skupper`, `skupper-traefik`, and `skupper-traefik-server`.
 

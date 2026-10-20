@@ -59,6 +59,8 @@ class Cluster:
             return yaml.safe_dump_all([{'apiVersion': 'skupper.io/v2alpha1', 'kind': 'Link',
                 'metadata': {'name': 'link-cloud-'}, 'spec': {'tlsCredentials': name, 'cost': 1,
                 'endpoints': [{'name': 'inter-router', 'host': 'skupper-traefik.cloud', 'port': '55671'}]}}, secret])
+        if 'auth' in command:
+            return 'yes\n'
         if 'rollout' in command:
             return ''
         if 'get' in command:
@@ -96,7 +98,7 @@ class CloudListenerTests(unittest.TestCase):
         self.mod = module()
         self.cluster = Cluster()
         self.argv = ['script', '--context', 'test-context', '--namespace', 'cloud', '--listener-name', 'backend',
-                     '--listener-port', '7990', '--routing-key', 'customer/backend', '--cloud-host', 'router.example.test',
+                     '--listener-port', '7990', '--routing-key', 'customer-backend', '--cloud-host', 'router.example.test',
                      '--client-id', 'customer-01', '--link-output', str(self.output)]
 
     def execute(self, *extra):
@@ -231,6 +233,24 @@ class CloudListenerTests(unittest.TestCase):
         self.cluster.run = original
         self.execute()
         self.assertTrue(self.output.exists())
+
+    def test_routing_key_contract_and_derived_name_limits(self):
+        for flag, value in [('--routing-key', 'Customer/key'), ('--routing-key', 'x' * 64),
+                            ('--site-name', 'x' * 59), ('--client-id', 'x' * 57)]:
+            with self.subTest(flag=flag), self.assertRaises(RuntimeError):
+                self.execute(flag, value)
+        self.assertFalse(self.cluster.writes)
+
+    def test_write_permission_checked_before_apply(self):
+        original = self.cluster.run
+        def denied(command, **kwargs):
+            if 'auth' in command and 'patch' in command:
+                return 'no\n'
+            return original(command, **kwargs)
+        self.cluster.run = denied
+        with self.assertRaisesRegex(RuntimeError, 'Missing permission to patch'):
+            self.execute()
+        self.assertFalse(self.cluster.writes)
 
     def test_timeout_reports_resource_and_last_status(self):
         self.mod.A = types.SimpleNamespace(timeout=1)
