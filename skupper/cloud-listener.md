@@ -6,7 +6,7 @@
 flowchart LR
     App[Cloud application] -->|TCP: listener port| Listener[ClusterIP listener]
     Listener --> Cloud[Cloud Skupper router]
-    Remote[Remote Skupper router] -->|Outbound mutual TLS: cloud hostname / 443| Traefik[Existing Traefik: TCP passthrough]
+    Remote[Remote Skupper router] -->|Outbound mutual TLS: cloud hostname / port| Traefik[Existing Traefik: TCP passthrough]
     Traefik -->|55671| Cloud
     Remote --> Backend[Target application IP or DNS / port]
 ```
@@ -29,14 +29,14 @@ Download the script from a reviewed repository revision, then run it with your v
 
 ```bash
 bash setup-skupper-cloud-listener.sh \
-  --context production-cloud \
-  --namespace customer-network \
-  --listener-name application \
-  --listener-port 7990 \
-  --routing-key customer-application \
-  --cloud-host skupper.example.com \
-  --client-id customer-vm-01 \
-  --link-output "$HOME/customer-vm-01-link.yaml"
+  --context "$CLOUD_CONTEXT" \
+  --namespace "$CLOUD_NAMESPACE" \
+  --listener-name "$LISTENER_NAME" \
+  --listener-port "$LISTENER_PORT" \
+  --routing-key "$ROUTING_KEY" \
+  --cloud-host "$CLOUD_HOST" \
+  --client-id "$CLIENT_ID" \
+  --link-output "$LINK_OUTPUT"
 ```
 
 Add `--install-controller` to install a namespace-scoped 2.2.3 controller when none covers the namespace. This is a new installation only; the flag does not authorize replacing another controller. Do not run multiple installers concurrently against one namespace.
@@ -68,11 +68,11 @@ The installer checks controller coverage and rollout, required CRD fields, Site 
 After installing the remote connector, run these from the administrator workstation:
 
 ```bash
-kubectl --context production-cloud -n customer-network get sites,routeraccesses,listeners
-skupper --platform kubernetes --context production-cloud -n customer-network listener status
+kubectl --context "$CLOUD_CONTEXT" -n "$CLOUD_NAMESPACE" get sites,routeraccesses,listeners
+skupper --platform kubernetes --context "$CLOUD_CONTEXT" -n "$CLOUD_NAMESPACE" listener status
 ```
 
-From an existing application pod, connect to `application:7990` using the application's normal client and confirm its expected response. For HTTP, a `curl --max-time 15 http://application:7990/` check is suitable. Do not apply HTTP tests to arbitrary TCP services. Monitor the router Deployment, Skupper resource conditions, certificate expiry, and the application's own health through your existing monitoring system. A configured listener alone is not an application health check.
+From an existing application pod, connect to the supplied Listener Service and port using the application's normal client and confirm its expected response. For HTTP, use `curl --max-time 15 "http://${LISTENER_NAME}:${LISTENER_PORT}/"`. Do not apply HTTP tests to arbitrary TCP services. Monitor the router Deployment, Skupper resource conditions, certificate expiry, and the application's own health through your existing monitoring system. A configured listener alone is not an application health check.
 
 For problems, inspect resource conditions, namespace events and controller/router logs. Check the remote site's Link status and its target application's reachability. Hostname SNI, certificate identity, port forwarding and ingress-class selection must agree. Avoid logging Secret contents.
 
@@ -87,6 +87,8 @@ python3 -m unittest discover -s skupper/tests -p test_cloud_listener.py -v
 Hermetic tests cover private credential export and repeat runs, input rejection, incompatible versions/CRDs, controller assignment, unmanaged resource collisions, credential conflicts, ingress-class changes, symlinks and stale readiness generations. They use simulated API responses and make no network or cluster changes.
 
 Live validation passed on a disposable Kind Kubernetes **1.34.0** cluster with existing Traefik chart **34.5.0**, image **3.3.4**: explicit installation of a namespace-scoped Skupper **2.2.3** controller; Site, Certificate, RouterAccess and Listener configuration before a connector exists; private Link + Secret export with mode `0600`; and an identical rerun preserving the output without reinstalling the controller.
+
+Separate client IDs exported distinct private keys under the same site CA. A real HTTP request through the Listener, Traefik passthrough, and the Kubernetes connector's restricted CONNECT proxy returned the expected response. This used two namespaces in one disposable cluster, not a public ingress or two independent clusters.
 
 Before production rollout, additionally validate your external public ingress/load balancer, firewall and network policies, existing cluster-scoped controller reuse, remote VM and real multi-cluster connectivity, backend responses and failure recovery. Those scenarios are not established by the checks above. No customer cluster was accessed.
 
