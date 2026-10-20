@@ -1,6 +1,12 @@
 # install-scripts
 Critical Manufacturing Installation Scripts
 
+## Skupper private application connectivity
+
+Set up an Ubuntu VM connector for an existing cloud Kubernetes Skupper site.
+See [skupper/README.md](skupper/README.md) for inputs, secure GitHub execution,
+operations, and architecture diagrams.
+
 ## CM MES v12 external dependencies (Kubernetes / OpenShift)
 
 Production-ready, highly available Kafka, ClickHouse and S3 storage for CM MES v12, installed into an existing namespace:
