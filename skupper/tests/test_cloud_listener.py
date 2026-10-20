@@ -241,6 +241,14 @@ class CloudListenerTests(unittest.TestCase):
                 self.execute(flag, value)
         self.assertFalse(self.cluster.writes)
 
+    def test_auth_denial_exit_status_preserves_clear_permission_error(self):
+        self.mod.A = types.SimpleNamespace(timeout=1, context='test', namespace='cloud')
+        denied = types.SimpleNamespace(returncode=1, stdout='no\n', stderr='')
+        with patch.object(self.mod.subprocess, 'run', return_value=denied):
+            self.assertEqual(self.mod.kube('auth', 'can-i', 'patch', 'sites.skupper.io').strip(), 'no')
+            with self.assertRaisesRegex(RuntimeError, 'kubectl failed'):
+                self.mod.kube('get', 'sites.skupper.io')
+
     def test_write_permission_checked_before_apply(self):
         original = self.cluster.run
         def denied(command, **kwargs):

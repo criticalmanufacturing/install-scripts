@@ -63,12 +63,12 @@ def arguments():
     return args
 
 
-def run(command, *, data=None, secret=False, timeout=None):
+def run(command, *, data=None, secret=False, timeout=None, allow_denied=False):
     try:
         result = subprocess.run(command, input=data, text=True, capture_output=True, timeout=timeout or A.timeout + 30)
     except subprocess.TimeoutExpired:
         fail(f'{Path(command[0]).name} timed out; check cluster access and retry.')
-    if result.returncode:
+    if result.returncode and not (allow_denied and result.stdout.strip() == 'no'):
         detail = 'Credential command failed; inspect the Certificate status without printing its Secret.' if secret else result.stderr.strip()[-3000:]
         fail(f'{Path(command[0]).name} failed: {detail or "command returned an error"}')
     return result.stdout
@@ -78,7 +78,7 @@ def kube(*command, data=None, namespace=True):
     prefix = ['kubectl', '--context', A.context, '--request-timeout=30s']
     if namespace:
         prefix += ['--namespace', A.namespace]
-    return run(prefix + list(command), data=data)
+    return run(prefix + list(command), data=data, allow_denied=command[:2] == ('auth', 'can-i'))
 
 
 def get(kind, name=None, *, namespace=True):
