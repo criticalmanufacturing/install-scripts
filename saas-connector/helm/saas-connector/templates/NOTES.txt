@@ -1,0 +1,12 @@
+Connector {{ .Values.connectorName }} targets {{ .Values.appIp }}:{{ .Values.appPort }}.
+The existing cloud Listener must use routing key {{ default .Values.connectorName .Values.routingKey }}.
+
+Inspect bootstrap and live router connection errors:
+  kubectl logs -n {{ .Release.Namespace }} deployment/{{ .Release.Name }}
+
+Inspect live link connection status (the image defaults to this release's namespace):
+  kubectl exec -n {{ .Release.Namespace }} deployment/{{ .Release.Name }} -- skupper link status
+
+Readiness checks the local router and backend TCP port. Verify the authenticated
+cloud connection by sending an application request through the cloud Listener.
+Link credentials are stored in the Kubernetes Secret and Helm release history.

@@ -1,0 +1,31 @@
+# One app per Helm release. The matching cloud Listener must already exist.
+connectorName: ""
+appIp: ""
+appPort: null
+# Supply the generated multi-document Link/Secret file with --set-file linkYaml=link.yaml.
+# Credentials are stored in the release's Secret AND Helm release history.
+linkYaml: ""
+
+# Optional script inputs. Empty strings use the defaults described here.
+siteName: ""       # Helm release name (stable when pods are replaced).
+routingKey: ""     # Connector name.
+cloudHost: ""      # First Link endpoint hostname. Does not rewrite the Link/TLS identity.
+cloudIp: ""        # Optional pod hosts mapping for cloudHost; empty uses cluster DNS.
+timeout: 180       # Bootstrap command and startup-probe timeout in seconds.
+
+image:
+  repository: docker.io/criticalmanufacturing/saas-connector
+  tag: ""          # Required: a published version or sha-<commit> tag.
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+nodeSelector:
+  kubernetes.io/os: linux
+tolerations: []
+affinity: {}

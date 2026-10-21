@@ -1,0 +1,7 @@
+**
+!saas-connector/
+!saas-connector/container/
+!saas-connector/container/Dockerfile
+!saas-connector/container/entrypoint.sh
+!saas-connector/container/healthcheck.sh
+!saas-connector/container/saas-connector-cli.sh

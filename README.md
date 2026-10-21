@@ -1,6 +1,14 @@
 # install-scripts
 Critical Manufacturing Installation Scripts
 
+## SaaS Connector
+
+Set up SaaS Connector on an Ubuntu VM for an existing cloud Kubernetes Skupper site.
+See [saas-connector/README.md](saas-connector/README.md) for inputs, secure GitHub execution,
+operations, and architecture diagrams.
+For Kubernetes and OpenShift connectors, see the
+[connector image and Helm chart](saas-connector/container/README.md).
+
 ## CM MES v12 external dependencies (Kubernetes / OpenShift)
 
 Production-ready, highly available Kafka, ClickHouse and S3 storage for CM MES v12, installed into an existing namespace:

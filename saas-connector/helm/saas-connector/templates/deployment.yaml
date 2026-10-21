@@ -1,0 +1,113 @@
+{{- $cloudHost := include "saas-connector.cloudHost" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "saas-connector.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: saas-connector
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  template:
+    metadata:
+      labels:
+        {{- include "saas-connector.labels" . | nindent 8 }}
+      annotations:
+        checksum/link: {{ .Values.linkYaml | sha256sum | quote }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.cloudIp }}
+      hostAliases:
+        - ip: {{ .Values.cloudIp | quote }}
+          hostnames:
+            - {{ $cloudHost | quote }}
+      {{- end }}
+      containers:
+        - name: connector
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: SITE_NAME
+              value: {{ default .Release.Name .Values.siteName | quote }}
+            - name: NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: LINK_FILE
+              value: /input/link.yaml
+            - name: CONNECTOR_NAME
+              value: {{ .Values.connectorName | quote }}
+            - name: ROUTING_KEY
+              value: {{ default .Values.connectorName .Values.routingKey | quote }}
+            - name: APP_IP
+              value: {{ .Values.appIp | quote }}
+            - name: APP_PORT
+              value: {{ .Values.appPort | quote }}
+            - name: TIMEOUT
+              value: {{ .Values.timeout | quote }}
+          startupProbe:
+            exec:
+              command: [/usr/local/bin/healthcheck.sh, live]
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: {{ div (add .Values.timeout 4) 5 }}
+          livenessProbe:
+            exec:
+              command: [/usr/local/bin/healthcheck.sh, live]
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            exec:
+              command: [/usr/local/bin/healthcheck.sh, ready]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: link
+              mountPath: /input
+              readOnly: true
+            - name: state
+              mountPath: /output
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: link
+          secret:
+            secretName: {{ .Release.Name }}-link
+            defaultMode: 0444
+        - name: state
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: temporary
+          emptyDir:
+            sizeLimit: 64Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

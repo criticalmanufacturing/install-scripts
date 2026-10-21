@@ -1,0 +1,30 @@
+name: SaaS Connector Ubuntu
+on:
+  pull_request:
+    paths: ['saas-connector/**', '.github/workflows/saas-connector-ubuntu.yml']
+  push:
+    paths: ['saas-connector/**', '.github/workflows/saas-connector-ubuntu.yml']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+      - name: Check script and isolated behavior
+        run: |
+          bash -n saas-connector/setup-saas-connector-ubuntu.sh
+          bash -n saas-connector/tests/test_ubuntu.sh
+          shellcheck -x -S style saas-connector/setup-saas-connector-ubuntu.sh saas-connector/tests/test_ubuntu.sh
+          bash saas-connector/tests/test_ubuntu.sh
+      - name: Check imports with Skupper 2.2.3
+        run: |
+          source saas-connector/setup-saas-connector-ubuntu.sh
+          WORK_DIR="$RUNNER_TEMP/saas-connector-cli-test"
+          SKUPPER="$WORK_DIR/bin/skupper"
+          mkdir -p "$WORK_DIR/bin"
+          install_cli
+          SAAS_CONNECTOR_TEST_CLI="$SKUPPER" bash saas-connector/tests/test_ubuntu.sh

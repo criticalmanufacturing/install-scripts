@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["connectorName", "appIp", "appPort", "linkYaml", "image"],
+  "properties": {
+    "connectorName": {"type": "string", "minLength": 1, "maxLength": 63, "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"},
+    "appIp": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_:][A-Za-z0-9_.:%-]*$"},
+    "appPort": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "linkYaml": {"type": "string", "minLength": 1},
+    "siteName": {"type": "string", "maxLength": 63, "pattern": "^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"},
+    "routingKey": {"type": "string"},
+    "cloudHost": {"type": "string", "maxLength": 253, "pattern": "^$|^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$"},
+    "cloudIp": {"anyOf": [{"enum": [""]}, {"type": "string", "format": "ipv4"}, {"type": "string", "format": "ipv6"}]},
+    "timeout": {"type": "integer", "minimum": 1, "maximum": 3600},
+    "image": {
+      "type": "object", "required": ["repository", "tag"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string", "minLength": 1},
+        "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]}
+      }
+    },
+    "imagePullSecrets": {"type": "array", "items": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "minLength": 1}}}},
+    "resources": {"type": "object"},
+    "nodeSelector": {"type": "object", "additionalProperties": {"type": "string"}},
+    "tolerations": {"type": "array", "items": {"type": "object"}},
+    "affinity": {"type": "object"}
+  }
+}

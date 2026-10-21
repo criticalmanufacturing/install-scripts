@@ -1,0 +1,7 @@
+apiVersion: v2
+name: saas-connector
+description: SaaS Connector for Kubernetes and OpenShift, using the official Skupper router
+type: application
+version: 0.1.0
+appVersion: "2.2.3"
+kubeVersion: ">=1.25.0-0"
