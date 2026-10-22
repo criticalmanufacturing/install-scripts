@@ -1,0 +1,3 @@
+{{- if eq (include "s3.provider" .) "rustfs" }}
+{{ include "common.pdb" (dict "ctx" . "component" "s3" "maxUnavailable" 1) }}
+{{- end }}

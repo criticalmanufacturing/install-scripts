@@ -1,0 +1,14 @@
+apiVersion: v2
+name: s3
+description: S3 object storage for Critical Manufacturing MES 11.3 - standalone RustFS with one persistent data volume
+type: application
+version: 11.3.0
+appVersion: "1.0.1"
+keywords:
+  - s3
+  - rustfs
+  - critical-manufacturing
+dependencies:
+  - name: common
+    version: 11.3.0
+    repository: file://../common

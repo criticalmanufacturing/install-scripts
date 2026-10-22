@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clickhouse.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+  ports:
+    - {name: tcp-secure, port: 9440, targetPort: tcp-secure}
+    - {name: https, port: 8443, targetPort: https}
+    {{- if include "common.observability.enabled" . }}
+    - {name: metrics, port: 9363, targetPort: metrics}
+    {{- end }}
+---
+# Pod DNS for the StatefulSet.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clickhouse.headless" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "clickhouse") | nindent 4 }}
+  ports:
+    - {name: tcp-secure, port: 9440, targetPort: tcp-secure}
+    - {name: https, port: 8443, targetPort: https}
+    {{- if include "common.observability.enabled" . }}
+    - {name: metrics, port: 9363, targetPort: metrics}
+    {{- end }}

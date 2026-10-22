@@ -1,0 +1,10 @@
+apiVersion: v2
+name: rabbitmq
+description: RabbitMQ for Critical Manufacturing MES 11.3
+type: application
+version: 11.3.0
+appVersion: "3.13.7"
+dependencies:
+  - name: common
+    version: 11.3.0
+    repository: file://../common
