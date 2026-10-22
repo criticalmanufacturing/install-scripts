@@ -19,6 +19,12 @@ See [platform/v12.0/README.md](platform/v12.0/README.md).
 curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/ubuntu/install.bash | sudo bash
 ```
 
+## Prepare single server SLES environment
+
+```
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/development-add-sles-scripts/sles/install.bash | sudo bash
+```
+
 ## Prepare Windows environment
 
 The installation assumes that docker is installed and running.
