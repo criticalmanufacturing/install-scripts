@@ -13,6 +13,18 @@ cd install-scripts/platform/v12.0
 
 See [platform/v12.0/README.md](platform/v12.0/README.md).
 
+## SaaS Connector
+
+Save the application settings and private connection file supplied by Critical
+Manufacturing, then install the latest stable release from that folder:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/saas-connector/install.sh | bash
+```
+
+See the [simple customer instructions](saas-connector/README.md) for prerequisites
+and verification.
+
 ## Prepare single server Ubuntu environment
 
 ```
