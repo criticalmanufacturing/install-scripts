@@ -1,0 +1,13 @@
+apiVersion: v2
+name: clickhouse
+description: Single-server ClickHouse with TLS for MES 11.3.
+type: application
+version: 11.3.0
+appVersion: "25.3.3.42"
+keywords:
+  - clickhouse
+  - critical-manufacturing
+dependencies:
+  - name: common
+    version: 11.3.0
+    repository: file://../common

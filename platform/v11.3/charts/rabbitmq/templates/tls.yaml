@@ -1,0 +1,15 @@
+{{- $name := include "rabbitmq.fullname" . }}
+{{- $headless := include "rabbitmq.headless" . }}
+{{- $ns := .Release.Namespace }}
+{{- $cd := include "common.clusterDomain" . }}
+{{- $dns := list }}
+{{- range $svc := list $name $headless }}
+{{- $dns = concat $dns (list $svc (printf "%s.%s" $svc $ns) (printf "%s.%s.svc" $svc $ns) (printf "%s.%s.svc.%s" $svc $ns $cd)) }}
+{{- end }}
+{{- /* Stable pod name. */}}
+{{- $dns = concat $dns (list (printf "*.%s.%s.svc.%s" $headless $ns $cd) (printf "*.%s.%s.svc" $headless $ns) (printf "*.%s.%s" $headless $ns)) }}
+{{- with (include "common.tls.caSecret" (dict "ctx" . "component" "rabbitmq")) }}
+{{ . }}
+---
+{{- end }}
+{{ include "common.tls.certificate" (dict "ctx" . "component" "rabbitmq" "name" (include "rabbitmq.tlsSecret" .) "cn" $name "dnsNames" $dns) }}

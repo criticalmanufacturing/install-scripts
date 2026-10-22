@@ -1,0 +1,6 @@
+apiVersion: v2
+name: common
+description: Shared helpers for the Critical Manufacturing MES 11.3 external dependency charts
+type: library
+version: 11.3.0
+appVersion: "11.3.0"

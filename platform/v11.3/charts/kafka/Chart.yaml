@@ -1,0 +1,13 @@
+apiVersion: v2
+name: kafka
+description: Apache Kafka 3.8 (static KRaft, combined controller+broker) for Critical Manufacturing MES 11.3
+type: application
+version: 11.3.0
+appVersion: "3.8.1"
+keywords:
+  - kafka
+  - critical-manufacturing
+dependencies:
+  - name: common
+    version: 11.3.0
+    repository: file://../common
