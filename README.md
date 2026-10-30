@@ -13,6 +13,19 @@ cd install-scripts/platform/v12.0
 
 See [platform/v12.0/README.md](platform/v12.0/README.md).
 
+## CM Cloud Bridge
+
+Save the application settings and private connection file supplied by Critical
+Manufacturing, then run this command from that folder. Choose Native Ubuntu,
+Podman on Ubuntu, or Helm for your existing Kubernetes/OpenShift cluster:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/cm-cloud-bridge/install.sh | bash
+```
+
+See the [simple customer instructions](cm-cloud-bridge/README.md) for prerequisites
+and verification.
+
 ## Prepare single server Ubuntu environment
 
 ```

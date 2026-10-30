@@ -1,0 +1,5 @@
+# Critical Manufacturing completes these settings before sending them to the customer.
+# Save the completed file as app-values.yaml. Do not put credentials in this file.
+connectorName: customer-app
+appIp: "application.internal"
+appPort: 7990
