@@ -173,5 +173,10 @@ kafka:
       limits:
         memory: 768Mi
 
+  test:
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {memory: 512Mi}
+
 observability:
   otlpEndpoint: ""

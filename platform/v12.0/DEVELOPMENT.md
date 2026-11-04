@@ -223,3 +223,5 @@ and sends them over OTLP/HTTP to that endpoint (CM Observability).
 - **RustFS** exports its telemetry itself over OTLP to the local collector
   (`http://<prefix>-otel.<ns>.svc.<clusterDomain>:4318`) when `observability.otlpEndpoint` is set.
   The collector always exposes an OTLP receiver on 4317/4318 for this.
+
+Configuration types and enums are validated by Helm using `values.schema.json`, including direct chart use. The version-level schema validates the wizard values; runtime cluster checks remain in the installer. Keep these schemas aligned when adding settings.

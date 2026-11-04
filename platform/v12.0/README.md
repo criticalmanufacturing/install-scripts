@@ -186,3 +186,31 @@ To look inside ClickHouse (no password needed from inside the pod):
 `kubectl -n <namespace> exec -it cmmes-clickhouse-0 -- clickhouse-client`.
 
 Maintainers: see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+## Storage maintenance and recovery
+
+Ordinary installation and upgrade stop before changing existing PVCs when larger volumes are requested. Use an explicit maintenance window with the desired values:
+
+```bash
+./install.sh -n <namespace> -f values.yaml --resize-storage
+```
+
+This operation requires Helm 3.13+ (or Helm 4). It performs a server-side Helm preflight for all affected releases and saves private copies of the live StatefulSet definitions before expanding volumes. The recovery YAML is prepared locally by `kubectl`/`oc`; Python and additional JSON/YAML tools are not required. It temporarily orphans pods while recreating their StatefulSet controllers through Helm. Run it without concurrent installers or maintenance on those releases.
+
+The affected releases are upgraded using the supplied values, so any other changes in those values are applied too. Expansion requests cannot shrink existing PVCs. Some storage drivers require a pod restart to finish filesystem expansion.
+
+If maintenance fails or is interrupted, the script reports the recovery directory. Recovery is manual: check the affected release and its controllers before retrying. For example, for ClickHouse:
+
+```bash
+kubectl -n <namespace> get statefulset <prefix>-clickhouse
+# Only if that controller is NotFound, recreate it from this maintenance run:
+kubectl -n <namespace> create -f output/storage-maintenance/run-XXXXXXXX/statefulset-<prefix>-clickhouse.yaml
+```
+
+Repeat for any other missing StatefulSets using their saved YAML. Use `oc` in place of `kubectl` on OpenShift. `create` refuses to overwrite an existing controller. Do not apply the entire directory: it also contains logs and raw live objects. Check the target cluster and namespace against the saved manifests before restoring.
+
+After restoring missing controllers, diagnose the Helm failure using `helm status`, `helm history` and the saved upgrade logs. If a restored controller still has its previous claim-template size, retry `--resize-storage` with the same desired values; it skips PVCs already at the requested size. If Helm already created the controller with the requested size before failing, resolve the failure and rerun the ordinary installer with the same values, without `--resize-storage`: maintenance does nothing when no growth remains. After a partially completed multi-release maintenance run, an ordinary installer run also retries releases that already have their new controllers.
+
+Helm rollback restores release manifests, but does not undo PVC expansion performed by this script. It can also fail on immutable StatefulSet claim-template differences if a new controller was already created. An interruption before Helm starts has no failed upgrade to roll back. Keep controller recovery separate from any decision to roll back application changes.
+
+Recovery files can contain configuration or credentials: keep them private. Restore controllers promptly before orphaned pods are lost; the saved YAML is not a backup of application data.

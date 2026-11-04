@@ -118,6 +118,7 @@ Options:
   -y, --yes              Do not ask for confirmation.
       --dry-run          Only render the manifests into ./output/rendered/ (installs nothing).
       --print            Print the connection information of an existing installation again.
+      --resize-storage   Explicit volume expansion and affected-release upgrades.
       --uninstall        Uninstall the releases. Data volumes (PVCs) are kept.
       --timeout <dur>    Time to wait for each component (default ${HELM_TIMEOUT}).
   -h, --help             Show this help.
@@ -329,7 +330,14 @@ EOF
 
 # read_values <file>...: fills V[] with the merged values of the given files.
 read_values() {
+  local historical=false
+  if [[ "${1:-}" == --historical ]]; then historical=true; shift; fi
   build_reader_chart
+  if $historical; then
+    rm -f "$TMP_DIR/values-reader/values.schema.json"
+  else
+    cp "$SCRIPT_DIR/values.schema.json" "$TMP_DIR/values-reader/values.schema.json"
+  fi
   local -a args=()
   local f out line key value
   for f in "$@"; do args+=(-f "$f"); done
@@ -363,49 +371,6 @@ read_values() {
 enabled() { [[ "${V[$1.enabled]:-true}" == "true" ]]; }
 otel_enabled() { [[ -n "${V[observability.otlpEndpoint]:-}" ]]; }
 
-validate_values() {
-  local p=${V[global.namePrefix]}
-  is_dns_label "$p" && [[ ${#p} -le 20 ]] || die "global.namePrefix '$p' is invalid: use at most 20 lowercase letters, digits and '-'."
-  case "${V[global.tls.mode]}" in auto|existing|certManager) ;; *)
-    die "global.tls.mode must be auto, existing or certManager (got '${V[global.tls.mode]}')." ;; esac
-  # CM MES always authenticates to Kafka with a client certificate (mTLS). The setting is
-  # only read to tell users of older values files that it no longer applies.
-  if [[ -n "${V[kafka.auth.method]:-}" && "${V[kafka.auth.method]}" != mtls ]]; then
-    warn "kafka.auth.method '${V[kafka.auth.method]}' is no longer supported: CM MES always uses a client certificate (mTLS). Remove it from your values file."
-  fi
-  unset 'V[kafka.auth.method]'
-  case "${V[s3.provider]}" in rustfs) ;; *)
-    die "s3.provider must be rustfs (standalone) (got '${V[s3.provider]}')." ;; esac
-  case "${V[global.podAntiAffinity]}" in hard|soft) ;; *)
-    die "global.podAntiAffinity must be hard or soft (got '${V[global.podAntiAffinity]}')." ;; esac
-  case "${V[global.platform]}" in auto|openshift|kubernetes) ;; *)
-    die "global.platform must be auto, openshift or kubernetes (got '${V[global.platform]}')." ;; esac
-  local c
-  for c in "${COMPONENTS[@]}"; do
-    case "${V[$c.enabled]}" in true|false) ;; *) die "$c.enabled must be true or false (got '${V[$c.enabled]}')." ;; esac
-  done
-  if ! enabled kafka && ! enabled clickhouse && ! enabled rabbitmq && ! enabled s3; then
-    die "No component is enabled (kafka.enabled, clickhouse.enabled, rabbitmq.enabled and s3.enabled are all false)."
-  fi
-  if [[ "${V[global.tls.mode]}" == certManager && -z "${V[global.tls.certManager.issuerName]:-}" ]]; then
-    die "global.tls.mode=certManager needs global.tls.certManager.issuerName."
-  fi
-  if [[ "${V[global.tls.mode]}" == existing ]]; then
-    local missing=()
-    enabled kafka && [[ -z "${V[kafka.tls.existingSecret]:-}" ]] && missing+=(kafka.tls.existingSecret)
-    enabled kafka && [[ -z "${V[kafka.tls.existingClientSecret]:-}" ]] && missing+=(kafka.tls.existingClientSecret)
-    enabled clickhouse && [[ -z "${V[clickhouse.tls.existingSecret]:-}" ]] && missing+=(clickhouse.tls.existingSecret)
-    enabled rabbitmq && [[ -z "${V[rabbitmq.tls.existingSecret]:-}" ]] && missing+=(rabbitmq.tls.existingSecret)
-    enabled s3 && [[ "${V[s3.provider]}" == rustfs && -z "${V[s3.rustfs.tls.existingSecret]:-}" ]] && missing+=(s3.rustfs.tls.existingSecret)
-    ((${#missing[@]} == 0)) || die "global.tls.mode=existing needs these Secret names: ${missing[*]}"
-  fi
-
-  local ep=${V[observability.otlpEndpoint]:-}
-  if [[ -n "$ep" && ! "$ep" =~ ^https?://[^[:space:]]+$ ]]; then
-    die "observability.otlpEndpoint must be an HTTP(S) endpoint without spaces."
-  fi
-
-}
 
 # ----------------------------------------------------------------------------
 # Step 1: prerequisites
@@ -756,7 +721,7 @@ wizard_storage() {
 
 
   note "Size of each data volume (e.g. 50Gi, 1Ti). It can be increased later (never decreased)"
-  note "when the StorageClass allows volume expansion; install.sh then resizes the volumes."
+  note "when the StorageClass allows expansion; use --resize-storage for existing volumes."
   [[ "${W[kafka.enabled]}" == true ]] && ask_size kafka.storage.size "Kafka, per broker (x${V[kafka.replicas]:-3})" kafka data
   if [[ "${W[clickhouse.enabled]}" == true ]]; then
     ask_size clickhouse.storage.size "ClickHouse (one server)" clickhouse data
@@ -1173,7 +1138,6 @@ install_release() {
     return 0
   fi
 
-  apply_resize "$comp"
   info "Installing $(component_title "$comp") (release $rel). This can take up to $HELM_TIMEOUT..."
   if run_with_progress "$rel" "$log" "$HELM" upgrade --install "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" \
       "${vargs[@]}" --wait --timeout "$HELM_TIMEOUT"; then
@@ -1329,7 +1293,7 @@ live_checks() {
     release_exists "$rel" || continue
     make_tmp
     "$HELM" get values "$rel" -n "$NAMESPACE" -a -o yaml >"$TMP_DIR/live-$rel.yaml" 2>/dev/null || continue
-    read_values "$TMP_DIR/live-$rel.yaml"
+    read_values --historical "$TMP_DIR/live-$rel.yaml"
     if [[ "$c" != otel && "${V[global.tls.mode]}" != "$new_tls" ]]; then
       changes+=("$(component_title "$c"): TLS mode ${V[global.tls.mode]} -> $new_tls. All its certificates change; CM MES must trust the new CA ($c-ca.crt).")
     fi
@@ -1350,6 +1314,7 @@ live_checks() {
     [[ "$c" == otel ]] || check_volumes "$c"
   done
   if ((${#RESIZE_PLAN[@]} > 0)); then
+    [[ "$ACTION" == resize ]] || $DRY_RUN || die "Volume growth requires explicit maintenance: rerun with --resize-storage and the same values file. No volumes or controllers were changed."
     local comp sts vct size lsize
     heading "Volume resize"
     info "These volumes will be enlarged. Kubernetes cannot change the volume size of a StatefulSet,"
@@ -1363,7 +1328,6 @@ live_checks() {
     if $DRY_RUN; then note "Dry run: nothing is resized."; return 0; fi
     require_can_i patch persistentvolumeclaims
     require_can_i delete statefulsets.apps
-    confirm_or_exit "Resize these volumes?"
   fi
 }
 
@@ -1594,6 +1558,7 @@ parse_args() {
       -y|--yes)       ASSUME_YES=true; shift ;;
       --dry-run)      DRY_RUN=true; shift ;;
       --print)        ACTION=print; shift ;;
+      --resize-storage) ACTION=resize; shift ;;
       --uninstall)    ACTION=uninstall; shift ;;
       --timeout)      [[ $# -ge 2 ]] || die "$1 needs a value"; HELM_TIMEOUT=$2; shift 2 ;;
       -h|--help)      usage; exit 0 ;;
@@ -1670,7 +1635,6 @@ main() {
   fi
   set_values_files
   read_values "${VALUES_FILES[@]}"
-  $INTERACTIVE || validate_values
 
   if $INTERACTIVE; then
     run_wizard
@@ -1682,7 +1646,6 @@ main() {
     VALUES_FILES=("$BASE_VALUES" "$tmpv")
     VALUES_DISPLAY="values.yaml + your answers (saved as $GENERATED_VALUES)"
     read_values "${VALUES_FILES[@]}"
-    validate_values
     show_summary
     preflight_checks
     prepare_charts
@@ -1698,9 +1661,96 @@ main() {
     prepare_charts
     live_checks
     # A dry run changes nothing, so it needs no confirmation.
-    $DRY_RUN || confirm_or_exit "Install now?"
+    if [[ "$ACTION" == install ]]; then $DRY_RUN || confirm_or_exit "Install now?"; fi
   fi
-  run_install
+  if [[ "$ACTION" == resize ]]; then run_storage_maintenance; else run_install; fi
+}
+
+# Explicit storage maintenance and recovery.
+storage_maintenance_worker() (
+  # Subshell confines recovery traps and umask to this explicit operation.
+  if $DRY_RUN; then info "Storage maintenance dry run: no volumes or controllers changed."; return 0; fi
+  if ((${#RESIZE_PLAN[@]} == 0)); then info "No volume expansion is needed."; return 0; fi
+  local -a vargs=() comps=() controllers=()
+  local -A seen=() saved=()
+  local f line comp sts vct size old rel directory
+  for f in "${VALUES_FILES[@]}"; do vargs+=(-f "$f"); done
+  for line in "${RESIZE_PLAN[@]}"; do
+    IFS='|' read -r comp sts vct size old <<<"$line"
+    if [[ -z "${seen[$comp]+set}" ]]; then comps+=("$comp"); seen[$comp]=1; fi
+    if [[ -z "${saved[$sts]+set}" ]]; then controllers+=("$sts"); saved[$sts]=1; fi
+  done
+  info "This expands PVCs, temporarily orphans their pods and upgrades only the affected releases."
+  info "On failure, restore missing controllers from the saved YAML as documented. Expanded PVCs cannot shrink."
+  info "Run without other installers or storage maintenance acting on these releases."
+  umask 077
+  mkdir -p "$OUTPUT_DIR/storage-maintenance"
+  directory=$(mktemp -d "$OUTPUT_DIR/storage-maintenance/run-XXXXXXXX")
+  info "Private recovery directory: $directory"
+  # Render against live cluster state for EVERY affected release before the first mutation.
+  # In particular, lookup-based retained Kafka identity checks must pass first.
+  for comp in "${comps[@]}"; do
+    rel="$(release_name "$comp")"
+    if ! "$HELM" upgrade "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" "${vargs[@]}" \
+      --dry-run=server >"$directory/preflight-$rel.log" 2>&1; then
+      err "Server-side Helm preflight failed for $rel; nothing was changed."
+      err "See $directory/preflight-$rel.log. Maintenance requires Helm 3.13+ or Helm 4."
+      exit 1
+    fi
+  done
+  for sts in "${controllers[@]}"; do
+    kcn get statefulset "$sts" -o json >"$directory/live-$sts.json" || exit 1
+    # Use the Kubernetes CLI's local JSON merge support; no cluster mutation here.
+    kc patch --local -f "$directory/live-$sts.json" --type=merge \
+      -p '{"metadata":{"uid":null,"resourceVersion":null,"generation":null,"creationTimestamp":null,"managedFields":null,"selfLink":null,"deletionTimestamp":null,"deletionGracePeriodSeconds":null},"status":null}' \
+      -o yaml >"$directory/statefulset-$sts.yaml" || exit 1
+  done
+  # Also covers SIGINT/SIGTERM after a controller has been removed.
+  trap 'rc=$?; if ((rc)); then err "Maintenance interrupted/failed. PVC expansion is retained; check for missing StatefulSet controllers."; err "Restore missing controllers with kubectl/oc create -f <saved YAML>; see the README."; err "Recovery files: $directory"; fi' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  for comp in "${comps[@]}"; do
+    apply_resize "$comp"
+    rel="$(release_name "$comp")"
+    if ! "$HELM" upgrade "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" "${vargs[@]}" \
+      --wait --timeout "$HELM_TIMEOUT" >"$directory/upgrade-$rel.log" 2>&1; then
+      err "Helm upgrade failed for $rel. See $directory/upgrade-$rel.log."
+      exit 1
+    fi
+  done
+  ok "Storage maintenance completed. Recovery snapshots remain in $directory."
+)
+
+cancel_storage_maintenance() {
+  local status=$1 child=$2 previous=$3
+  # $! covers cancellation after fork but before the parent records the worker PID.
+  # Before the fork, it still refers to an unrelated, previously started job.
+  if [[ -n "$child" && "$child" != "$previous" ]]; then
+    kill -TERM -- -"$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null || true
+    wait "$child" || true
+  fi
+  exit "$status"
+}
+
+run_storage_maintenance() {
+  if $DRY_RUN; then info "Storage maintenance dry run: no volumes or controllers changed."; return 0; fi
+  if ((${#RESIZE_PLAN[@]} == 0)); then info "No volume expansion is needed."; return 0; fi
+  confirm_or_exit "Start storage maintenance in $NAMESPACE?"
+  local maintenance_pid="" previous_background_pid=${!:-} saved_traps had_monitor=false rc=0
+  saved_traps=$(trap -p INT TERM)
+  trap 'cancel_storage_maintenance 143 "${maintenance_pid:-${!:-}}" "$previous_background_pid"' TERM
+  trap 'cancel_storage_maintenance 130 "${maintenance_pid:-${!:-}}" "$previous_background_pid"' INT
+  [[ $- != *m* ]] || had_monitor=true
+  # A separate process group allows signals to stop Helm/kubectl as well as the worker.
+  # All interactive confirmation happens above, in the foreground installer.
+  set -m
+  storage_maintenance_worker &
+  maintenance_pid=$!
+  $had_monitor || set +m
+  wait "$maintenance_pid" || rc=$?
+  trap - INT TERM
+  [[ -z "$saved_traps" ]] || eval "$saved_traps"
+  return "$rc"
 }
 
 main "$@"

@@ -153,5 +153,10 @@ s3:
   setup:
     # Applied to each container of the bucket-setup Job, which run sequentially.
     resources: {}
+  test:
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {memory: 512Mi}
+
 observability:
   otlpEndpoint: ""

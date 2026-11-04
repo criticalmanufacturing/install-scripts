@@ -56,3 +56,5 @@ done
 Keep support statements consistent with README.md: these are guidance templates. Preserve the v12 directory and older release configurations when adapting this version.
 
 `s3.setup.resources` configures the bucket setup Job. Its containers run sequentially and use the same resource settings.
+
+Configuration types and enums are validated by Helm using `values.schema.json`, including direct chart use. The version-level schema validates the wizard values; runtime cluster checks remain in the installer. Keep these schemas aligned when adding settings.
