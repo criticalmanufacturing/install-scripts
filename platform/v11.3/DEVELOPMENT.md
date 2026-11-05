@@ -45,7 +45,7 @@ Kafka monitor ACLs grant only Describe and DescribeConfigs. Collector backend he
 
 `install.sh` passes one values file to every chart. Each chart reads `global` and its component section. The optional collector also reads the enabled component sections.
 
-Each application chart depends on the library chart at `file://../common`, version `11.3.0`. Regenerate its `Chart.lock` with:
+Each application chart depends on the library chart at `file://../../../common/chart`, version `1.0.0`. Regenerate its `Chart.lock` with:
 
 ```bash
 for chart in kafka clickhouse rabbitmq s3 otel; do
@@ -56,5 +56,7 @@ done
 Keep support statements consistent with README.md: these are guidance templates. Preserve the v12 directory and older release configurations when adapting this version.
 
 `s3.setup.resources` configures the bucket setup Job. Its containers run sequentially and use the same resource settings.
+
+Shared installer functions live in `../lib/install-common.sh`; version-specific prompts, layouts and connection guidance stay in each version entry point. Keep the `platform` directory structure when copying these samples.
 
 Configuration types and enums are validated by Helm using `values.schema.json`, including direct chart use. The version-level schema validates the wizard values; runtime cluster checks remain in the installer. Keep these schemas aligned when adding settings.

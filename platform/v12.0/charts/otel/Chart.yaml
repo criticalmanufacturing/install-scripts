@@ -13,5 +13,5 @@ keywords:
   - critical-manufacturing
 dependencies:
   - name: common
-    version: 12.0.0
-    repository: file://../common
+    version: 1.0.0
+    repository: file://../../../common/chart

@@ -27,12 +27,17 @@ if [ -z "${BASH_VERSINFO:-}" ] || [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
   exit 1
 fi
 
+# shellcheck source=../lib/install-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/install-common.sh"
+# shellcheck source=../lib/storage-maintenance.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/storage-maintenance.sh"
+
 # ----------------------------------------------------------------------------
 # Constants
 # ----------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHARTS_DIR="${SCRIPT_DIR}/charts"
-BASE_VALUES="${SCRIPT_DIR}/values.yaml"
+BASE_VALUES_FILE="${SCRIPT_DIR}/values.yaml"
 OUTPUT_DIR="${PWD}/output"
 OUT_SHOW="./output"            # how OUTPUT_DIR is shown to the user
 GENERATED_VALUES="values.generated.yaml"
@@ -54,7 +59,6 @@ ANN="cmf\\.criticalmanufacturing\\.com"   # annotation prefix, escaped for kubec
 ACTION="install"          # install | uninstall | print
 NAMESPACE=""
 USER_VALUES=""
-ASSUME_YES=false
 DRY_RUN=false
 HELM_TIMEOUT="20m"
 INTERACTIVE=false
@@ -64,37 +68,16 @@ IS_OPENSHIFT=false
 HAS_CERT_MANAGER=false
 HAS_OBC=false
 NODE_COUNT="unknown"
-DEFAULT_SC=""
-KUBE_CONTEXT=""
-CHARTS_READY=false
+DEFAULT_STORAGE_CLASS=""
 declare -a STORAGE_CLASSES=()   # "name|provisioner|default(true/empty)"
 declare -a RGW_CLASSES=()       # bucket StorageClass names (Ceph RGW)
-declare -A V=()                 # effective values (read through helm)
-declare -A OV=()                # wizard overrides: path -> YAML value
-declare -A W=()                 # wizard answers: path -> plain value
-declare -A B=()                 # values.yaml alone (the wizard writes only differences from it)
+declare -A EFFECTIVE_VALUES=()        # effective values (read through helm)
+declare -A VALUE_OVERRIDES=()         # wizard overrides: path -> YAML value
+declare -A WIZARD_ANSWERS=()          # wizard answers: path -> plain value
+declare -A BASE_VALUES=()             # values.yaml alone (the wizard writes only differences from it)
 declare -a VALUES_FILES=()      # values files passed to every release
 declare -a SAVED_FILES=()       # files written to ./output by print_connection_info
 VALUES_DISPLAY=""
-TMP_DIR=""
-
-# ----------------------------------------------------------------------------
-# Output helpers (colours only on a terminal)
-# ----------------------------------------------------------------------------
-if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-  C_BOLD=$'\033[1m'; C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'
-  C_CYAN=$'\033[36m'; C_DIM=$'\033[2m'; C_RESET=$'\033[0m'
-else
-  C_BOLD=""; C_RED=""; C_GREEN=""; C_YELLOW=""; C_CYAN=""; C_DIM=""; C_RESET=""
-fi
-
-heading() { printf '\n%s%s== %s ==%s\n' "$C_BOLD" "$C_CYAN" "$*" "$C_RESET"; }
-info()    { if [[ -z "$*" ]]; then printf '\n'; else printf '  %s\n' "$*"; fi; }
-note()    { printf '  %s%s%s\n' "$C_DIM" "$*" "$C_RESET"; }
-ok()      { printf '  %s[ OK ]%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
-warn()    { printf '  %s[WARN]%s %s\n' "$C_YELLOW" "$C_RESET" "$*"; }
-err()     { printf '  %s[FAIL]%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; }
-die()     { err "$*"; exit 1; }
 
 cleanup() { if [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then rm -rf "$TMP_DIR"; fi; }
 trap cleanup EXIT
@@ -136,123 +119,9 @@ EOF
 }
 
 # ----------------------------------------------------------------------------
-# Prompt helpers (read from stdin, so answers can also be piped in)
-# ----------------------------------------------------------------------------
-trim() {
-  local s=$1
-  s="${s#"${s%%[![:space:]]*}"}"
-  s="${s%"${s##*[![:space:]]}"}"
-  printf '%s' "$s"
-}
-
-# read_line <var>: one line from stdin, trimmed, CR removed.
-read_line() {
-  local __line=""
-  if ! IFS= read -r __line; then
-    [[ -n "$__line" ]] || { printf '\n'; die "No more answers on standard input. Run ./install.sh in a terminal, or use: -f <values file> --yes"; }
-  fi
-  __line="$(trim "${__line%$'\r'}")"
-  [[ -t 0 ]] || printf '%s\n' "$__line"
-  printf -v "$1" '%s' "$__line"
-}
-
-# ask <var> <question> [default]
-ask() {
-  local __var=$1 __q=$2 __def=${3-} __ans
-  if [[ -n "$__def" ]]; then
-    printf '  %s%s%s [%s]: ' "$C_BOLD" "$__q" "$C_RESET" "$__def"
-  else
-    printf '  %s%s%s: ' "$C_BOLD" "$__q" "$C_RESET"
-  fi
-  read_line __ans
-  [[ -n "$__ans" ]] || __ans=$__def
-  printf -v "$__var" '%s' "$__ans"
-}
-
-# ask_secret <var> <question>: hidden input on a terminal.
-ask_secret() {
-  local __var=$1 __q=$2 __ans=""
-  printf '  %s%s%s: ' "$C_BOLD" "$__q" "$C_RESET"
-  if [[ -t 0 ]]; then
-    IFS= read -rs __ans || true
-    printf '\n'
-  else
-    IFS= read -r __ans || [[ -n "$__ans" ]] || die "No more answers on standard input."
-    printf '(hidden)\n'
-  fi
-  printf -v "$__var" '%s' "${__ans%$'\r'}"
-}
-
-# ask_yn <var> <question> <default y|n>  -> var = true | false
-ask_yn() {
-  local __var=$1 __q=$2 __def=$3 __ans __hint
-  if [[ "$__def" == y ]]; then __hint="Y/n"; else __hint="y/N"; fi
-  while true; do
-    printf '  %s%s%s [%s]: ' "$C_BOLD" "$__q" "$C_RESET" "$__hint"
-    read_line __ans
-    [[ -n "$__ans" ]] || __ans=$__def
-    case "${__ans,,}" in
-      y|yes) printf -v "$__var" true; return 0 ;;
-      n|no)  printf -v "$__var" false; return 0 ;;
-      *)     warn "Please answer y or n." ;;
-    esac
-  done
-}
-
-# ask_choice <var> <question> <default value> "value|description" ...
-ask_choice() {
-  local __var=$1 __q=$2 __def=$3; shift 3
-  local -a __vals=() __descs=()
-  local __o __i __ans __defidx=1 __w=14
-  for __o in "$@"; do
-    __vals+=("${__o%%|*}"); __descs+=("${__o#*|}")
-    (( ${#__vals[-1]} > __w )) && __w=${#__vals[-1]}
-  done
-  printf '  %s%s%s\n' "$C_BOLD" "$__q" "$C_RESET"
-  for __i in "${!__vals[@]}"; do
-    printf '    %2d) %-*s %s\n' $((__i + 1)) "$__w" "${__vals[__i]}" "${__descs[__i]}"
-    [[ "${__vals[__i]}" == "$__def" ]] && __defidx=$((__i + 1))
-  done
-  while true; do
-    printf '  Choice [%d]: ' "$__defidx"
-    read_line __ans
-    [[ -n "$__ans" ]] || __ans=$__defidx
-    if [[ "$__ans" =~ ^[0-9]+$ ]] && (( __ans >= 1 && __ans <= ${#__vals[@]} )); then
-      printf -v "$__var" '%s' "${__vals[__ans - 1]}"; return 0
-    fi
-    for __i in "${!__vals[@]}"; do
-      if [[ "${__vals[__i]}" == "$__ans" ]]; then printf -v "$__var" '%s' "$__ans"; return 0; fi
-    done
-    warn "Please type a number between 1 and ${#__vals[@]}."
-  done
-}
-
-confirm_or_exit() {
-  local q=$1 answer
-  if $ASSUME_YES; then return 0; fi
-  if [[ ! -t 0 ]] && ! $INTERACTIVE; then
-    die "Confirmation needed but standard input is not a terminal. Add --yes to proceed."
-  fi
-  ask_yn answer "$q" y
-  $answer || { info "Cancelled. Nothing was changed."; exit 0; }
-}
-
-# ----------------------------------------------------------------------------
 # Small utilities
 # ----------------------------------------------------------------------------
 kc()  { "$KUBECTL" "$@"; }
-kcn() { "$KUBECTL" -n "$NAMESPACE" "$@"; }
-have() { command -v "$1" >/dev/null 2>&1; }
-
-# base64 decode from stdin (GNU, BSD/macOS and Git Bash all accept --decode).
-b64d() { base64 --decode 2>/dev/null; }
-
-# Quote a string for YAML (double-quoted style).
-yaml_str() {
-  local s=$1
-  s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\t'/\\t}; s=${s//$'\n'/\\n}; s=${s//$'\r'/}
-  printf '"%s"' "$s"
-}
 
 is_dns_label()  { [[ "$1" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ && ${#1} -le 63 ]]; }
 is_secret_name(){ [[ "$1" =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ && ${#1} -le 253 ]]; }
@@ -261,7 +130,7 @@ is_size()       { [[ "$1" =~ ^[0-9]+(\.[0-9]+)?(Mi|Gi|Ti)$ ]]; }
 # Absolute path of an existing file (for comparing values files).
 abs_path() { (cd "$(dirname "$1")" && printf '%s/%s' "$(pwd -P)" "$(basename "$1")"); }
 
-release_name() { printf '%s-%s' "${V[global.namePrefix]}" "$1"; }
+release_name() { printf '%s-%s' "${EFFECTIVE_VALUES[global.namePrefix]}" "$1"; }
 
 component_title() {
   case "$1" in
@@ -297,163 +166,16 @@ VALUE_KEYS=(
   observability.tls.ca observability.headers@json observability.tls.ca@json
 )
 
-make_tmp() { [[ -n "$TMP_DIR" ]] || TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t cmmes)"; }
 
-build_reader_chart() {
-  make_tmp
-  local dir="$TMP_DIR/values-reader" k
-  [[ -f "$dir/Chart.yaml" ]] && return 0
-  mkdir -p "$dir/templates"
-  printf 'apiVersion: v2\nname: values-reader\nversion: 0.0.0\n' >"$dir/Chart.yaml"
-  { printf '__cmReaderKeys:\n'; for k in "${VALUE_KEYS[@]}"; do printf '  - "%s"\n' "$k"; done; } >"$dir/values.yaml"
-  # Prints "K|<path>|<value>" for every key. Maps -> sorted key names, lists -> comma-separated.
-  cat >"$dir/templates/values.yaml" <<'EOF'
-{{- define "v" -}}
-{{- if kindIs "map" . -}}{{- keys . | sortAlpha | join "," -}}
-{{- else if kindIs "slice" . -}}
-{{- $l := list -}}
-{{- range . -}}{{- if kindIs "map" . -}}{{- $l = append $l (toString (.name | default "")) -}}{{- else -}}{{- $l = append $l (toString .) -}}{{- end -}}{{- end -}}
-{{- join "," $l -}}
-{{- else if kindIs "invalid" . -}}
-{{- else -}}{{- toString . | replace "\r" "" | replace "\n" "\\n" -}}
-{{- end -}}
-{{- end -}}
-{{- range $p := .Values.__cmReaderKeys }}
-{{- $cur := $.Values -}}{{- $found := true -}}
-{{- $json := hasSuffix "@json" $p -}}
-{{- range $k := splitList "." (trimSuffix "@json" $p) -}}
-{{- if and $found (kindIs "map" $cur) (hasKey $cur $k) -}}{{- $cur = index $cur $k -}}{{- else -}}{{- $found = false -}}{{- end -}}
-{{- end }}
-# K|{{ $p }}|{{ if and $found $json }}{{ toJson $cur }}{{ else if $found }}{{ include "v" $cur }}{{ end }}
-{{- end }}
-EOF
-}
-
-# read_values <file>...: fills V[] with the merged values of the given files.
-read_values() {
-  local historical=false
-  if [[ "${1:-}" == --historical ]]; then historical=true; shift; fi
-  build_reader_chart
-  if $historical; then
-    rm -f "$TMP_DIR/values-reader/values.schema.json"
-  else
-    cp "$SCRIPT_DIR/values.schema.json" "$TMP_DIR/values-reader/values.schema.json"
-  fi
-  local -a args=()
-  local f out line key value
-  for f in "$@"; do args+=(-f "$f"); done
-  if ! out="$("$HELM" template values-reader "$TMP_DIR/values-reader" "${args[@]}" 2>&1)"; then
-    err "Could not read the values file(s): $*"
-    printf '%s\n' "$out" | sed 's/^/         /' >&2
-    die "Fix the YAML syntax (indentation with spaces, 'key: value') and try again."
-  fi
-  V=()
-  while IFS= read -r line; do
-    line=${line%$'\r'}
-    [[ "$line" == "# K|"* ]] || continue
-    line=${line#"# K|"}
-    key=${line%%|*}
-    value=${line#*|}
-    V["$key"]=$value
-  done <<<"$out"
-  # Defaults for keys that are missing from every file.
-  : "${V[global.namePrefix]:=cmmes}"
-  [[ -n "${V[global.namePrefix]}" ]] || V[global.namePrefix]=cmmes
-  : "${V[global.tls.mode]:=auto}"; [[ -n "${V[global.tls.mode]}" ]] || V[global.tls.mode]=auto
-  : "${V[global.podAntiAffinity]:=hard}"
-  : "${V[global.platform]:=auto}"
-  : "${V[s3.provider]:=rustfs}"; [[ -n "${V[s3.provider]}" ]] || V[s3.provider]=rustfs
-  local c
-  for c in "${COMPONENTS[@]}"; do
-    [[ -n "${V[$c.enabled]:-}" ]] || V[$c.enabled]=true
-  done
-}
-
-enabled() { [[ "${V[$1.enabled]:-true}" == "true" ]]; }
-otel_enabled() { [[ -n "${V[observability.otlpEndpoint]:-}" ]]; }
+enabled() { [[ "${EFFECTIVE_VALUES[$1.enabled]:-true}" == "true" ]]; }
+otel_enabled() { [[ -n "${EFFECTIVE_VALUES[observability.otlpEndpoint]:-}" ]]; }
 
 
 # ----------------------------------------------------------------------------
 # Step 1: prerequisites
 # ----------------------------------------------------------------------------
-check_tools() {
-  local missing_tool=0 t
-  if have "$KUBECTL"; then ok "$KUBECTL found: $(command -v "$KUBECTL")"; else
-    err "'$KUBECTL' was not found in PATH."
-    info "Install kubectl: https://kubernetes.io/docs/tasks/tools/ (or set KUBECTL=oc on OpenShift)"
-    missing_tool=1
-  fi
-  if have "$HELM"; then ok "$HELM found: $(command -v "$HELM")"; else
-    err "'$HELM' was not found in PATH."
-    info "Install helm: https://helm.sh/docs/intro/install/"
-    missing_tool=1
-  fi
-  [[ "$missing_tool" == 0 ]] || exit 1
-  for t in sed awk grep sort base64; do have "$t" || die "'$t' was not found in PATH."; done
-  if have openssl; then ok "openssl found"; else warn "openssl was not found: it is needed to create the CA in TLS mode 'auto'."; fi
 
-  local ver major minor rest
-  ver="$("$HELM" version --template '{{.Version}}' 2>/dev/null || true)"
-  ver=${ver#v}
-  major=${ver%%.*}; rest=${ver#*.}; minor=${rest%%.*}
-  major=${major//[!0-9]/}; minor=${minor//[!0-9]/}
-  if [[ -z "$major" || -z "$minor" ]]; then
-    die "Could not determine the helm version ('$HELM version' failed). Helm ${MIN_HELM_MAJOR}.${MIN_HELM_MINOR} or newer is required."
-  fi
-  if (( major < MIN_HELM_MAJOR || (major == MIN_HELM_MAJOR && minor < MIN_HELM_MINOR) )); then
-    die "Helm v$ver is too old. Install Helm ${MIN_HELM_MAJOR}.${MIN_HELM_MINOR} or newer: https://helm.sh/docs/intro/install/"
-  fi
-  ok "helm v$ver"
-}
 
-check_cluster() {
-  local strict=$1       # true = fail when the cluster is unreachable
-  local question=${2-}  # yes/no question to confirm the context ("" = do not ask)
-  local ctx server out
-  ctx="$(kc config current-context 2>/dev/null || true)"
-  if [[ -z "$ctx" ]]; then
-    if $strict; then die "kubectl has no current context. Log in to the cluster first (e.g. 'oc login ...' or set KUBECONFIG)."; fi
-    warn "kubectl has no current context: continuing without cluster checks (dry run)."; return 0
-  fi
-  server="$(kc config view --minify -o 'jsonpath={.clusters[0].cluster.server}' 2>/dev/null || true)"
-  # MSYS_NO_PATHCONV: stops Git Bash from turning "/version" into a Windows path.
-  if ! out="$(MSYS_NO_PATHCONV=1 kc get --raw /version --request-timeout=20s 2>&1)"; then
-    if $strict; then
-      err "Cannot reach the cluster of context '$ctx' (${server:-unknown server}):"
-      printf '%s\n' "$out" | head -n 3 | sed 's/^/         /' >&2
-      die "Check your network/VPN and that you are logged in (kubectl get pods should work)."
-    fi
-    warn "Cannot reach the cluster: continuing without cluster checks (dry run)."; return 0
-  fi
-  CLUSTER_OK=true
-  KUBE_CONTEXT=$ctx
-  ok "Cluster reachable. Context: ${C_BOLD}$ctx${C_RESET} (${server:-unknown server})"
-  if [[ -n "$question" ]] && ! $ASSUME_YES && [[ -t 0 || "$INTERACTIVE" == true ]]; then
-    local yes
-    ask_yn yes "$question" y
-    $yes || die "Switch the context first: kubectl config use-context <name>"
-  fi
-}
-
-choose_namespace() {
-  local def
-  if [[ -z "$NAMESPACE" ]]; then
-    def="$(kc config view --minify -o 'jsonpath={..namespace}' 2>/dev/null || true)"
-    [[ -n "$def" ]] || def=default
-    if $INTERACTIVE; then
-      note "The namespace must already exist (this installer does not create it)."
-      while true; do
-        ask NAMESPACE "Namespace to install into" "$def"
-        is_dns_label "$NAMESPACE" && break
-        warn "'$NAMESPACE' is not a valid namespace name."
-      done
-    else
-      NAMESPACE=$def
-      info "No -n given: using the namespace of the current context: $NAMESPACE"
-    fi
-  fi
-  is_dns_label "$NAMESPACE" || die "'$NAMESPACE' is not a valid namespace name."
-}
 
 check_namespace() {
   $CLUSTER_OK || return 0
@@ -472,26 +194,10 @@ check_namespace() {
 }
 
 # require_can_i <verb> <resource>...: stops when the user may not <verb> one of them.
-require_can_i() {
-  local verb=$1 r ans
-  local -a denied=()
-  shift
-  for r in "$@"; do
-    ans="$(kcn auth can-i "$verb" "$r" 2>/dev/null || true)"
-    ans=${ans%$'\r'}
-    [[ "$ans" == yes ]] || denied+=("$r")
-  done
-  if ((${#denied[@]} > 0)); then
-    die "You cannot $verb ${denied[*]} in namespace '$NAMESPACE'. Ask for the 'admin' role on this namespace (kubectl create rolebinding ... --clusterrole=admin)."
-  fi
-}
 
 # ----------------------------------------------------------------------------
 # Step 2: detection
 # ----------------------------------------------------------------------------
-api_group_has() {   # api_group_has <group> <resource>
-  kc api-resources --api-group="$1" -o name 2>/dev/null | tr -d '\r' | grep -Eq "^$2(\.|$)"
-}
 
 detect_cluster() {
   $CLUSTER_OK || return 0
@@ -505,7 +211,7 @@ detect_cluster() {
   else note "cert-manager is not installed (optional)"; fi
 
   local out line name prov def
-  STORAGE_CLASSES=(); RGW_CLASSES=(); DEFAULT_SC=""
+  STORAGE_CLASSES=(); RGW_CLASSES=(); DEFAULT_STORAGE_CLASS=""
   if out="$(kc get storageclass -o "jsonpath={range .items[*]}{.metadata.name}{\"|\"}{.provisioner}{\"|\"}{.metadata.annotations.storageclass\\.kubernetes\\.io/is-default-class}{\"\\n\"}{end}" 2>/dev/null)"; then
     while IFS='|' read -r name prov def; do
       name=${name%$'\r'}; def=${def%$'\r'}
@@ -515,13 +221,13 @@ detect_cluster() {
       fi
       [[ "$prov" == *noobaa* || "$prov" == *bucket* ]] && continue
       STORAGE_CLASSES+=("$name|$prov|$def")
-      [[ "$def" == true ]] && DEFAULT_SC=$name
+      [[ "$def" == true ]] && DEFAULT_STORAGE_CLASS=$name
     done <<<"$out"
     if ((${#STORAGE_CLASSES[@]} == 0)); then
       warn "No StorageClass found: the data volumes cannot be created. Ask your cluster administrator."
     else
-      ok "StorageClasses: $(for s in "${STORAGE_CLASSES[@]}"; do printf '%s ' "${s%%|*}"; done)${DEFAULT_SC:+(default: $DEFAULT_SC)}"
-      [[ -n "$DEFAULT_SC" ]] || warn "No default StorageClass: you will have to choose one."
+      ok "StorageClasses: $(for s in "${STORAGE_CLASSES[@]}"; do printf '%s ' "${s%%|*}"; done)${DEFAULT_STORAGE_CLASS:+(default: $DEFAULT_STORAGE_CLASS)}"
+      [[ -n "$DEFAULT_STORAGE_CLASS" ]] || warn "No default StorageClass: you will have to choose one."
     fi
   else
     warn "Cannot list StorageClasses (no permission); you can still type a name."
@@ -559,14 +265,7 @@ detect_cluster() {
 # ----------------------------------------------------------------------------
 # Wizard (steps 3 to 9)
 # ----------------------------------------------------------------------------
-# set_ov <path> <yaml value> <plain value>: remember an override if it differs from values.yaml.
-set_ov() {
-  local base=${B[$1]:-}
-  [[ -z "$base" && "$3" == false ]] && base=false   # unset boolean = false
-  if [[ "$base" != "$3" ]]; then OV["$1"]=$2; else unset 'OV[$1]'; fi
-}
-
-OV_ORDER=(
+OVERRIDE_KEY_ORDER=(
   global.namePrefix global.storageClass global.imageRegistry global.imagePullSecrets
   global.podAntiAffinity global.tls.mode global.tls.certManager.issuerName
   global.tls.certManager.issuerKind
@@ -576,31 +275,6 @@ OV_ORDER=(
   s3.rustfs.allowSharedDisks s3.rgw.storageClass
   observability.otlpEndpoint observability.headers observability.tls.insecureSkipVerify observability.tls.ca
 )
-
-# Writes OV[] as nested YAML (keys in OV_ORDER, which keeps siblings together).
-emit_overrides() {
-  local -a prev=() parts=()
-  local path val i j depth ind first=true
-  for path in "${OV_ORDER[@]}"; do
-    [[ -n "${OV[$path]+x}" ]] || continue
-    val=${OV[$path]}
-    IFS=. read -r -a parts <<<"$path"
-    i=0
-    while (( i < ${#parts[@]} - 1 && i < ${#prev[@]} - 1 )) && [[ "${parts[i]}" == "${prev[i]}" ]]; do i=$((i + 1)); done
-    if (( i == 0 )) && ! $first; then printf '\n'; fi
-    first=false
-    for ((j = i; j < ${#parts[@]} - 1; j++)); do printf '%*s%s:\n' $((j * 2)) '' "${parts[j]}"; done
-    depth=$(( (${#parts[@]} - 1) * 2 ))
-    if [[ "$val" == "|"$'\n'* ]]; then          # block scalar (multi-line text)
-      printf '%*s%s: |\n' "$depth" '' "${parts[${#parts[@]} - 1]}"
-      ind=$((depth + 2))
-      while IFS= read -r j; do printf '%*s%s\n' "$ind" '' "$j"; done <<<"${val#|$'\n'}"
-    else
-      printf '%*s%s: %s\n' "$depth" '' "${parts[${#parts[@]} - 1]}" "$val"
-    fi
-    prev=("${parts[@]}")
-  done
-}
 
 write_generated() {
   local file=$1
@@ -616,7 +290,7 @@ write_generated() {
       printf '# Only the settings that differ from values.yaml are listed here.\n'
       printf '# Re-run the same installation with:\n#   ./install.sh -n %s -f %s\n' "$NAMESPACE" "$file"
       printf '# Keep this file private if it contains an observability token.\n\n'
-      if ((${#OV[@]} == 0)); then printf '{}\n'; else emit_overrides; fi
+      if ((${#VALUE_OVERRIDES[@]} == 0)); then printf '{}\n'; else emit_overrides; fi
     } >"$file"
   )
   ok "Answers saved to $file"
@@ -628,9 +302,9 @@ wizard_components() {
   local c ans any=false
   while true; do
     for c in "${COMPONENTS[@]}"; do
-      local def=y; [[ "${V[$c.enabled]}" == false ]] && def=n
+      local def=y; [[ "${EFFECTIVE_VALUES[$c.enabled]}" == false ]] && def=n
       ask_yn ans "Install $(component_title "$c")?" "$def"
-      W[$c.enabled]=$ans
+      WIZARD_ANSWERS[$c.enabled]=$ans
       $ans && any=true
     done
     $any && break
@@ -644,88 +318,64 @@ wizard_tls() {
   local -a opts=("auto|generated automatically, signed by one CA created now (recommended)"
                  "existing|you already created Secrets with tls.crt, tls.key and ca.crt")
   $HAS_CERT_MANAGER && opts+=("certManager|issued by cert-manager (installed in this cluster)")
-  local def=${V[global.tls.mode]}
+  local def=${EFFECTIVE_VALUES[global.tls.mode]}
   [[ "$def" == certManager ]] && ! $HAS_CERT_MANAGER && def=auto
-  ask_choice "W[global.tls.mode]" "Certificate mode" "$def" "${opts[@]}"
-  case "${W[global.tls.mode]}" in
+  ask_choice "WIZARD_ANSWERS[global.tls.mode]" "Certificate mode" "$def" "${opts[@]}"
+  case "${WIZARD_ANSWERS[global.tls.mode]}" in
     auto)
-      note "A CA Secret '${V[global.namePrefix]}-ca' is created (RSA 4096, valid 10 years) if it does not exist."
+      note "A CA Secret '${EFFECTIVE_VALUES[global.namePrefix]}-ca' is created (RSA 4096, valid 10 years) if it does not exist."
       note "install.sh saves its certificate as <component>-ca.crt for the CM MES installer." ;;
     existing)
       note "Each Secret must have tls.crt, tls.key and ca.crt, and the certificate must be valid for the"
       note "service names (<prefix>-<component>.$NAMESPACE.svc and *.<prefix>-<component>-headless...)."
-      if [[ "${W[kafka.enabled]}" == true ]]; then
+      if [[ "${WIZARD_ANSWERS[kafka.enabled]}" == true ]]; then
         ask_existing_secret kafka.tls.existingSecret "Kafka server certificate Secret"
         ask_existing_secret kafka.tls.existingClientSecret "Kafka client (CM MES, CN=mes) certificate Secret"
       fi
-      [[ "${W[clickhouse.enabled]}" == true ]] && ask_existing_secret clickhouse.tls.existingSecret "ClickHouse server certificate Secret"
+      [[ "${WIZARD_ANSWERS[clickhouse.enabled]}" == true ]] && ask_existing_secret clickhouse.tls.existingSecret "ClickHouse server certificate Secret"
       true ;;
     certManager)
       while true; do
-        ask "W[global.tls.certManager.issuerName]" "cert-manager issuer name" "${V[global.tls.certManager.issuerName]:-}"
-        [[ -n "${W[global.tls.certManager.issuerName]}" ]] && break
+        ask "WIZARD_ANSWERS[global.tls.certManager.issuerName]" "cert-manager issuer name" "${EFFECTIVE_VALUES[global.tls.certManager.issuerName]:-}"
+        [[ -n "${WIZARD_ANSWERS[global.tls.certManager.issuerName]}" ]] && break
         warn "The issuer name is required."
       done
-      ask_choice "W[global.tls.certManager.issuerKind]" "Issuer kind" "${V[global.tls.certManager.issuerKind]:-ClusterIssuer}" \
+      ask_choice "WIZARD_ANSWERS[global.tls.certManager.issuerKind]" "Issuer kind" "${EFFECTIVE_VALUES[global.tls.certManager.issuerKind]:-ClusterIssuer}" \
         "ClusterIssuer|cluster-wide issuer" "Issuer|issuer in namespace $NAMESPACE"
-      local kind=${W[global.tls.certManager.issuerKind],,}
-      if $CLUSTER_OK && ! kcn get "$kind.cert-manager.io" "${W[global.tls.certManager.issuerName]}" >/dev/null 2>&1; then
-        warn "Could not find $kind '${W[global.tls.certManager.issuerName]}' (or no permission to read it). Check the name."
+      local kind=${WIZARD_ANSWERS[global.tls.certManager.issuerKind],,}
+      if $CLUSTER_OK && ! kcn get "$kind.cert-manager.io" "${WIZARD_ANSWERS[global.tls.certManager.issuerName]}" >/dev/null 2>&1; then
+        warn "Could not find $kind '${WIZARD_ANSWERS[global.tls.certManager.issuerName]}' (or no permission to read it). Check the name."
       fi ;;
   esac
 }
 
-# ask_existing_secret <values path> <label>
-ask_existing_secret() {
-  local path=$1 label=$2 name
-  while true; do
-    ask name "$label" "${V[$path]:-}"
-    if is_secret_name "$name"; then break; fi
-    warn "Type the name of a Secret in namespace $NAMESPACE."
-  done
-  W[$path]=$name
-  check_tls_secret "$name"
-}
-
-check_tls_secret() {
-  $CLUSTER_OK || return 0
-  local keys
-  if ! keys="$(kcn get secret "$1" -o 'jsonpath={.data}' 2>/dev/null)"; then
-    warn "Secret '$1' was not found in namespace $NAMESPACE. Create it before the installation starts."
-    return 0
-  fi
-  local k
-  for k in tls.crt tls.key ca.crt; do
-    [[ "$keys" == *"\"$k\""* ]] || warn "Secret '$1' has no '$k' key."
-  done
-}
 
 wizard_s3() {
-  [[ "${W[s3.enabled]}" == true ]] || return 0
+  [[ "${WIZARD_ANSWERS[s3.enabled]}" == true ]] || return 0
   heading "Step 5/8 - S3 storage"
   if $HAS_OBC && ((${#RGW_CLASSES[@]} > 0)); then
     note "A Ceph RGW object store was found in this cluster. You can use it instead of installing RustFS."
-    ask_choice "W[s3.provider]" "S3 provider" "${V[s3.provider]}" \
-      "rustfs|install RustFS here, distributed over ${V[s3.rustfs.replicas]:-3} pods (recommended)" \
+    ask_choice "WIZARD_ANSWERS[s3.provider]" "S3 provider" "${EFFECTIVE_VALUES[s3.provider]}" \
+      "rustfs|install RustFS here, distributed over ${EFFECTIVE_VALUES[s3.rustfs.replicas]:-3} pods (recommended)" \
       "rgw|use the existing Ceph RGW (a bucket is requested with an ObjectBucketClaim)"
   else
-    note "RustFS (S3 compatible) is installed, distributed over ${V[s3.rustfs.replicas]:-3} pods."
-    [[ "${V[s3.provider]}" == rgw ]] && warn "s3.provider=rgw in values.yaml, but no Ceph RGW bucket StorageClass was found: using RustFS."
-    W[s3.provider]=rustfs
+    note "RustFS (S3 compatible) is installed, distributed over ${EFFECTIVE_VALUES[s3.rustfs.replicas]:-3} pods."
+    [[ "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]] && warn "s3.provider=rgw in values.yaml, but no Ceph RGW bucket StorageClass was found: using RustFS."
+    WIZARD_ANSWERS[s3.provider]=rustfs
   fi
-  if [[ "${W[s3.provider]}" == rgw ]]; then
+  if [[ "${WIZARD_ANSWERS[s3.provider]}" == rgw ]]; then
     local -a opts=() s
     local def=${RGW_CLASSES[0]}
-    for s in "${RGW_CLASSES[@]}"; do opts+=("$s|"); [[ "$s" == "${V[s3.rgw.storageClass]:-}" ]] && def=$s; done
-    ask_choice "W[s3.rgw.storageClass]" "Bucket StorageClass" "$def" "${opts[@]}"
-  elif [[ "${W[global.tls.mode]}" == existing ]]; then
+    for s in "${RGW_CLASSES[@]}"; do opts+=("$s|"); [[ "$s" == "${EFFECTIVE_VALUES[s3.rgw.storageClass]:-}" ]] && def=$s; done
+    ask_choice "WIZARD_ANSWERS[s3.rgw.storageClass]" "Bucket StorageClass" "$def" "${opts[@]}"
+  elif [[ "${WIZARD_ANSWERS[global.tls.mode]}" == existing ]]; then
     ask_existing_secret s3.rustfs.tls.existingSecret "RustFS server certificate Secret"
   fi
 }
 
 # Provisioner of a StorageClass ("" = cluster default). Empty when unknown.
 sc_provisioner() {
-  local want=${1:-$DEFAULT_SC} s name prov isdef
+  local want=${1:-$DEFAULT_STORAGE_CLASS} s name prov isdef
   for s in ${STORAGE_CLASSES[@]+"${STORAGE_CLASSES[@]}"}; do
     IFS='|' read -r name prov isdef <<<"$s"
     [[ "$name" == "$want" ]] && { printf '%s' "$prov"; return 0; }
@@ -744,21 +394,21 @@ is_shared_disk_provisioner() {
 
 # StorageClass used by the RustFS volumes (component value, else global).
 rustfs_storage_class() {
-  local sc=${1-${V[s3.rustfs.storage.storageClass]:-}}
-  [[ -n "$sc" ]] || sc=${2-${V[global.storageClass]:-}}
+  local sc=${1-${EFFECTIVE_VALUES[s3.rustfs.storage.storageClass]:-}}
+  [[ -n "$sc" ]] || sc=${2-${EFFECTIVE_VALUES[global.storageClass]:-}}
   printf '%s' "$sc"
 }
 
 wizard_rustfs_disks() {
   local sc prov choice
-  W[s3.rustfs.storage.storageClass]=${V[s3.rustfs.storage.storageClass]:-}
-  W[s3.rustfs.allowSharedDisks]=${V[s3.rustfs.allowSharedDisks]:-false}
+  WIZARD_ANSWERS[s3.rustfs.storage.storageClass]=${EFFECTIVE_VALUES[s3.rustfs.storage.storageClass]:-}
+  WIZARD_ANSWERS[s3.rustfs.allowSharedDisks]=${EFFECTIVE_VALUES[s3.rustfs.allowSharedDisks]:-false}
   while true; do
-    sc="$(rustfs_storage_class "${W[s3.rustfs.storage.storageClass]}" "${W[global.storageClass]}")"
+    sc="$(rustfs_storage_class "${WIZARD_ANSWERS[s3.rustfs.storage.storageClass]}" "${WIZARD_ANSWERS[global.storageClass]}")"
     prov="$(sc_provisioner "$sc")"
     if [[ -z "$prov" ]] || ! is_shared_disk_provisioner "$prov"; then return 0; fi
-    [[ "${W[s3.rustfs.allowSharedDisks]}" == true ]] && return 0
-    warn "StorageClass '${sc:-$DEFAULT_SC}' ($prov) usually puts both RustFS volumes of a pod on the"
+    [[ "${WIZARD_ANSWERS[s3.rustfs.allowSharedDisks]}" == true ]] && return 0
+    warn "StorageClass '${sc:-$DEFAULT_STORAGE_CLASS}' ($prov) usually puts both RustFS volumes of a pod on the"
     warn "same disk. RustFS refuses that: one disk failure would lose several drives at once."
     note "Use block storage that gives every volume its own disk: Ceph RBD, cloud disks (EBS, Azure Disk,"
     note "GCE PD), vSphere, Longhorn..."
@@ -766,13 +416,13 @@ wizard_rustfs_disks() {
     ((${#STORAGE_CLASSES[@]} > 1)) && opts+=("other|choose another StorageClass for RustFS only")
     opts+=("allow|allow shared disks anyway (s3.rustfs.allowSharedDisks=true; NOT for production)")
     ask_choice choice "What do you want to do?" "${opts[0]%%|*}" "${opts[@]}"
-    if [[ "$choice" == allow ]]; then W[s3.rustfs.allowSharedDisks]=true; return 0; fi
+    if [[ "$choice" == allow ]]; then WIZARD_ANSWERS[s3.rustfs.allowSharedDisks]=true; return 0; fi
     local -a scs=() s name prov2 isdef
     for s in "${STORAGE_CLASSES[@]}"; do
       IFS='|' read -r name prov2 isdef <<<"$s"
       scs+=("$name|$prov2")
     done
-    ask_choice "W[s3.rustfs.storage.storageClass]" "StorageClass for the RustFS volumes" "${scs[0]%%|*}" "${scs[@]}"
+    ask_choice "WIZARD_ANSWERS[s3.rustfs.storage.storageClass]" "StorageClass for the RustFS volumes" "${scs[0]%%|*}" "${scs[@]}"
   done
 }
 
@@ -781,81 +431,58 @@ wizard_storage() {
   local -a opts=() s
   local def="" name prov isdef
   if ((${#STORAGE_CLASSES[@]} > 0)); then
-    [[ -n "$DEFAULT_SC" ]] && opts+=("|cluster default ($DEFAULT_SC)")
+    [[ -n "$DEFAULT_STORAGE_CLASS" ]] && opts+=("|cluster default ($DEFAULT_STORAGE_CLASS)")
     for s in "${STORAGE_CLASSES[@]}"; do
       IFS='|' read -r name prov isdef <<<"$s"
       if [[ "$isdef" == true ]]; then opts+=("$name|$prov (default)"); else opts+=("$name|$prov"); fi
     done
-    def=${V[global.storageClass]:-}
-    [[ -z "$def" && -z "$DEFAULT_SC" ]] && def=${STORAGE_CLASSES[0]%%|*}
+    def=${EFFECTIVE_VALUES[global.storageClass]:-}
+    [[ -z "$def" && -z "$DEFAULT_STORAGE_CLASS" ]] && def=${STORAGE_CLASSES[0]%%|*}
     note "Data volumes need a StorageClass with ReadWriteOnce volumes, ideally block storage"
     note "(Ceph RBD, cloud disks, vSphere...). NFS and CephFS are not recommended for databases."
-    ask_choice "W[global.storageClass]" "StorageClass for the data volumes" "$def" "${opts[@]}"
+    ask_choice "WIZARD_ANSWERS[global.storageClass]" "StorageClass for the data volumes" "$def" "${opts[@]}"
   else
-    ask "W[global.storageClass]" "StorageClass for the data volumes (empty = cluster default)" "${V[global.storageClass]:-}"
+    ask "WIZARD_ANSWERS[global.storageClass]" "StorageClass for the data volumes (empty = cluster default)" "${EFFECTIVE_VALUES[global.storageClass]:-}"
   fi
 
-  if [[ "${W[s3.enabled]}" == true && "${W[s3.provider]}" == rustfs ]]; then wizard_rustfs_disks; fi
+  if [[ "${WIZARD_ANSWERS[s3.enabled]}" == true && "${WIZARD_ANSWERS[s3.provider]}" == rustfs ]]; then wizard_rustfs_disks; fi
 
   note "Size of each data volume (e.g. 50Gi, 1Ti). It can be increased later (never decreased)"
   note "when the StorageClass allows expansion; use --resize-storage for existing volumes."
-  [[ "${W[kafka.enabled]}" == true ]] && ask_size kafka.storage.size "Kafka, per broker (x${V[kafka.replicas]:-3})" kafka data
-  if [[ "${W[clickhouse.enabled]}" == true ]]; then
-    ask_size clickhouse.storage.size "ClickHouse, per server (x${V[clickhouse.replicas]:-2})" clickhouse data
-    ask_size clickhouse.keeper.storage.size "ClickHouse Keeper, per server (x${V[clickhouse.keeper.replicas]:-3})" keeper data
+  [[ "${WIZARD_ANSWERS[kafka.enabled]}" == true ]] && ask_size kafka.storage.size "Kafka, per broker (x${EFFECTIVE_VALUES[kafka.replicas]:-3})" kafka data
+  if [[ "${WIZARD_ANSWERS[clickhouse.enabled]}" == true ]]; then
+    ask_size clickhouse.storage.size "ClickHouse, per server (x${EFFECTIVE_VALUES[clickhouse.replicas]:-2})" clickhouse data
+    ask_size clickhouse.keeper.storage.size "ClickHouse Keeper, per server (x${EFFECTIVE_VALUES[clickhouse.keeper.replicas]:-3})" keeper data
   fi
-  if [[ "${W[s3.enabled]}" == true && "${W[s3.provider]}" == rustfs ]]; then
-    ask_size s3.rustfs.storage.size "RustFS, per volume (x${V[s3.rustfs.replicas]:-3} pods x ${V[s3.rustfs.volumesPerPod]:-2} volumes)" s3 data-0
+  if [[ "${WIZARD_ANSWERS[s3.enabled]}" == true && "${WIZARD_ANSWERS[s3.provider]}" == rustfs ]]; then
+    ask_size s3.rustfs.storage.size "RustFS, per volume (x${EFFECTIVE_VALUES[s3.rustfs.replicas]:-3} pods x ${EFFECTIVE_VALUES[s3.rustfs.volumesPerPod]:-2} volumes)" s3 data-0
   fi
 
-  W[global.podAntiAffinity]=${V[global.podAntiAffinity]}
+  WIZARD_ANSWERS[global.podAntiAffinity]=${EFFECTIVE_VALUES[global.podAntiAffinity]}
   if [[ "$NODE_COUNT" != unknown ]] && (( NODE_COUNT < 3 )); then
     local soft
     warn "This cluster has fewer than 3 schedulable nodes."
     ask_yn soft "Allow several pods of a component on the same node (NOT highly available; test only)?" n
-    $soft && W[global.podAntiAffinity]=soft
+    $soft && WIZARD_ANSWERS[global.podAntiAffinity]=soft
   fi
 
   local private
   note "Air-gapped clusters pull the images from a private registry that mirrors them."
-  ask_yn private "Use a private image registry?" "$([[ -n "${V[global.imageRegistry]:-}" ]] && echo y || echo n)"
+  ask_yn private "Use a private image registry?" "$([[ -n "${EFFECTIVE_VALUES[global.imageRegistry]:-}" ]] && echo y || echo n)"
   if $private; then
     local reg
     while true; do
-      ask reg "Registry and path (e.g. registry.example.com/mirror)" "${V[global.imageRegistry]:-}"
+      ask reg "Registry and path (e.g. registry.example.com/mirror)" "${EFFECTIVE_VALUES[global.imageRegistry]:-}"
       reg=${reg#http://}; reg=${reg#https://}; reg=${reg%/}
       [[ -n "$reg" && "$reg" != *" "* ]] && break
       warn "Type the registry host, optionally with a path."
     done
-    W[global.imageRegistry]=$reg
-    ask "W[global.imagePullSecrets]" "Image pull Secret name (empty = none)" "${V[global.imagePullSecrets]%%,*}"
+    WIZARD_ANSWERS[global.imageRegistry]=$reg
+    ask "WIZARD_ANSWERS[global.imagePullSecrets]" "Image pull Secret name (empty = none)" "${EFFECTIVE_VALUES[global.imagePullSecrets]%%,*}"
   else
-    W[global.imageRegistry]=""
-    W[global.imagePullSecrets]=""
+    WIZARD_ANSWERS[global.imageRegistry]=""
+    WIZARD_ANSWERS[global.imagePullSecrets]=""
   fi
-}
-
-# Size of volume <vct> in the live StatefulSet <prefix>-<name> ("" when not installed).
-live_volume_size() {
-  kcn get statefulset "${V[global.namePrefix]}-$1" \
-    -o "jsonpath={.spec.volumeClaimTemplates[?(@.metadata.name==\"$2\")].spec.resources.requests.storage}" 2>/dev/null | tr -d '\r' || true
-}
-
-# ask_size <values path> <label> [<statefulset name> <volume>]: the default is the size
-# of the existing installation, so that pressing Enter never resizes a volume.
-ask_size() {
-  local path=$1 label=$2 val def=${V[$1]:-} live=""
-  [[ -n "${3:-}" ]] && live="$(live_volume_size "$3" "$4")"
-  if [[ -n "$live" ]]; then
-    def=$live
-    label="$label, currently $live"
-  fi
-  while true; do
-    ask val "$label" "$def"
-    is_size "$val" && break
-    warn "Use a number followed by Mi, Gi or Ti, e.g. 100Gi."
-  done
-  W[$path]=$val
 }
 
 wizard_observability() {
@@ -864,26 +491,26 @@ wizard_observability() {
   note "endpoint, for example the CM Observability service. Leave empty to skip."
   local ep
   while true; do
-    ask ep "OTLP/HTTP endpoint (e.g. https://otlp.example.com:4318)" "${V[observability.otlpEndpoint]:-}"
+    ask ep "OTLP/HTTP endpoint (e.g. https://otlp.example.com:4318)" "${EFFECTIVE_VALUES[observability.otlpEndpoint]:-}"
     [[ -z "$ep" || "$ep" =~ ^https?://[^[:space:]]+$ ]] && break
     warn "The endpoint must start with https:// (or http://)."
   done
-  W[observability.otlpEndpoint]=$ep
-  W[observability.headers]=""
-  W[observability.tls.ca]=""
-  W[observability.tls.insecureSkipVerify]=${V[observability.tls.insecureSkipVerify]:-false}
+  WIZARD_ANSWERS[observability.otlpEndpoint]=$ep
+  WIZARD_ANSWERS[observability.headers]=""
+  WIZARD_ANSWERS[observability.tls.ca]=""
+  WIZARD_ANSWERS[observability.tls.insecureSkipVerify]=${EFFECTIVE_VALUES[observability.tls.insecureSkipVerify]:-false}
   if [[ -z "$ep" ]]; then
     warn "No monitoring will be installed. Without it, problems in Kafka, ClickHouse or S3 are"
     warn "only noticed when CM MES fails. We recommend CM Observability: $CM_OBSERVABILITY_URL"
     return 0
   fi
-  local auth hname hvalue old_headers=${V[observability.headers]:-}
+  local auth hname hvalue old_headers=${EFFECTIVE_VALUES[observability.headers]:-}
   ask_yn auth "Does the endpoint need an authentication header (e.g. an API token)?" "$([[ -n "$old_headers" ]] && echo y || echo n)"
   if $auth; then
     if [[ -n "$old_headers" ]]; then
       local keep
       ask_yn keep "Keep the current header(s) ($old_headers)?" y
-      if $keep; then W[observability.headers]=${V[observability.headers@json]}; auth=false; fi
+      if $keep; then WIZARD_ANSWERS[observability.headers]=${EFFECTIVE_VALUES[observability.headers@json]}; auth=false; fi
     fi
   fi
   if $auth; then
@@ -894,27 +521,27 @@ wizard_observability() {
       [[ -n "$hvalue" ]] && break
       warn "The value cannot be empty."
     done
-    W[observability.headers]="{$(yaml_str "$hname"): $(yaml_str "$hvalue")}"
+    WIZARD_ANSWERS[observability.headers]="{$(yaml_str "$hname"): $(yaml_str "$hvalue")}"
   fi
   if [[ "$ep" == https://* ]]; then
-    local caf old_ca=${V[observability.tls.ca]:-}
+    local caf old_ca=${EFFECTIVE_VALUES[observability.tls.ca]:-}
     while true; do
       if [[ -n "$old_ca" ]]; then
         ask caf "File with the endpoint's CA certificate (PEM; Enter = keep the current one, '-' = none)" ""
-        if [[ -z "$caf" ]]; then W[observability.tls.ca]=${V[observability.tls.ca@json]}; break; fi
-        [[ "$caf" == - ]] && { W[observability.tls.ca]='""'; break; }
+        if [[ -z "$caf" ]]; then WIZARD_ANSWERS[observability.tls.ca]=${EFFECTIVE_VALUES[observability.tls.ca@json]}; break; fi
+        [[ "$caf" == - ]] && { WIZARD_ANSWERS[observability.tls.ca]='""'; break; }
       else
         ask caf "File with the endpoint's CA certificate (PEM; empty = public CAs)" ""
         [[ -z "$caf" ]] && break
       fi
       if [[ -f "$caf" ]] && grep -q 'BEGIN CERTIFICATE' "$caf"; then
-        W[observability.tls.ca]="|"$'\n'"$(tr -d '\r' <"$caf")"; break
+        WIZARD_ANSWERS[observability.tls.ca]="|"$'\n'"$(tr -d '\r' <"$caf")"; break
       fi
       warn "'$caf' is not a readable PEM certificate file."
     done
     local skip
-    ask_yn skip "Skip the endpoint certificate validation (testing only)?" "$([[ "${W[observability.tls.insecureSkipVerify]}" == true ]] && echo y || echo n)"
-    W[observability.tls.insecureSkipVerify]=$skip
+    ask_yn skip "Skip the endpoint certificate validation (testing only)?" "$([[ "${WIZARD_ANSWERS[observability.tls.insecureSkipVerify]}" == true ]] && echo y || echo n)"
+    WIZARD_ANSWERS[observability.tls.insecureSkipVerify]=$skip
   fi
 }
 
@@ -926,31 +553,31 @@ run_wizard() {
   wizard_observability
 
   # Translate the answers into overrides of values.yaml.
-  OV=()
+  VALUE_OVERRIDES=()
   local c
-  for c in "${COMPONENTS[@]}"; do set_ov "$c.enabled" "${W[$c.enabled]}" "${W[$c.enabled]}"; done
-  set_ov global.tls.mode "$(yaml_str "${W[global.tls.mode]}")" "${W[global.tls.mode]}"
-  if [[ "${W[global.tls.mode]}" == certManager ]]; then
-    set_ov global.tls.certManager.issuerName "$(yaml_str "${W[global.tls.certManager.issuerName]}")" "${W[global.tls.certManager.issuerName]}"
-    set_ov global.tls.certManager.issuerKind "$(yaml_str "${W[global.tls.certManager.issuerKind]}")" "${W[global.tls.certManager.issuerKind]}"
+  for c in "${COMPONENTS[@]}"; do set_ov "$c.enabled" "${WIZARD_ANSWERS[$c.enabled]}" "${WIZARD_ANSWERS[$c.enabled]}"; done
+  set_ov global.tls.mode "$(yaml_str "${WIZARD_ANSWERS[global.tls.mode]}")" "${WIZARD_ANSWERS[global.tls.mode]}"
+  if [[ "${WIZARD_ANSWERS[global.tls.mode]}" == certManager ]]; then
+    set_ov global.tls.certManager.issuerName "$(yaml_str "${WIZARD_ANSWERS[global.tls.certManager.issuerName]}")" "${WIZARD_ANSWERS[global.tls.certManager.issuerName]}"
+    set_ov global.tls.certManager.issuerKind "$(yaml_str "${WIZARD_ANSWERS[global.tls.certManager.issuerKind]}")" "${WIZARD_ANSWERS[global.tls.certManager.issuerKind]}"
   fi
   local p
   for p in kafka.tls.existingSecret kafka.tls.existingClientSecret clickhouse.tls.existingSecret s3.rustfs.tls.existingSecret \
            s3.provider s3.rgw.storageClass kafka.storage.size clickhouse.storage.size \
            clickhouse.keeper.storage.size s3.rustfs.storage.size global.podAntiAffinity global.storageClass \
            s3.rustfs.storage.storageClass global.imageRegistry observability.otlpEndpoint; do
-    [[ -n "${W[$p]+x}" ]] && set_ov "$p" "$(yaml_str "${W[$p]}")" "${W[$p]}"
+    [[ -n "${WIZARD_ANSWERS[$p]+x}" ]] && set_ov "$p" "$(yaml_str "${WIZARD_ANSWERS[$p]}")" "${WIZARD_ANSWERS[$p]}"
   done
-  if [[ -n "${W[global.imagePullSecrets]:-}" ]]; then
-    set_ov global.imagePullSecrets "[$(yaml_str "${W[global.imagePullSecrets]}")]" "${W[global.imagePullSecrets]}"
-  elif [[ -n "${B[global.imagePullSecrets]:-}" && "${W[global.imageRegistry]:-}" == "" ]]; then
-    OV[global.imagePullSecrets]="[]"
+  if [[ -n "${WIZARD_ANSWERS[global.imagePullSecrets]:-}" ]]; then
+    set_ov global.imagePullSecrets "[$(yaml_str "${WIZARD_ANSWERS[global.imagePullSecrets]}")]" "${WIZARD_ANSWERS[global.imagePullSecrets]}"
+  elif [[ -n "${BASE_VALUES[global.imagePullSecrets]:-}" && "${WIZARD_ANSWERS[global.imageRegistry]:-}" == "" ]]; then
+    VALUE_OVERRIDES[global.imagePullSecrets]="[]"
   fi
-  [[ -n "${W[observability.headers]}" ]] && OV[observability.headers]=${W[observability.headers]}
-  [[ -n "${W[observability.tls.ca]}" ]] && OV[observability.tls.ca]=${W[observability.tls.ca]}
-  set_ov observability.tls.insecureSkipVerify "${W[observability.tls.insecureSkipVerify]}" "${W[observability.tls.insecureSkipVerify]}"
-  if [[ -n "${W[s3.rustfs.allowSharedDisks]+x}" ]]; then
-    set_ov s3.rustfs.allowSharedDisks "${W[s3.rustfs.allowSharedDisks]}" "${W[s3.rustfs.allowSharedDisks]}"
+  [[ -n "${WIZARD_ANSWERS[observability.headers]}" ]] && VALUE_OVERRIDES[observability.headers]=${WIZARD_ANSWERS[observability.headers]}
+  [[ -n "${WIZARD_ANSWERS[observability.tls.ca]}" ]] && VALUE_OVERRIDES[observability.tls.ca]=${WIZARD_ANSWERS[observability.tls.ca]}
+  set_ov observability.tls.insecureSkipVerify "${WIZARD_ANSWERS[observability.tls.insecureSkipVerify]}" "${WIZARD_ANSWERS[observability.tls.insecureSkipVerify]}"
+  if [[ -n "${WIZARD_ANSWERS[s3.rustfs.allowSharedDisks]+x}" ]]; then
+    set_ov s3.rustfs.allowSharedDisks "${WIZARD_ANSWERS[s3.rustfs.allowSharedDisks]}" "${WIZARD_ANSWERS[s3.rustfs.allowSharedDisks]}"
   fi
 }
 
@@ -959,31 +586,31 @@ run_wizard() {
 # ----------------------------------------------------------------------------
 show_summary() {
   $INTERACTIVE || heading "Summary"
-  local p=${V[global.namePrefix]} sc=${V[global.storageClass]:-}
-  [[ -n "$sc" ]] || sc="cluster default${DEFAULT_SC:+ ($DEFAULT_SC)}"
-  printf '  %-22s %s\n' "Namespace:" "$NAMESPACE" "Name prefix:" "$p" "TLS certificates:" "${V[global.tls.mode]}"
+  local p=${EFFECTIVE_VALUES[global.namePrefix]} sc=${EFFECTIVE_VALUES[global.storageClass]:-}
+  [[ -n "$sc" ]] || sc="cluster default${DEFAULT_STORAGE_CLASS:+ ($DEFAULT_STORAGE_CLASS)}"
+  printf '  %-22s %s\n' "Namespace:" "$NAMESPACE" "Name prefix:" "$p" "TLS certificates:" "${EFFECTIVE_VALUES[global.tls.mode]}"
   if enabled kafka; then
-    printf '  %-22s %s\n' "Kafka:" "${V[kafka.replicas]:-3} brokers, ${V[kafka.storage.size]:-?} each, CM MES logs in with a client certificate (release $p-kafka)"
+    printf '  %-22s %s\n' "Kafka:" "${EFFECTIVE_VALUES[kafka.replicas]:-3} brokers, ${EFFECTIVE_VALUES[kafka.storage.size]:-?} each, CM MES logs in with a client certificate (release $p-kafka)"
   else printf '  %-22s %s\n' "Kafka:" "not installed"; fi
   if enabled clickhouse; then
     local lb="failover load balancer"
-    [[ "${V[clickhouse.loadBalancer.enabled]:-true}" == false ]] && lb="no load balancer (sticky Service)"
-    printf '  %-22s %s\n' "ClickHouse:" "${V[clickhouse.replicas]:-2} servers x ${V[clickhouse.storage.size]:-?}, ${V[clickhouse.keeper.replicas]:-3} keepers x ${V[clickhouse.keeper.storage.size]:-?}, $lb (release $p-clickhouse)"
+    [[ "${EFFECTIVE_VALUES[clickhouse.loadBalancer.enabled]:-true}" == false ]] && lb="no load balancer (sticky Service)"
+    printf '  %-22s %s\n' "ClickHouse:" "${EFFECTIVE_VALUES[clickhouse.replicas]:-2} servers x ${EFFECTIVE_VALUES[clickhouse.storage.size]:-?}, ${EFFECTIVE_VALUES[clickhouse.keeper.replicas]:-3} keepers x ${EFFECTIVE_VALUES[clickhouse.keeper.storage.size]:-?}, $lb (release $p-clickhouse)"
   else printf '  %-22s %s\n' "ClickHouse:" "not installed"; fi
   if enabled s3; then
-    if [[ "${V[s3.provider]}" == rgw ]]; then
-      printf '  %-22s %s\n' "S3:" "Ceph RGW bucket (StorageClass ${V[s3.rgw.storageClass]:-?}) (release $p-s3)"
+    if [[ "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]]; then
+      printf '  %-22s %s\n' "S3:" "Ceph RGW bucket (StorageClass ${EFFECTIVE_VALUES[s3.rgw.storageClass]:-?}) (release $p-s3)"
     else
-      printf '  %-22s %s\n' "S3:" "RustFS, ${V[s3.rustfs.replicas]:-3} pods x ${V[s3.rustfs.volumesPerPod]:-2} volumes x ${V[s3.rustfs.storage.size]:-?} (release $p-s3)"
+      printf '  %-22s %s\n' "S3:" "RustFS, ${EFFECTIVE_VALUES[s3.rustfs.replicas]:-3} pods x ${EFFECTIVE_VALUES[s3.rustfs.volumesPerPod]:-2} volumes x ${EFFECTIVE_VALUES[s3.rustfs.storage.size]:-?} (release $p-s3)"
     fi
   else printf '  %-22s %s\n' "S3:" "not installed"; fi
   if otel_enabled; then
-    printf '  %-22s %s\n' "Monitoring:" "OpenTelemetry collector -> ${V[observability.otlpEndpoint]} (release $p-otel)"
+    printf '  %-22s %s\n' "Monitoring:" "OpenTelemetry collector -> ${EFFECTIVE_VALUES[observability.otlpEndpoint]} (release $p-otel)"
   else
     printf '  %-22s %s\n' "Monitoring:" "none"
   fi
-  printf '  %-22s %s\n' "StorageClass:" "$sc" "Pod spreading:" "${V[global.podAntiAffinity]}"
-  [[ -n "${V[global.imageRegistry]:-}" ]] && printf '  %-22s %s\n' "Image registry:" "${V[global.imageRegistry]} (pull Secret: ${V[global.imagePullSecrets]:-none})"
+  printf '  %-22s %s\n' "StorageClass:" "$sc" "Pod spreading:" "${EFFECTIVE_VALUES[global.podAntiAffinity]}"
+  [[ -n "${EFFECTIVE_VALUES[global.imageRegistry]:-}" ]] && printf '  %-22s %s\n' "Image registry:" "${EFFECTIVE_VALUES[global.imageRegistry]} (pull Secret: ${EFFECTIVE_VALUES[global.imagePullSecrets]:-none})"
   local shown=$VALUES_DISPLAY f
   if [[ -z "$shown" ]]; then
     for f in "${VALUES_FILES[@]}"; do
@@ -999,45 +626,45 @@ show_summary() {
 # Warnings that need the cluster facts, for both the wizard and -f mode.
 preflight_checks() {
   $CLUSTER_OK || return 0
-  [[ "${V[global.tls.mode]}" == certManager ]] && require_can_i create certificates.cert-manager.io
-  if enabled s3 && [[ "${V[s3.provider]}" == rgw ]]; then require_can_i create objectbucketclaims.objectbucket.io; fi
-  if enabled s3 && [[ "${V[s3.provider]}" == rustfs && "${V[s3.rustfs.allowSharedDisks]:-false}" != true ]]; then
+  [[ "${EFFECTIVE_VALUES[global.tls.mode]}" == certManager ]] && require_can_i create certificates.cert-manager.io
+  if enabled s3 && [[ "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]]; then require_can_i create objectbucketclaims.objectbucket.io; fi
+  if enabled s3 && [[ "${EFFECTIVE_VALUES[s3.provider]}" == rustfs && "${EFFECTIVE_VALUES[s3.rustfs.allowSharedDisks]:-false}" != true ]]; then
     local rsc rprov
     rsc="$(rustfs_storage_class)"; rprov="$(sc_provisioner "$rsc")"
     if [[ -n "$rprov" ]] && is_shared_disk_provisioner "$rprov"; then
-      warn "RustFS StorageClass '${rsc:-$DEFAULT_SC}' ($rprov) usually puts both volumes of a pod on one disk:"
+      warn "RustFS StorageClass '${rsc:-$DEFAULT_STORAGE_CLASS}' ($rprov) usually puts both volumes of a pod on one disk:"
       warn "RustFS will refuse to start. Use block storage (s3.rustfs.storage.storageClass), or for"
       warn "non-production only set s3.rustfs.allowSharedDisks: true."
     fi
   fi
-  if [[ "${V[global.tls.mode]}" == certManager ]] && ! $HAS_CERT_MANAGER; then
+  if [[ "${EFFECTIVE_VALUES[global.tls.mode]}" == certManager ]] && ! $HAS_CERT_MANAGER; then
     die "global.tls.mode=certManager, but cert-manager is not installed in this cluster."
   fi
-  if enabled s3 && [[ "${V[s3.provider]}" == rgw ]]; then
+  if enabled s3 && [[ "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]]; then
     $HAS_OBC || die "s3.provider=rgw, but the ObjectBucketClaim API (objectbucket.io) is not available in this cluster."
     local found=false s
-    for s in ${RGW_CLASSES[@]+"${RGW_CLASSES[@]}"}; do [[ "$s" == "${V[s3.rgw.storageClass]}" ]] && found=true; done
-    $found || warn "s3.rgw.storageClass '${V[s3.rgw.storageClass]}' is not a known Ceph RGW bucket StorageClass (found: ${RGW_CLASSES[*]:-none})."
+    for s in ${RGW_CLASSES[@]+"${RGW_CLASSES[@]}"}; do [[ "$s" == "${EFFECTIVE_VALUES[s3.rgw.storageClass]}" ]] && found=true; done
+    $found || warn "s3.rgw.storageClass '${EFFECTIVE_VALUES[s3.rgw.storageClass]}' is not a known Ceph RGW bucket StorageClass (found: ${RGW_CLASSES[*]:-none})."
   fi
-  if [[ "${V[global.tls.mode]}" == existing ]]; then
+  if [[ "${EFFECTIVE_VALUES[global.tls.mode]}" == existing ]]; then
     local p
     for p in kafka.tls.existingSecret kafka.tls.existingClientSecret clickhouse.tls.existingSecret s3.rustfs.tls.existingSecret; do
-      [[ -n "${V[$p]:-}" ]] && enabled "${p%%.*}" && check_tls_secret "${V[$p]}"
+      [[ -n "${EFFECTIVE_VALUES[$p]:-}" ]] && enabled "${p%%.*}" && check_tls_secret "${EFFECTIVE_VALUES[$p]}"
     done
   fi
-  if [[ "$NODE_COUNT" != unknown ]] && (( NODE_COUNT < 3 )) && [[ "${V[global.podAntiAffinity]}" == hard ]]; then
+  if [[ "$NODE_COUNT" != unknown ]] && (( NODE_COUNT < 3 )) && [[ "${EFFECTIVE_VALUES[global.podAntiAffinity]}" == hard ]]; then
     warn "Fewer than 3 schedulable nodes with global.podAntiAffinity=hard: some pods will stay Pending."
   fi
-  if [[ -n "${V[global.storageClass]:-}" ]] && ((${#STORAGE_CLASSES[@]} > 0)); then
+  if [[ -n "${EFFECTIVE_VALUES[global.storageClass]:-}" ]] && ((${#STORAGE_CLASSES[@]} > 0)); then
     local s found=false
-    for s in "${STORAGE_CLASSES[@]}"; do [[ "${s%%|*}" == "${V[global.storageClass]}" ]] && found=true; done
-    $found || warn "StorageClass '${V[global.storageClass]}' was not found in the cluster."
-  elif [[ -z "${V[global.storageClass]:-}" && -z "$DEFAULT_SC" ]] && ((${#STORAGE_CLASSES[@]} > 0)); then
+    for s in "${STORAGE_CLASSES[@]}"; do [[ "${s%%|*}" == "${EFFECTIVE_VALUES[global.storageClass]}" ]] && found=true; done
+    $found || warn "StorageClass '${EFFECTIVE_VALUES[global.storageClass]}' was not found in the cluster."
+  elif [[ -z "${EFFECTIVE_VALUES[global.storageClass]:-}" && -z "$DEFAULT_STORAGE_CLASS" ]] && ((${#STORAGE_CLASSES[@]} > 0)); then
     warn "global.storageClass is empty and the cluster has no default StorageClass: volumes will stay Pending."
   fi
-  if [[ -n "${V[global.imagePullSecrets]:-}" ]]; then
+  if [[ -n "${EFFECTIVE_VALUES[global.imagePullSecrets]:-}" ]]; then
     local s
-    IFS=, read -r -a _ips <<<"${V[global.imagePullSecrets]}"
+    IFS=, read -r -a _ips <<<"${EFFECTIVE_VALUES[global.imagePullSecrets]}"
     for s in "${_ips[@]}"; do
       kcn get secret "$s" >/dev/null 2>&1 || warn "Image pull Secret '$s' was not found in namespace $NAMESPACE."
     done
@@ -1048,169 +675,6 @@ preflight_checks() {
 # ----------------------------------------------------------------------------
 # Installation
 # ----------------------------------------------------------------------------
-selected_releases() {   # prints the components to install, in order
-  local c
-  for c in "${COMPONENTS[@]}"; do enabled "$c" && echo "$c"; done
-  otel_enabled && echo otel
-  true
-}
-
-build_dependencies() {
-  local comp=$1 out
-  [[ -f "$CHARTS_DIR/$comp/Chart.yaml" ]] || die "Chart $CHARTS_DIR/$comp is missing. Get the complete installer package."
-  if ! out="$("$HELM" dependency update --skip-refresh "$CHARTS_DIR/$comp" 2>&1)"; then
-    err "helm dependency update failed for charts/$comp:"
-    printf '%s\n' "$out" | sed 's/^/         /' >&2
-    exit 1
-  fi
-}
-
-ensure_ca() {
-  local name=${V[global.tls.caSecret]:-}
-  [[ -n "$name" ]] || name="${V[global.namePrefix]}-ca"
-  if kcn get secret "$name" >/dev/null 2>&1; then
-    ok "CA Secret '$name' already exists: reused (never overwritten)"
-    return 0
-  fi
-  have openssl || die "openssl is needed to create the CA Secret '$name'. Install it, or use global.tls.mode=existing/certManager."
-  make_tmp
-  local d="$TMP_DIR/ca" cn="${V[global.namePrefix]} CM MES dependencies CA"
-  mkdir -p "$d"
-  # The subject is given in a config file instead of "-subj /CN=...": Git Bash on Windows
-  # would turn "/CN=..." into a Windows path. A config file also works with every OpenSSL
-  # (1.1, 3.x, LibreSSL on macOS) and sets proper CA extensions.
-  cat >"$d/ca.cnf" <<EOF
-[req]
-distinguished_name = dn
-x509_extensions    = v3_ca
-prompt             = no
-[dn]
-CN = $cn
-[v3_ca]
-basicConstraints       = critical, CA:TRUE
-keyUsage               = critical, keyCertSign, cRLSign
-subjectKeyIdentifier   = hash
-EOF
-  info "Creating the CA (RSA 4096, valid 10 years). This can take a few seconds..."
-  local out
-  if ! out="$( (umask 077; openssl req -x509 -new -newkey rsa:4096 -nodes -sha256 -days 3650 \
-          -config "$d/ca.cnf" -keyout "$d/ca.key" -out "$d/ca.crt") 2>&1)"; then
-    err "openssl failed:"; printf '%s\n' "$out" | sed 's/^/         /' >&2; exit 1
-  fi
-  # The OpenSSL of Git for Windows writes CRLF line endings: store LF-only PEM files.
-  local f
-  for f in ca.crt ca.key; do
-    (umask 077; tr -d '\r' <"$d/$f" >"$d/$f.lf") && mv -f "$d/$f.lf" "$d/$f"
-  done
-  if ! out="$(kcn create secret tls "$name" --cert "$d/ca.crt" --key "$d/ca.key" 2>&1)"; then
-    err "Could not create the CA Secret '$name':"; printf '%s\n' "$out" | sed 's/^/         /' >&2; exit 1
-  fi
-  kcn label secret "$name" app.kubernetes.io/part-of=cm-mes-dependencies >/dev/null 2>&1 || true
-  rm -f "$d/ca.key"
-  ok "CA Secret '$name' created. Back it up: all certificates are signed by it."
-}
-
-# Prints "<ready>/<total>" pods of a release.
-pods_ready() {
-  local out total=0 ready=0 line
-  out="$(kcn get pods -l "app.kubernetes.io/instance=$1" -o 'jsonpath={range .items[*]}{.status.containerStatuses[*].ready}{"\n"}{end}' 2>/dev/null || true)"
-  while IFS= read -r line; do
-    line=${line%$'\r'}
-    [[ -n "$line" ]] || { [[ -z "$out" ]] && continue; total=$((total + 1)); continue; }
-    total=$((total + 1))
-    [[ "$line" != *false* ]] && ready=$((ready + 1))
-  done <<<"$out"
-  printf '%d/%d' "$ready" "$total"
-}
-
-# run_with_progress <release> <log> <cmd...>: runs a command, showing elapsed time and pods.
-run_with_progress() {
-  local rel=$1 log=$2; shift 2
-  "$@" >"$log" 2>&1 &
-  local pid=$! start=$SECONDS last=0 rc=0 el
-  while kill -0 "$pid" 2>/dev/null; do
-    sleep 2
-    el=$((SECONDS - start))
-    if [[ -t 1 ]]; then
-      if (( el - last >= 10 )); then last=$el; printf '\r  ... %dm%02ds elapsed, pods ready: %-8s' $((el / 60)) $((el % 60)) "$(pods_ready "$rel")"; fi
-    elif (( el - last >= 60 )); then
-      last=$el; printf '  ... %dm elapsed, pods ready: %s\n' $((el / 60)) "$(pods_ready "$rel")"
-    fi
-  done
-  wait "$pid" || rc=$?
-  [[ -t 1 ]] && printf '\r%*s\r' 60 ''
-  return "$rc"
-}
-
-diagnose() {
-  local rel=$1 log=$2
-  heading "What went wrong"
-  if [[ -s "$log" ]]; then
-    info "Last lines of the helm output (${log#"$PWD"/}):"
-    tail -n 15 "$log" | sed 's/^/    /'
-  fi
-  if grep -q 'another operation (install/upgrade/rollback) is in progress' "$log" 2>/dev/null; then
-    warn "A previous installation of $rel was interrupted. Run: $HELM rollback $rel -n $NAMESPACE"
-    warn "(or '$HELM uninstall $rel -n $NAMESPACE' if it was never installed successfully), then retry."
-  fi
-  $CLUSTER_OK || return 0
-
-  local out name phase states
-  out="$(kcn get pods -l "app.kubernetes.io/instance=$rel" -o 'jsonpath={range .items[*]}{.metadata.name}{"|"}{.status.phase}{"|"}{range .status.initContainerStatuses[*]}{.ready}{":"}{.state.waiting.reason}{" "}{end}{range .status.containerStatuses[*]}{.ready}{":"}{.state.waiting.reason}{" "}{end}{"\n"}{end}' 2>/dev/null || true)"
-  if [[ -n "$out" ]]; then
-    info ""
-    info "Pods of $rel:"
-    kcn get pods -l "app.kubernetes.io/instance=$rel" -o wide 2>/dev/null | sed 's/^/    /' || true
-  fi
-  local hint_pending=false
-  while IFS='|' read -r name phase states; do
-    [[ -n "$name" ]] || continue
-    states=${states%$'\r'}
-    if [[ "$phase" == Pending && -z "$(trim "$states")" ]]; then
-      hint_pending=true
-      local ev
-      ev="$(kcn get events --field-selector "involvedObject.name=$name,reason=FailedScheduling" -o 'jsonpath={range .items[*]}{.message}{"\n"}{end}' 2>/dev/null | tail -n 1 || true)"
-      warn "Pod $name cannot be scheduled${ev:+: $ev}"
-      case "$ev" in
-        *nsufficient*) info "    -> not enough CPU/memory on the nodes: add nodes or lower the resources in charts/<name>/values.yaml." ;;
-        *anti-affinity*) info "    -> one pod per node is required and there are not enough nodes (need >= 3). For tests only: global.podAntiAffinity: soft" ;;
-        *unbound*PersistentVolumeClaim*|*persistentvolumeclaim*) info "    -> its data volume is not bound yet (see the volumes below)." ;;
-        *taint*) info "    -> the nodes have taints: set global.tolerations or global.nodeSelector." ;;
-      esac
-    fi
-    case "$states" in
-      *ImagePullBackOff*|*ErrImagePull*|*InvalidImageName*)
-        warn "Pod $name cannot pull its image. Check internet access or global.imageRegistry / global.imagePullSecrets."
-        info "    kubectl -n $NAMESPACE describe pod $name" ;;
-      *CreateContainerConfigError*)
-        warn "Pod $name references a missing Secret or ConfigMap (e.g. a TLS Secret in mode 'existing')."
-        info "    kubectl -n $NAMESPACE describe pod $name" ;;
-      *CrashLoopBackOff*|*Error*)
-        warn "Pod $name keeps crashing. See its logs:"
-        info "    kubectl -n $NAMESPACE logs $name --all-containers --previous" ;;
-    esac
-    if [[ "$phase" == Running && "$states" == *false* && "$states" != *BackOff* ]]; then
-      warn "Pod $name is running but not ready yet. It may need more time, or see: kubectl -n $NAMESPACE logs $name"
-    fi
-  done <<<"$out"
-
-  local pvcs pvc pphase psc
-  pvcs="$(kcn get pvc -o 'jsonpath={range .items[*]}{.metadata.name}{"|"}{.status.phase}{"|"}{.spec.storageClassName}{"\n"}{end}' 2>/dev/null || true)"
-  while IFS='|' read -r pvc pphase psc; do
-    psc=${psc%$'\r'}
-    [[ "$pvc" == *"${V[global.namePrefix]}"* && "$pphase" == Pending ]] || continue
-    warn "Volume $pvc is Pending (StorageClass: ${psc:-cluster default})."
-    info "    -> check that the StorageClass exists and can provision volumes: kubectl -n $NAMESPACE describe pvc $pvc"
-  done <<<"$pvcs"
-
-  info ""
-  info "Recent warnings in namespace $NAMESPACE:"
-  kcn get events --field-selector type=Warning --sort-by=.lastTimestamp 2>/dev/null | tail -n 10 | sed 's/^/    /' || true
-  info ""
-  info "More details:  kubectl -n $NAMESPACE describe pod <pod>   /   kubectl -n $NAMESPACE logs <pod>"
-  $hint_pending && info "Pending pods usually mean: not enough nodes, not enough CPU/memory, or volumes not provisioned."
-  info "Fix the cause and run install.sh again with the same options: it continues where it stopped."
-}
 
 install_release() {
   local comp=$1 rel log
@@ -1246,12 +710,12 @@ install_release() {
     diagnose "$rel" "$log"
     exit 1
   fi
-  if [[ "$comp" == s3 && "${V[s3.provider]}" == rgw ]]; then
+  if [[ "$comp" == s3 && "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]]; then
     wait_obc_bound 600 || { diagnose_obc; exit 1; }
   fi
 }
 
-obc_name() { printf '%s-s3' "${V[global.namePrefix]}"; }
+obc_name() { printf '%s-s3' "${EFFECTIVE_VALUES[global.namePrefix]}"; }
 
 wait_obc_bound() {
   local timeout=$1 start=$SECONDS phase name
@@ -1270,7 +734,7 @@ diagnose_obc() {
   local name; name="$(obc_name)"
   info "Check the claim and the bucket StorageClass:"
   info "    kubectl -n $NAMESPACE describe objectbucketclaim $name"
-  info "    kubectl get storageclass ${V[s3.rgw.storageClass]}"
+  info "    kubectl get storageclass ${EFFECTIVE_VALUES[s3.rgw.storageClass]}"
   kcn describe objectbucketclaim "$name" 2>/dev/null | tail -n 15 | sed 's/^/    /' || true
 }
 
@@ -1278,110 +742,11 @@ diagnose_obc() {
 # Checks against the live installation (upgrades)
 # ----------------------------------------------------------------------------
 declare -a RESIZE_PLAN=()   # "comp|statefulset|template|new size"
-declare -A SAVED_V=()
+declare -A SAVED_EFFECTIVE_VALUES=()
 
-save_V()    { local k; SAVED_V=(); for k in "${!V[@]}"; do SAVED_V[$k]=${V[$k]}; done; }
-restore_V() { local k; V=(); for k in "${!SAVED_V[@]}"; do V[$k]=${SAVED_V[$k]}; done; }
+save_effective_values()    { local k; SAVED_EFFECTIVE_VALUES=(); for k in "${!EFFECTIVE_VALUES[@]}"; do SAVED_EFFECTIVE_VALUES[$k]=${EFFECTIVE_VALUES[$k]}; done; }
+restore_effective_values() { local k; EFFECTIVE_VALUES=(); for k in "${!SAVED_EFFECTIVE_VALUES[@]}"; do EFFECTIVE_VALUES[$k]=${SAVED_EFFECTIVE_VALUES[$k]}; done; }
 
-prepare_charts() {
-  $CHARTS_READY && return 0
-  local -a comps=()
-  local c
-  mapfile -t comps < <(selected_releases)
-  for c in "${comps[@]}"; do build_dependencies "$c"; done
-  ok "Charts prepared: ${comps[*]}"
-  CHARTS_READY=true
-}
-
-release_exists() { "$HELM" status "$1" -n "$NAMESPACE" >/dev/null 2>&1; }
-
-# Quantity (50Gi, 1.5Ti, 500M...) in bytes; -1 when it cannot be parsed.
-to_bytes() {
-  awk -v q="$1" 'BEGIN {
-    n = q; u = q; sub(/[A-Za-z]+$/, "", n); sub(/^[0-9.]+/, "", u)
-    m["Ki"]=1024; m["Mi"]=1024^2; m["Gi"]=1024^3; m["Ti"]=1024^4; m["Pi"]=1024^5
-    m["k"]=1e3; m["M"]=1e6; m["G"]=1e9; m["T"]=1e12; m["P"]=1e15; m[""]=1
-    if (n == "" || !(u in m)) { print -1; exit }
-    printf "%.0f\n", n * m[u] }'
-}
-
-# Prints "statefulset|template|size|storageClassName" for every volumeClaimTemplate
-# of the StatefulSets in a rendered manifest (helm template output).
-rendered_vcts() {
-  awk '
-    function unq(s) { gsub(/^["\047]|["\047]$/, "", s); return s }
-    function val(l) { sub(/^[^:]*:[ ]*/, "", l); return unq(l) }
-    function flush() { if (item && sts != "") print sts "|" vname "|" size "|" sc; item = 0; vname = ""; size = ""; sc = "" }
-    /^---/ { flush(); kind = ""; sts = ""; inmeta = 0; invct = 0; next }
-    /^kind: / { kind = $2; next }
-    /^metadata:/ { inmeta = 1; next }
-    inmeta && /^  name: / { if (sts == "") sts = val($0); inmeta = 0; next }
-    /^[^ #]/ { inmeta = 0 }
-    kind != "StatefulSet" { next }
-    /^  volumeClaimTemplates:/ { invct = 1; next }
-    invct {
-      if ($0 !~ /[^ ]/) next
-      match($0, /^ */); ind = RLENGTH
-      if (ind <= 2 && $0 !~ /^  - /) { flush(); invct = 0; next }
-      if ($0 ~ /^ *- / && ind <= 4) { flush(); item = 1 }
-      line = $0; sub(/^ *(- )?/, "", line)
-      if (line ~ /^name: / && vname == "") vname = val(line)
-      else if (line ~ /^storageClassName:/) sc = val(line)
-      else if (line ~ /^storage: /) size = val(line)
-    }
-    END { flush() }' "$1"
-}
-
-# Compares the volumes of the StatefulSets that already exist with the new values.
-# Fills RESIZE_PLAN; stops (before anything is changed) on changes Kubernetes forbids.
-check_volumes() {
-  local comp=$1 rel rendered line sts vct size sc live lsize lsc
-  rel="$(release_name "$comp")"
-  make_tmp
-  rendered="$TMP_DIR/check-$rel.yaml"
-  local -a vargs=()
-  local f
-  for f in "${VALUES_FILES[@]}"; do vargs+=(-f "$f"); done
-  if ! "$HELM" template "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" "${vargs[@]}" >"$rendered" 2>/dev/null; then
-    warn "$(component_title "$comp"): could not render the chart to compare the volumes (see the install step)."
-    return 0
-  fi
-  while IFS='|' read -r sts vct size sc; do
-    [[ -n "$sts" && -n "$vct" ]] || continue
-    live="$(kcn get statefulset "$sts" -o "jsonpath={range .spec.volumeClaimTemplates[*]}{.metadata.name}{\"|\"}{.spec.resources.requests.storage}{\"|\"}{.spec.storageClassName}{\"\\n\"}{end}" 2>/dev/null | tr -d '\r' | grep "^$vct|" || true)"
-    [[ -n "$live" ]] || continue                     # new StatefulSet or new volume: nothing to compare
-    IFS='|' read -r _ lsize lsc <<<"$live"
-    if [[ "$lsc" != "$sc" ]]; then
-      err "The StorageClass of the '$vct' volumes of $sts cannot be changed (installed: '${lsc:-cluster default}', new: '${sc:-cluster default}')."
-      info "Kubernetes does not allow it for existing StatefulSets. Keep the installed value in your values file"
-      info "(global.storageClass / <component>.storage.storageClass). Nothing was changed."
-      exit 1
-    fi
-    local lb nb
-    lb="$(to_bytes "$lsize")"; nb="$(to_bytes "$size")"
-    if [[ "$lb" == -1 || "$nb" == -1 ]]; then
-      warn "$sts: cannot compare the volume sizes '$lsize' and '$size'; continuing."; continue
-    fi
-    (( nb == lb )) && continue
-    if (( nb < lb )); then
-      err "The '$vct' volumes of $sts cannot be made smaller (installed: $lsize, new: $size). Nothing was changed."
-      info "Set the size back to $lsize (or larger) in your values file."
-      exit 1
-    fi
-    # Bigger: possible only when the StorageClass allows volume expansion.
-    local pvc0 psc exp
-    pvc0="$vct-$sts-0"
-    psc="$(kcn get pvc "$pvc0" -o 'jsonpath={.spec.storageClassName}' 2>/dev/null | tr -d '\r' || true)"
-    [[ -n "$psc" ]] || psc=${sc:-$DEFAULT_SC}
-    exp="$(kc get storageclass "$psc" -o 'jsonpath={.allowVolumeExpansion}' 2>/dev/null | tr -d '\r' || true)"
-    if [[ "$exp" != true ]]; then
-      err "The '$vct' volumes of $sts cannot grow from $lsize to $size: StorageClass '${psc:-?}' does not allow"
-      info "volume expansion (allowVolumeExpansion is not true, or it cannot be read). Keep $lsize. Nothing was changed."
-      exit 1
-    fi
-    RESIZE_PLAN+=("$comp|$sts|$vct|$size|$lsize")
-  done < <(rendered_vcts "$rendered")
-}
 
 # Warnings for changes of an existing installation, then the volume checks.
 live_checks() {
@@ -1397,40 +762,40 @@ live_checks() {
     line=${line%$'\r'}
     if [[ "$line" =~ ^(.+)-(kafka|clickhouse|s3|otel)$ ]]; then
       p=${BASH_REMATCH[1]}
-      if [[ "$p" == "${V[global.namePrefix]}" ]]; then mine=true
+      if [[ "$p" == "${EFFECTIVE_VALUES[global.namePrefix]}" ]]; then mine=true
       elif [[ " ${others[*]} " != *" $p "* ]]; then others+=("$p"); fi
     fi
   done < <("$HELM" list -n "$NAMESPACE" -q 2>/dev/null || true)
   if ((${#others[@]} > 0)) && ! $mine; then
     heading "Existing installation"
     warn "Namespace $NAMESPACE already has releases with the name prefix: ${others[*]}"
-    warn "global.namePrefix is '${V[global.namePrefix]}': this installs a SECOND, separate set (new volumes,"
+    warn "global.namePrefix is '${EFFECTIVE_VALUES[global.namePrefix]}': this installs a SECOND, separate set (new volumes,"
     warn "new passwords) instead of updating it. To update it, set global.namePrefix: ${others[0]}"
-    $DRY_RUN || confirm_or_exit "Install a second set with prefix '${V[global.namePrefix]}'?"
+    $DRY_RUN || confirm_or_exit "Install a second set with prefix '${EFFECTIVE_VALUES[global.namePrefix]}'?"
   fi
 
   # 2. Settings that change how CM MES connects.
   local -a changes=()
-  save_V
-  local new_tls=${V[global.tls.mode]} new_s3=${V[s3.provider]}
+  save_effective_values
+  local new_tls=${EFFECTIVE_VALUES[global.tls.mode]} new_s3=${EFFECTIVE_VALUES[s3.provider]}
   for c in "${comps[@]}"; do
     rel="$(release_name "$c")"
     release_exists "$rel" || continue
     make_tmp
     "$HELM" get values "$rel" -n "$NAMESPACE" -a -o yaml >"$TMP_DIR/live-$rel.yaml" 2>/dev/null || continue
     read_values --historical "$TMP_DIR/live-$rel.yaml"
-    if [[ "$c" != otel && "${V[global.tls.mode]}" != "$new_tls" ]]; then
-      changes+=("$(component_title "$c"): TLS mode ${V[global.tls.mode]} -> $new_tls. All its certificates change; CM MES must trust the new CA ($c-ca.crt).")
+    if [[ "$c" != otel && "${EFFECTIVE_VALUES[global.tls.mode]}" != "$new_tls" ]]; then
+      changes+=("$(component_title "$c"): TLS mode ${EFFECTIVE_VALUES[global.tls.mode]} -> $new_tls. All its certificates change; CM MES must trust the new CA ($c-ca.crt).")
     fi
-    if [[ "$c" == kafka && "${V[kafka.auth.method]:-}" == sasl ]]; then
+    if [[ "$c" == kafka && "${EFFECTIVE_VALUES[kafka.auth.method]:-}" == sasl ]]; then
       changes+=("Kafka: CM MES authentication changes from user name and password (SASL_SSL) to a client certificate (mTLS). CM MES can't connect until it uses the new values printed at the end.")
     fi
-    if [[ "$c" == s3 && "${V[s3.provider]}" != "$new_s3" ]]; then
-      changes+=("S3: provider ${V[s3.provider]} -> $new_s3. The data is NOT copied; CM MES starts with an empty bucket.")
+    if [[ "$c" == s3 && "${EFFECTIVE_VALUES[s3.provider]}" != "$new_s3" ]]; then
+      changes+=("S3: provider ${EFFECTIVE_VALUES[s3.provider]} -> $new_s3. The data is NOT copied; CM MES starts with an empty bucket.")
     fi
-    restore_V
+    restore_effective_values
   done
-  restore_V
+  restore_effective_values
   if ((${#changes[@]} > 0)); then
     heading "Changes to the existing installation"
     for line in "${changes[@]}"; do warn "$line"; done
@@ -1459,30 +824,7 @@ live_checks() {
   fi
 }
 
-# Runs the resize planned for one component, just before its upgrade.
-apply_resize() {
-  local comp=$1 line c sts vct size lsize pvc cur
-  local -a done_sts=()
-  for line in ${RESIZE_PLAN[@]+"${RESIZE_PLAN[@]}"}; do
-    IFS='|' read -r c sts vct size lsize <<<"$line"
-    [[ "$c" == "$comp" ]] || continue
-    while IFS= read -r pvc; do
-      pvc=${pvc%$'\r'}; pvc=${pvc#persistentvolumeclaim/}
-      [[ "$pvc" =~ ^$vct-$sts-[0-9]+$ ]] || continue
-      cur="$(kcn get pvc "$pvc" -o 'jsonpath={.spec.resources.requests.storage}' 2>/dev/null | tr -d '\r' || true)"
-      if [[ -n "$cur" ]] && (( $(to_bytes "$cur") >= $(to_bytes "$size") )); then continue; fi
-      kcn patch pvc "$pvc" --type merge -p "{\"spec\":{\"resources\":{\"requests\":{\"storage\":\"$size\"}}}}" >/dev/null \
-        || die "Could not resize volume $pvc (kubectl -n $NAMESPACE describe pvc $pvc)."
-      ok "Volume $pvc: resize to $size requested"
-    done < <(kcn get pvc -o name 2>/dev/null || true)
-    if [[ " ${done_sts[*]} " != *" $sts "* ]]; then
-      kcn delete statefulset "$sts" --cascade=orphan >/dev/null \
-        || die "Could not delete StatefulSet $sts (orphan). The volumes were resized; run install.sh again."
-      ok "StatefulSet $sts removed (pods keep running); the upgrade recreates it"
-      done_sts+=("$sts")
-    fi
-  done
-}
+# Installation uses Helm; storage changes require the explicit maintenance action.
 
 run_install() {
   local -a comps=()
@@ -1491,7 +833,7 @@ run_install() {
   heading "Preparing"
   local c
   prepare_charts
-  if [[ "${V[global.tls.mode]}" == auto ]]; then
+  if [[ "${EFFECTIVE_VALUES[global.tls.mode]}" == auto ]]; then
     if $DRY_RUN; then note "Dry run: the CA Secret is not created (each chart would render its own CA)."
     else ensure_ca; fi
   fi
@@ -1514,17 +856,6 @@ run_install() {
 # ----------------------------------------------------------------------------
 # Connection information
 # ----------------------------------------------------------------------------
-safe_name() { local s=$1; printf '%s' "${s//[^A-Za-z0-9._-]/_}"; }
-
-# save_secret_key <secret> <key> <file>
-save_secret_key() {
-  local data
-  data="$(kcn get secret "$1" -o "jsonpath={.data.${2//./\\.}}" 2>/dev/null || true)"
-  data=${data%$'\r'}
-  if [[ -z "$data" ]]; then warn "Secret $1 has no key '$2' (file $3 not saved)."; return 0; fi
-  printf '%s' "$data" | b64d >"$OUTPUT_DIR/$3"
-  SAVED_FILES+=("$3")
-}
 
 rgw_block() {   # prints the S3 block for a Ceph RGW bucket (from the OBC ConfigMap/Secret)
   local name host bucket port key secret scheme addr
@@ -1557,7 +888,7 @@ rgw_block() {   # prints the S3 block for a Ceph RGW bucket (from the OBC Config
 
 print_connection_info() {
   local after_install=${1:-false}
-  local prefix=${V[global.namePrefix]} out entries=() line name order comp ca files fsecret
+  local prefix=${EFFECTIVE_VALUES[global.namePrefix]} out entries=() line name order comp ca files fsecret
   local -a sorted=()
   SAVED_FILES=()
   mkdir -p "$OUTPUT_DIR"
@@ -1572,10 +903,10 @@ print_connection_info() {
     order=$(cut -d'|' -f2 <<<"$line"); [[ "$order" =~ ^[0-9]+$ ]] || order=50
     comp=$(cut -d'|' -f3 <<<"$line")
     # Ceph RGW: the S3 values come from the ObjectBucketClaim (rgw_block), not from a Secret.
-    [[ "$comp" == s3 && "${V[s3.provider]}" == rgw ]] && continue
+    [[ "$comp" == s3 && "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]] && continue
     entries+=("$order|secret|$line")
   done <<<"$out"
-  if enabled s3 && [[ "${V[s3.provider]}" == rgw ]]; then entries+=("30|rgw|"); fi
+  if enabled s3 && [[ "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]]; then entries+=("30|rgw|"); fi
   if ((${#entries[@]} == 0)); then
     warn "No connection information found in namespace $NAMESPACE for prefix '$prefix'."
     info "Is it installed? Check with: $HELM list -n $NAMESPACE"
@@ -1623,7 +954,7 @@ print_connection_info() {
 }
 
 final_message() {
-  local p=${V[global.namePrefix]} c
+  local p=${EFFECTIVE_VALUES[global.namePrefix]} c
   heading "Done"
   info "The dependencies are installed in namespace '$NAMESPACE'."
   info ""
@@ -1651,7 +982,7 @@ final_message() {
 # Uninstall
 # ----------------------------------------------------------------------------
 run_uninstall() {
-  local p=${V[global.namePrefix]} c rel
+  local p=${EFFECTIVE_VALUES[global.namePrefix]} c rel context
   local -a present=()
   for c in otel s3 clickhouse kafka; do
     rel="$p-$c"
@@ -1665,9 +996,11 @@ run_uninstall() {
   info "These releases will be removed from namespace $NAMESPACE: ${present[*]}"
   info "The data volumes (PersistentVolumeClaims) and the CA Secrets are KEPT, so a new"
   info "installation with the same prefix reuses the existing data."
-  enabled s3 && [[ "${V[s3.provider]}" == rgw ]] && \
+  enabled s3 && [[ "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]] && \
     info "The Ceph RGW bucket (ObjectBucketClaim $p-s3) is kept as well."
-  confirm_or_exit "Uninstall ${present[*]} from namespace $NAMESPACE (context ${KUBE_CONTEXT:-?})? The data volumes are kept"
+  context="$(kc config current-context 2>/dev/null || true)"
+  context=${context%$'\r'}
+  confirm_or_exit "Uninstall ${present[*]} from namespace $NAMESPACE (context ${context:-?})? The data volumes are kept"
   for rel in "${present[@]}"; do
     if "$HELM" uninstall "$rel" -n "$NAMESPACE" >/dev/null 2>&1; then ok "Uninstalled $rel"; else err "Could not uninstall $rel ($HELM uninstall $rel -n $NAMESPACE)"; fi
   done
@@ -1691,7 +1024,7 @@ run_uninstall() {
     printf '%s\n' "$secrets" | sed 's/^/    /'
     info "To delete them: kubectl -n $NAMESPACE delete $(printf '%s\n' "$secrets" | tr '\n' ' ')"
   fi
-  if enabled s3 && [[ "${V[s3.provider]}" == rgw ]]; then
+  if enabled s3 && [[ "${EFFECTIVE_VALUES[s3.provider]}" == rgw ]]; then
     info ""
     warn "To delete the Ceph RGW bucket and ALL its data (cannot be undone):"
     info "    kubectl -n $NAMESPACE delete objectbucketclaim $p-s3"
@@ -1701,52 +1034,18 @@ run_uninstall() {
 # ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
-parse_args() {
-  while (($# > 0)); do
-    case "$1" in
-      -n|--namespace) [[ $# -ge 2 ]] || die "$1 needs a value"; NAMESPACE=$2; shift 2 ;;
-      --namespace=*)  NAMESPACE=${1#*=}; shift ;;
-      -f|--values)    [[ $# -ge 2 ]] || die "$1 needs a value"; USER_VALUES=$2; shift 2 ;;
-      --values=*)     USER_VALUES=${1#*=}; shift ;;
-      -y|--yes)       ASSUME_YES=true; shift ;;
-      --dry-run)      DRY_RUN=true; shift ;;
-      --print)        ACTION=print; shift ;;
-      --resize-storage) ACTION=resize; shift ;;
-      --uninstall)    ACTION=uninstall; shift ;;
-      --timeout)      [[ $# -ge 2 ]] || die "$1 needs a value"; HELM_TIMEOUT=$2; shift 2 ;;
-      -h|--help)      usage; exit 0 ;;
-      *)              usage >&2; die "Unknown option: $1" ;;
-    esac
-  done
-  [[ "$HELM_TIMEOUT" =~ ^[0-9]+[smh]$|^[0-9]+m[0-9]+s$ ]] || die "--timeout must look like 20m or 1h (got '$HELM_TIMEOUT')."
-  [[ -z "$USER_VALUES" || -f "$USER_VALUES" ]] || die "Values file '$USER_VALUES' not found."
-}
-
-# The values files passed to every release: values.yaml, then the user's file.
-set_values_files() {
-  VALUES_FILES=("$BASE_VALUES")
-  local extra=$USER_VALUES
-  if [[ -z "$extra" && -f "$GENERATED_VALUES" ]] && { [[ "$ACTION" != install ]] || $INTERACTIVE; }; then
-    extra=$GENERATED_VALUES
-    if $INTERACTIVE; then note "The answers in $GENERATED_VALUES are used as the defaults."
-    else note "Using $GENERATED_VALUES (pass -f to use another file)."; fi
-  fi
-  if [[ -n "$extra" ]] && [[ "$(abs_path "$extra")" != "$(abs_path "$BASE_VALUES")" ]]; then
-    VALUES_FILES+=("$extra")
-  fi
-}
 
 main() {
   parse_args "$@"
   umask 077   # everything written (answers, connection info, keys) is private
-  [[ -f "$BASE_VALUES" ]] || die "$BASE_VALUES not found. Run install.sh from the installer folder."
+  [[ -f "$BASE_VALUES_FILE" ]] || die "$BASE_VALUES_FILE not found. Run install.sh from the installer folder."
   [[ "$ACTION" == install && -z "$USER_VALUES" ]] && INTERACTIVE=true
 
   printf '%sCritical Manufacturing MES v12 - external dependencies installer%s\n' "$C_BOLD" "$C_RESET"
   case "$ACTION" in
     print|uninstall)
       heading "Checking prerequisites"
-      check_tools
+      check_tools "$MIN_HELM_MAJOR" "$MIN_HELM_MINOR"
       check_cluster true ""
       choose_namespace
       set_values_files
@@ -1773,7 +1072,7 @@ main() {
   else
     heading "Checking prerequisites"
   fi
-  check_tools
+  check_tools "$MIN_HELM_MAJOR" "$MIN_HELM_MINOR"
   if $DRY_RUN && ! $INTERACTIVE; then check_cluster false ""; else check_cluster true "Install into this cluster?"; fi
   choose_namespace
   check_namespace
@@ -1782,9 +1081,9 @@ main() {
   if $CLUSTER_OK; then detect_cluster; else note "Skipped (no cluster)."; fi
 
   if $INTERACTIVE; then
-    # B = values.yaml alone: the wizard writes only what differs from it.
-    read_values "$BASE_VALUES"
-    local k; B=(); for k in "${!V[@]}"; do B[$k]=${V[$k]}; done
+    # BASE_VALUES = values.yaml alone: the wizard writes only what differs from it.
+    read_values "$BASE_VALUES_FILE"
+    local k; BASE_VALUES=(); for k in "${!EFFECTIVE_VALUES[@]}"; do BASE_VALUES[$k]=${EFFECTIVE_VALUES[$k]}; done
   fi
   set_values_files
   read_values "${VALUES_FILES[@]}"
@@ -1796,7 +1095,7 @@ main() {
     make_tmp
     local tmpv="$TMP_DIR/answers.yaml"
     ( umask 077; emit_overrides >"$tmpv" )
-    VALUES_FILES=("$BASE_VALUES" "$tmpv")
+    VALUES_FILES=("$BASE_VALUES_FILE" "$tmpv")
     VALUES_DISPLAY="values.yaml + your answers (saved as $GENERATED_VALUES)"
     read_values "${VALUES_FILES[@]}"
     show_summary
@@ -1806,7 +1105,7 @@ main() {
     confirm_or_exit "$($DRY_RUN && echo "Save the answers and render the manifests?" || echo "Save the answers and install now?")"
     write_generated "$GENERATED_VALUES"
     note "Re-running './install.sh -n $NAMESPACE -f $GENERATED_VALUES' reproduces this installation."
-    VALUES_FILES=("$BASE_VALUES" "$GENERATED_VALUES")
+    VALUES_FILES=("$BASE_VALUES_FILE" "$GENERATED_VALUES")
     VALUES_DISPLAY=""
   else
     show_summary
@@ -1817,93 +1116,6 @@ main() {
     if [[ "$ACTION" == install ]]; then $DRY_RUN || confirm_or_exit "Install now?"; fi
   fi
   if [[ "$ACTION" == resize ]]; then run_storage_maintenance; else run_install; fi
-}
-
-# Explicit storage maintenance and recovery.
-storage_maintenance_worker() (
-  # Subshell confines recovery traps and umask to this explicit operation.
-  if $DRY_RUN; then info "Storage maintenance dry run: no volumes or controllers changed."; return 0; fi
-  if ((${#RESIZE_PLAN[@]} == 0)); then info "No volume expansion is needed."; return 0; fi
-  local -a vargs=() comps=() controllers=()
-  local -A seen=() saved=()
-  local f line comp sts vct size old rel directory
-  for f in "${VALUES_FILES[@]}"; do vargs+=(-f "$f"); done
-  for line in "${RESIZE_PLAN[@]}"; do
-    IFS='|' read -r comp sts vct size old <<<"$line"
-    if [[ -z "${seen[$comp]+set}" ]]; then comps+=("$comp"); seen[$comp]=1; fi
-    if [[ -z "${saved[$sts]+set}" ]]; then controllers+=("$sts"); saved[$sts]=1; fi
-  done
-  info "This expands PVCs, temporarily orphans their pods and upgrades only the affected releases."
-  info "On failure, restore missing controllers from the saved YAML as documented. Expanded PVCs cannot shrink."
-  info "Run without other installers or storage maintenance acting on these releases."
-  umask 077
-  mkdir -p "$OUTPUT_DIR/storage-maintenance"
-  directory=$(mktemp -d "$OUTPUT_DIR/storage-maintenance/run-XXXXXXXX")
-  info "Private recovery directory: $directory"
-  # Render against live cluster state for EVERY affected release before the first mutation.
-  # In particular, lookup-based retained Kafka identity checks must pass first.
-  for comp in "${comps[@]}"; do
-    rel="$(release_name "$comp")"
-    if ! "$HELM" upgrade "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" "${vargs[@]}" \
-      --dry-run=server >"$directory/preflight-$rel.log" 2>&1; then
-      err "Server-side Helm preflight failed for $rel; nothing was changed."
-      err "See $directory/preflight-$rel.log. Maintenance requires Helm 3.13+ or Helm 4."
-      exit 1
-    fi
-  done
-  for sts in "${controllers[@]}"; do
-    kcn get statefulset "$sts" -o json >"$directory/live-$sts.json" || exit 1
-    # Use the Kubernetes CLI's local JSON merge support; no cluster mutation here.
-    kc patch --local -f "$directory/live-$sts.json" --type=merge \
-      -p '{"metadata":{"uid":null,"resourceVersion":null,"generation":null,"creationTimestamp":null,"managedFields":null,"selfLink":null,"deletionTimestamp":null,"deletionGracePeriodSeconds":null},"status":null}' \
-      -o yaml >"$directory/statefulset-$sts.yaml" || exit 1
-  done
-  # Also covers SIGINT/SIGTERM after a controller has been removed.
-  trap 'rc=$?; if ((rc)); then err "Maintenance interrupted/failed. PVC expansion is retained; check for missing StatefulSet controllers."; err "Restore missing controllers with kubectl/oc create -f <saved YAML>; see the README."; err "Recovery files: $directory"; fi' EXIT
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
-  for comp in "${comps[@]}"; do
-    apply_resize "$comp"
-    rel="$(release_name "$comp")"
-    if ! "$HELM" upgrade "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" "${vargs[@]}" \
-      --wait --timeout "$HELM_TIMEOUT" >"$directory/upgrade-$rel.log" 2>&1; then
-      err "Helm upgrade failed for $rel. See $directory/upgrade-$rel.log."
-      exit 1
-    fi
-  done
-  ok "Storage maintenance completed. Recovery snapshots remain in $directory."
-)
-
-cancel_storage_maintenance() {
-  local status=$1 child=$2 previous=$3
-  # $! covers cancellation after fork but before the parent records the worker PID.
-  # Before the fork, it still refers to an unrelated, previously started job.
-  if [[ -n "$child" && "$child" != "$previous" ]]; then
-    kill -TERM -- -"$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null || true
-    wait "$child" || true
-  fi
-  exit "$status"
-}
-
-run_storage_maintenance() {
-  if $DRY_RUN; then info "Storage maintenance dry run: no volumes or controllers changed."; return 0; fi
-  if ((${#RESIZE_PLAN[@]} == 0)); then info "No volume expansion is needed."; return 0; fi
-  confirm_or_exit "Start storage maintenance in $NAMESPACE?"
-  local maintenance_pid="" previous_background_pid=${!:-} saved_traps had_monitor=false rc=0
-  saved_traps=$(trap -p INT TERM)
-  trap 'cancel_storage_maintenance 143 "${maintenance_pid:-${!:-}}" "$previous_background_pid"' TERM
-  trap 'cancel_storage_maintenance 130 "${maintenance_pid:-${!:-}}" "$previous_background_pid"' INT
-  [[ $- != *m* ]] || had_monitor=true
-  # A separate process group allows signals to stop Helm/kubectl as well as the worker.
-  # All interactive confirmation happens above, in the foreground installer.
-  set -m
-  storage_maintenance_worker &
-  maintenance_pid=$!
-  $had_monitor || set +m
-  wait "$maintenance_pid" || rc=$?
-  trap - INT TERM
-  [[ -z "$saved_traps" ]] || eval "$saved_traps"
-  return "$rc"
 }
 
 main "$@"

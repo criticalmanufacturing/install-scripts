@@ -20,14 +20,14 @@ This document is for maintainers of the charts. Administrators should read [READ
 platform/v12.0/
   install.sh        interactive / non-interactive installer (bash)
   values.yaml       the single configuration file that admins edit (all sections)
-  charts/common     library chart shared by all charts (see "common helpers")
+  ../common/chart   library chart shared with v11.3
   charts/kafka      Kafka (KRaft, combined controller+broker StatefulSet)
   charts/clickhouse ClickHouse server StatefulSet + ClickHouse Keeper StatefulSet + HAProxy load balancer
   charts/s3         RustFS distributed StatefulSet, or an ObjectBucketClaim for Ceph RGW
   charts/otel       optional OpenTelemetry collector, pushing metrics to an OTLP/HTTP endpoint
 ```
 
-Every chart depends on `common` through `repository: file://../common`. Run
+Every chart depends on `common` through `repository: file://../../../common/chart`. Run
 `helm dependency update --skip-refresh charts/<name>` before rendering (install.sh does this). The
 vendored `charts/<name>/charts/` folders are git-ignored; `Chart.lock` files are committed.
 
@@ -223,5 +223,7 @@ and sends them over OTLP/HTTP to that endpoint (CM Observability).
 - **RustFS** exports its telemetry itself over OTLP to the local collector
   (`http://<prefix>-otel.<ns>.svc.<clusterDomain>:4318`) when `observability.otlpEndpoint` is set.
   The collector always exposes an OTLP receiver on 4317/4318 for this.
+
+Shared installer functions live in `../lib/install-common.sh`; version-specific prompts, layouts and connection guidance stay in each version entry point. Keep the `platform` directory structure when copying these samples.
 
 Configuration types and enums are validated by Helm using `values.schema.json`, including direct chart use. The version-level schema validates the wizard values; runtime cluster checks remain in the installer. Keep these schemas aligned when adding settings.

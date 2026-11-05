@@ -9,11 +9,11 @@ Keep installation and ordinary upgrade correctness in the charts so administrato
 
 ## Repository layout and compatibility
 
-- `platform/v11.3/install.sh` and `platform/v12.0/install.sh` each contain the installer functions, component selection and version-specific prompts and layouts.
-- Each version keeps its Helm library in `charts/common`. Application charts use a local dependency and committed lock files; generated `charts/*/charts/` directories are ignored.
+- `platform/lib/install-common.sh` contains shared installer functions. Version entry points own component selection and version-specific prompts and layouts.
+- `platform/common/chart` is the shared Helm library. Application charts use a local dependency and committed lock files; generated `charts/*/charts/` directories are ignored.
 - Each application chart has `values.schema.json`; the version-level schema validates proposed wizard/non-interactive values. Historical release inspection uses `read_values --historical` so legacy settings can still be migrated.
 - Preserve product invariants: 11.3 uses Kafka 3.8's fixed KRaft quorum, standalone ClickHouse and RustFS, and RabbitMQ classic priority queues. Do not import v12's ClickHouse HA or distributed-storage assumptions into 11.3. Check current version defaults before changing images or layouts.
-- Keep shell and template files LF on Git for Windows.
+- Keep shared shell and template files LF on Git for Windows.
 
 ## Choose the native mechanism
 
@@ -44,7 +44,7 @@ Document `helm test` separately from installation. It does not run automatically
 
 ## Explicit storage maintenance
 
-Ordinary upgrades must not silently expand PVCs or remove controllers. The existing `--resize-storage` operation in each version's `install.sh` is an explicit exception: it uses server-side preflight, private controller manifests and documented manual recovery using `kubectl`/`oc`. Read the relevant version README before changing this path. Use the existing Helm and Kubernetes CLIs rather than adding Python or extra JSON/YAML tools for storage maintenance.
+Ordinary upgrades must not silently expand PVCs or remove controllers. The existing `--resize-storage` operation in `platform/lib/storage-maintenance.sh` is an explicit exception: it uses server-side preflight, private controller manifests and documented manual recovery using `kubectl`/`oc`. Read the relevant version README before changing this path. Use the existing Helm and Kubernetes CLIs rather than adding Python or extra JSON/YAML tools for storage maintenance.
 
 Account for partial expansion, failed upgrades, interruption of the installer process, and manual recovery using saved StatefulSet YAML and `kubectl`/`oc create`. Preserve existing controllers and validate recovery namespaces. PVC expansion cannot be reversed by rollback. Independent releases do not form one transaction. Keep concurrency restrictions and failure/recovery instructions explicit; do not move broad cluster mutations into hooks merely to remove Bash.
 

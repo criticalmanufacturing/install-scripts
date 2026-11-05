@@ -6,5 +6,5 @@ version: 11.3.0
 appVersion: "3.13.7"
 dependencies:
   - name: common
-    version: 11.3.0
-    repository: file://../common
+    version: 1.0.0
+    repository: file://../../../common/chart
