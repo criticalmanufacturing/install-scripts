@@ -1,6 +1,8 @@
 ClickHouse runs as one server without replication. MES 11.3 does not support this chart with multiple servers.
 
 Read the MES connection information with:
-  ./install.sh -n {{ .Release.Namespace }} --print
+  ./install.sh -n {{ .Release.Namespace }} -f <values-file> --print
+
+Use a values file with global.namePrefix set to {{ include "common.prefix" . }}.
 
 See README.md for installation and support limitations.

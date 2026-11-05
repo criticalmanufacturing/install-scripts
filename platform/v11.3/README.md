@@ -36,6 +36,86 @@ The installer supports generated or existing TLS certificates, cert-manager, pri
 
 This creates a new deployment. Migrating existing data from another chart or installer needs a separate migration procedure.
 
+## Install and upgrade directly with Helm
+
+Run these commands from `platform/v11.3`, keeping the repository's `platform/common/chart` directory in place.
+The namespace must already exist. On OpenShift, use `oc` in place of `kubectl`.
+
+Copy [values.yaml](values.yaml), edit it, and choose which components to install:
+
+```bash
+cp values.yaml values.helm.yaml
+CM_NAMESPACE=mes-dependencies
+CM_PREFIX=cmmes
+CM_VALUES=values.helm.yaml
+CM_COMPONENTS=(kafka clickhouse rabbitmq s3)
+```
+
+Set `global.namePrefix` in the values file to `$CM_PREFIX`. When upgrading, use the existing release names,
+namespace and values. To reuse wizard answers, replace `-f "$CM_VALUES"` below with
+`-f values.yaml -f values.generated.yaml`.
+
+Remove components you already run elsewhere from `CM_COMPONENTS`. Also set their `<component>.enabled: false`
+in the values file to exclude them from monitoring.
+
+Build dependencies from the lock files, then install:
+
+```bash
+(
+  set -e
+  for component in "${CM_COMPONENTS[@]}"; do
+    helm dependency build --skip-refresh "charts/$component"
+    helm upgrade --install "$CM_PREFIX-$component" "charts/$component" \
+      -n "$CM_NAMESPACE" -f "$CM_VALUES" --wait --timeout 20m
+  done
+)
+```
+
+The loop stops on failure. Releases already installed are kept; fix the error and rerun it. For larger volumes,
+follow [Storage maintenance and recovery](#storage-maintenance-and-recovery) before upgrading.
+
+In `auto` TLS mode, each chart creates its own CA unless a shared CA Secret exists.
+Add each CA to MES's trusted certificates. To share a signing CA, create its TLS Secret in the namespace first
+and set `global.tls.caSecret` to its name. For `existing` or `certManager` mode, set the Secret names or issuer
+in the values file.
+
+For monitoring, set `observability.otlpEndpoint` in the same values file and install the collector after the other components:
+
+```bash
+helm dependency build --skip-refresh charts/otel
+helm upgrade --install "$CM_PREFIX-otel" charts/otel \
+  -n "$CM_NAMESPACE" -f "$CM_VALUES" --wait --timeout 20m
+```
+
+To upgrade, review the new defaults, update your values file and rerun the commands above. Keep the TLS mode and CA unless
+you are rotating certificates. Use Helm for upgrades: offline `helm template` output cannot reuse credentials and certificates
+from the cluster.
+
+### Test the deployment
+
+After installing or upgrading, run the application tests:
+
+```bash
+for component in "${CM_COMPONENTS[@]}"; do
+  helm test "$CM_PREFIX-$component" -n "$CM_NAMESPACE" --logs --timeout 4m || break
+done
+```
+
+The loop stops at the first failed test. Check its logs, fix the problem and rerun. All component tests should pass.
+
+Tests connect over TLS with MES credentials and exercise Kafka produce/consume, ClickHouse queries and writes,
+RabbitMQ classic priority queues, and S3 object operations. Tests run separately from installation and do not roll back a failed release.
+
+### Diagnose failures
+
+For a failed Kafka release, check:
+
+```bash
+helm status "$CM_PREFIX-kafka" -n "$CM_NAMESPACE"
+helm get notes "$CM_PREFIX-kafka" -n "$CM_NAMESPACE"
+kubectl -n "$CM_NAMESPACE" get pods -l "app.kubernetes.io/instance=$CM_PREFIX-kafka"
+```
+
 ## MES connection settings
 
 The installer prints the connection settings and saves them in `output/connection-info.txt`, together with the certificate files required by MES.
@@ -67,11 +147,13 @@ kubectl -n "$MES_NAMESPACE" create secret generic cmmes-s3-ca \
 
 Add `cmmes-s3-ca` to **Custom Certificates** and apply the MES deployment so its containers import the CA at startup. Repeat for `clickhouse-ca.crt` if it has a different CA. A single entry is sufficient for components that share the same CA. Kafka's certificate fields alone do not configure the operating-system trust store used by Cube Store to connect to S3.
 
-Keep the files in `output/` private: they contain passwords and keys. Print the connection information again with:
+Keep the files in `output/` private: they contain passwords and keys. To print the connection information again, use the values file that sets the installed prefix:
 
 ```bash
-./install.sh -n <namespace> --print
+./install.sh -n <namespace> -f <values-file> --print
 ```
+
+If `values.generated.yaml` exists in the current directory, `--print` uses it automatically when `-f` is omitted. Otherwise, it uses the prefix in `values.yaml`.
 
 ## Verify application access
 

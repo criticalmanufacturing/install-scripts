@@ -4,8 +4,10 @@
 Standalone RustFS (one server, one persistent data volume) is starting in namespace {{ $ns }}.
 S3 endpoint: {{ include "s3.endpointUrl" . }}   bucket: {{ include "s3.bucket" . }}
 
-Values to type in the CM MES installer (run ./install.sh to print them and save the CA):
+Values to type in the CM MES installer (or use ./install.sh -n {{ $ns }} -f <values-file> --print):
   kubectl -n {{ $ns }} get secret {{ $name }}-connection -o jsonpath='{.data.mes-installer\.txt}' | base64 -d
   kubectl -n {{ $ns }} get secret {{ include "s3.tlsSecret" . }} -o jsonpath='{.data.ca\.crt}' | base64 -d > s3-ca.crt
+
+For --print, use a values file with global.namePrefix set to {{ include "common.prefix" . }}.
 
 {{- end }}
