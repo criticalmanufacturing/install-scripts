@@ -32,7 +32,13 @@ fixture = pathlib.Path(os.environ['MODE_FIXTURES'])
 with open(os.environ['MODE_REQUESTS'], 'a', encoding='utf-8') as stream:
     stream.write(json.dumps(args) + '\n')
 expected = os.environ.get('MODE_REGISTRY', 'criticalmanufacturing.io')
-version = os.environ.get('MODE_VERSION', '1.0.0')
+version = os.environ.get('MODE_VERSION', '1.0.1')
+if url == 'https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/cm-cloud-bridge/stable-version':
+    if os.environ.get('MODE_LATEST_FAILURE'):
+        print('Synthetic stable-release lookup failure', file=sys.stderr)
+        sys.exit(22)
+    print(os.environ.get('MODE_STABLE_VERSION', version), end='')
+    sys.exit(0)
 prefix = '/repository/tools/cm-cloud-bridge-' + version + '/latest/'
 if parsed.netloc != expected or not parsed.path.startswith(prefix) or parsed.query:
     print('Unexpected artifact URL', file=sys.stderr)
@@ -95,7 +101,7 @@ class InstallModes(unittest.TestCase):
             path.chmod(0o755)
         for mode, name in SCRIPTS.items():
             (self.fixtures / name).write_bytes(backend(mode))
-        (self.fixtures / "VERSION").write_text("1.0.0\n")
+        (self.fixtures / "VERSION").write_text("1.0.1\n")
         self.write_manifest()
         (self.work / "link.yaml").write_text("# SYNTHETIC_PRIVATE_LINK_MUST_NOT_APPEAR\n")
         (self.work / "app-values.yaml").write_text(
@@ -212,6 +218,70 @@ class InstallModes(unittest.TestCase):
                 self.assertEqual(args[args.index("--app-port") + 1], "7990")
                 self.assertTrue(any(SCRIPTS[mode] in arg for command in self.downloaded() for arg in command))
 
+    def test_latest_stable_is_resolved_once_for_each_ubuntu_mode(self):
+        self.env['MODE_VERSION'] = '2.4.6'
+        (self.fixtures / 'VERSION').write_text('2.4.6\n')
+        for mode in SCRIPTS:
+            with self.subTest(mode=mode):
+                self.requests.unlink(missing_ok=True)
+                self.executed.unlink(missing_ok=True)
+                status, output = self.run_installer('--mode', mode)
+                self.assertEqual(status, 0, output)
+                self.assertIn('Selected version: 2.4.6', output)
+                self.assert_backend(mode)
+                requests = self.downloaded()
+                self.assertEqual(len(requests), 4, requests)
+                lookup = requests[0]
+                self.assertEqual(lookup[-1], 'https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/cm-cloud-bridge/stable-version')
+                for option, value in (('--connect-timeout', '15'), ('--max-time', '60'),
+                                      ('--max-redirs', '5'), ('--proto', '=https'), ('--proto-redir', '=https')):
+                    self.assertEqual(lookup[lookup.index(option) + 1], value)
+                for request in requests[1:]:
+                    self.assertIn('/cm-cloud-bridge-2.4.6/latest/', request[-1])
+
+    def test_malformed_stable_catalog_stops_before_artifact_download(self):
+        for content in ('1.0.2-beta.1', '1.0.2+build', '01.0.2', '1.2', 'v1.0.2',
+                        'cm-cloud-bridge-v1.0.2', '1.0.2\n1.0.3', '1.0.2 extra',
+                        ' 1.0.2', '1.0.2 ', '1.0.2\r\n', '', '<html>error</html>'):
+            with self.subTest(content=content):
+                self.requests.unlink(missing_ok=True)
+                self.env['MODE_STABLE_VERSION'] = content
+                status, output = self.run_installer('--mode', 'native')
+                self.assertNotEqual(status, 0, output)
+                self.assertIn('stable Ubuntu release catalog contains an invalid version', output)
+                self.assertEqual(len(self.downloaded()), 1)
+                self.assert_no_backend()
+                self.assert_no_helm()
+
+    def test_latest_lookup_failure_stops_without_pinned_fallback(self):
+        self.env['MODE_LATEST_FAILURE'] = '1'
+        status, output = self.run_installer('--mode', 'podman')
+        self.assertNotEqual(status, 0, output)
+        self.assertIn('Could not resolve the latest stable Ubuntu release', output)
+        self.assertEqual(len(self.downloaded()), 1)
+        self.assert_no_backend()
+        self.assert_no_helm()
+
+    def test_stable_catalog_accepts_its_normal_line_ending(self):
+        self.env['MODE_STABLE_VERSION'] = '1.0.1\n'
+        status, output = self.run_installer('--mode', 'native')
+        self.assertEqual(status, 0, output)
+        self.assertIn('Selected version: 1.0.1', output)
+        self.assert_backend('native')
+
+    def test_explicit_pin_works_for_each_mode_when_catalog_is_offline(self):
+        self.env.update(MODE_VERSION='2.3.4', MODE_LATEST_FAILURE='1')
+        (self.fixtures / 'VERSION').write_text('2.3.4\n')
+        for mode in SCRIPTS:
+            with self.subTest(mode=mode):
+                self.requests.unlink(missing_ok=True)
+                self.executed.unlink(missing_ok=True)
+                status, output = self.run_installer('--mode', mode, '--version', '2.3.4')
+                self.assertEqual(status, 0, output)
+                self.assert_backend(mode)
+                self.assertEqual(len(self.downloaded()), 3)
+                self.assertFalse(any('stable-version' in arg for request in self.downloaded() for arg in request))
+
     def test_menu_native_and_podman_choices(self):
         for choice, mode in (("1", "native"), ("2", "podman"), ("native", "native"), ("podman", "podman")):
             with self.subTest(choice=choice):
@@ -248,7 +318,7 @@ class InstallModes(unittest.TestCase):
                 self.assert_no_backend()
 
     def test_explicit_version_registry_and_array_arguments(self):
-        self.env.update(MODE_VERSION="2.3.4", MODE_REGISTRY="registry.example.test:5443")
+        self.env.update(MODE_VERSION="2.3.4", MODE_REGISTRY="registry.example.test:5443", MODE_LATEST_FAILURE="1")
         (self.fixtures / "VERSION").write_text("2.3.4\n")
         link = self.work / "private folder" / "another link.yaml"
         link.parent.mkdir()
@@ -261,6 +331,8 @@ class InstallModes(unittest.TestCase):
             "--timeout", "120",
         )
         self.assertEqual(status, 0, output)
+        self.assertEqual(len(self.downloaded()), 3)
+        self.assertFalse(any('stable-version' in arg for request in self.downloaded() for arg in request))
         arguments = self.assert_backend("native")
         final = dict(zip(arguments[::2], arguments[1::2]))
         self.assertEqual(final["--link-file"], str(link))

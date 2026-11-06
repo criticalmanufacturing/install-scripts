@@ -63,7 +63,7 @@ class InstallLogs(unittest.TestCase):
         status, output = self.run_installer("--mode", "native")
         self.assertEqual(status, 0, output)
         content = self.assert_log(0, output)
-        for message in ("Selected version: 1.0.0", "Synthetic backend executed.",
+        for message in ("Selected version: 1.0.1", "Synthetic backend executed.",
                         "Synthetic build diagnostic on stderr.", "Synthetic build line 299",
                         "Synthetic final build line."):
             self.assertIn(message, content)

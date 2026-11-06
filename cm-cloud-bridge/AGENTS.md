@@ -11,6 +11,8 @@ customer installation flow and the existing security and retry guarantees.
   installers; Helm does not install workstation tools.
 - `README.md` is the customer guide. `app-values.example.yaml` shows the settings
   Critical Manufacturing prepares before sending them to the customer.
+- `stable-version` contains the verified stable Ubuntu release as one numeric
+  `X.Y.Z` line; promotion follows the release contract below.
 - `tests/test_helm_install.sh` contains offline installer tests with mocked tools
   and a real controlling terminal for piped execution.
 - `tests/test_install_modes.py` covers mode selection and Ubuntu delegation with
@@ -31,8 +33,16 @@ customer installation flow and the existing security and retry guarantees.
 
 - Offer Native Ubuntu, Podman on Ubuntu, and Helm in the terminal menu;
   `--mode native|podman|helm` skips that menu. Preserve piped execution for all modes.
-- Ubuntu modes default to release `1.0.0`; `--version X.Y.Z` pins the numeric
-  connector release. Download the appropriate published script and `SHA256SUMS`
+- Ubuntu modes read the public `cm-cloud-bridge/stable-version` file from `main`
+  exactly once and accept only a strict stable numeric `X.Y.Z` version. This file
+  is the stable-release catalog, separate from the installer code. Promote it only
+  after all corresponding release artifacts have been published
+  and verified at their customer endpoints. Keep this promotion step in future
+  release instructions; GitHub tags and releases are not required.
+  Fail clearly on lookup/network failures or malformed catalog contents; never fall
+  back to a hardcoded version. `--version X.Y.Z` pins the connector release and
+  skips the catalog lookup. Require no additional runtime parsing tools.
+  Download the appropriate published script and `SHA256SUMS`
   from `https://criticalmanufacturing.io/repository/tools/cm-cloud-bridge-<version>/latest/`.
   Verify its checksum before execution. The version is pinned by package name;
   do not treat the storage segment `latest` as permission to select another release.
