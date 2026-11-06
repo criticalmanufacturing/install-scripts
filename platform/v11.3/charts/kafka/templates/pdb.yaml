@@ -1,0 +1,1 @@
+{{ include "common.pdb" (dict "ctx" . "component" "kafka" "maxUnavailable" 1) }}

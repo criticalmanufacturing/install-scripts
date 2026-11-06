@@ -1,0 +1,10 @@
+{{/* TLS certificate for the single ClickHouse server. */}}
+{{- $docs := list -}}
+{{- $docs = append $docs (include "common.tls.caSecret" (dict "ctx" . "component" "clickhouse")) -}}
+{{- $docs = append $docs (include "common.tls.certificate" (dict "ctx" . "component" "clickhouse" "name" (include "clickhouse.tlsSecret" .) "cn" (include "clickhouse.fullname" .) "dnsNames" (include "clickhouse.tls.dnsNames" . | fromYamlArray) "ips" (list "127.0.0.1" "::1"))) -}}
+{{- range $docs }}
+{{- if trim . }}
+---
+{{ trim . }}
+{{- end }}
+{{- end }}

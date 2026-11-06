@@ -1,0 +1,4 @@
+# Scripts (install.sh and the shell scripts inside the chart templates) break with CRLF,
+# so keep LF on checkout even with core.autocrlf=true (Git for Windows default).
+* text=auto eol=lf
+*.tgz binary

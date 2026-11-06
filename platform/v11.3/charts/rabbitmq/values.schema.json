@@ -1,0 +1,333 @@
+{
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "namePrefix": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 20,
+          "minLength": 1
+        },
+        "storageClass": {
+          "type": "string"
+        },
+        "imageRegistry": {
+          "type": "string"
+        },
+        "imagePullSecrets": {
+          "type": "array"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "openshift",
+            "kubernetes"
+          ]
+        },
+        "clusterDomain": {
+          "type": "string"
+        },
+        "podAntiAffinity": {
+          "type": "string",
+          "enum": [
+            "hard",
+            "soft"
+          ]
+        },
+        "nodeSelector": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "existing",
+                "certManager"
+              ]
+            },
+            "caSecret": {
+              "type": "string"
+            },
+            "regenerate": {
+              "type": "boolean"
+            },
+            "validityDays": {
+              "type": "integer"
+            },
+            "certManager": {
+              "type": "object",
+              "properties": {
+                "issuerName": {
+                  "type": "string"
+                },
+                "issuerKind": {
+                  "type": "string"
+                },
+                "issuerGroup": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "rabbitmq": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1,
+          "const": 1
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            },
+            "pullPolicy": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "erlangCookie": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "virtualHost": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "existingSecret": {
+              "type": "string"
+            },
+            "renewalCheckIntervalSeconds": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": true
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "diskFreeLimit": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": [
+                    "string",
+                    "number"
+                  ]
+                },
+                "memory": {
+                  "type": [
+                    "string",
+                    "number"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "memory": {
+                  "type": [
+                    "string",
+                    "number"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        },
+        "management": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": true
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "affinity": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "test": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "required": [
+    "global",
+    "rabbitmq"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "global",
+          "rabbitmq"
+        ],
+        "properties": {
+          "global": {
+            "properties": {
+              "tls": {
+                "properties": {
+                  "mode": {
+                    "const": "existing"
+                  }
+                }
+              }
+            }
+          },
+          "rabbitmq": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "rabbitmq": {
+            "properties": {
+              "tls": {
+                "properties": {
+                  "existingSecret": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "existingSecret"
+                ]
+              }
+            },
+            "required": [
+              "tls"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "global": {
+            "properties": {
+              "tls": {
+                "properties": {
+                  "mode": {
+                    "const": "certManager"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "global": {
+            "properties": {
+              "tls": {
+                "properties": {
+                  "certManager": {
+                    "properties": {
+                      "issuerName": {
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "issuerName"
+                    ]
+                  }
+                },
+                "required": [
+                  "certManager"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

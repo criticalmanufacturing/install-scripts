@@ -4,7 +4,7 @@ Pod-level helpers: images, pull secrets, security contexts and scheduling.
 
 {{/*
 Full image reference, honouring global.imageRegistry for private registries.
-image: { repository: "apache/kafka", tag: "4.3.1", pullPolicy: IfNotPresent }
+image: { repository: "apache/kafka", tag: "3.8.1", pullPolicy: IfNotPresent }
 Usage: include "common.image" (dict "ctx" $ "image" .Values.kafka.image)
 */}}
 {{- define "common.image" -}}
@@ -160,4 +160,9 @@ spec:
   selector:
     matchLabels:
       {{- include "common.selectorLabels" (dict "ctx" .ctx "component" .component) | nindent 6 }}
+{{- end -}}
+
+{{/* Metrics/exporters are enabled only when an OTLP backend is configured. */}}
+{{- define "common.observability.enabled" -}}
+{{- if and .Values.observability (.Values.observability.otlpEndpoint | default "" | trim) -}}true{{- end -}}
 {{- end -}}
