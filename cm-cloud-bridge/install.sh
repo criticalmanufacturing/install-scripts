@@ -9,7 +9,6 @@ umask 077
 
 version=''
 mode=''
-ubuntu_default_version=1.0.0
 ubuntu_options=()
 namespace_supplied=false
 release_supplied=false
@@ -41,7 +40,7 @@ Install the CM Cloud Bridge using files supplied by Critical Manufacturing.
 Usage: bash install.sh [options]
 
   --mode MODE             native, podman, or helm (default: ask in the terminal)
-  --version VERSION       Helm: latest stable by default; Ubuntu: 1.0.0
+  --version VERSION       Pin a release (default: latest stable)
   --values FILE           Optional application settings (default: ./app-values.yaml)
   --link-file FILE        Private cloud Link file (default: ./link.yaml)
   --namespace NAME        Installation namespace (default: default)
@@ -106,7 +105,7 @@ if [[ $registry == *:* ]]; then
     ((10#$registry_port >= 1 && 10#$registry_port <= 65535)) || fail 'Registry port must be 1..65535.'
 fi
 if [[ -n $version && ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-    fail 'Invalid release version; use a version such as --version 1.0.0, or omit it for latest stable.'
+    fail 'Invalid release version; use a version such as --version 1.0.1, or omit it for latest stable.'
 fi
 if [[ -z $mode ]]; then
     if ! { exec 3<>/dev/tty; } 2>/dev/null; then
@@ -131,10 +130,9 @@ esac
 
 install_ubuntu() {
     [[ $release_supplied == false ]] || fail '--release applies to Helm. Use --site-name for Ubuntu.'
-    version=${version:-$ubuntu_default_version}
-    [[ $version =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] ||
-        fail 'Ubuntu release versions must use X.Y.Z, such as --version 1.0.0.'
-    local tool installer base checksum_file checksum extra expected_sum='' line key value seen=' '
+    [[ -z $version || $version =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] ||
+        fail 'Ubuntu release versions must use X.Y.Z, such as --version 1.0.1.'
+    local tool installer base checksum_file checksum extra expected_sum='' line key value stable_version seen=' '
     local settings_options=()
     for tool in curl mktemp sha256sum; do
         command -v "$tool" >/dev/null || fail "Install $tool before running this installer."
@@ -172,6 +170,21 @@ install_ubuntu() {
         settings_options+=(--link-file "$link_file")
     fi
     if [[ $namespace_supplied == true ]]; then settings_options+=(--namespace "$namespace"); fi
+    if [[ -z $version ]]; then
+        stage='resolving the latest stable Ubuntu release'
+        # Promote this public catalog only after all release artifacts pass verification.
+        if ! stable_version=$(curl --disable --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' --max-redirs 5 \
+            --connect-timeout 15 --max-time 60 \
+            https://raw.githubusercontent.com/criticalmanufacturing/install-scripts/main/cm-cloud-bridge/stable-version); then
+            fail 'Could not resolve the latest stable Ubuntu release. Check download access or use --version X.Y.Z supplied by Critical Manufacturing.'
+        fi
+        if [[ $stable_version =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            version=$stable_version
+        else
+            fail 'The stable Ubuntu release catalog contains an invalid version. Contact Critical Manufacturing or use a supplied --version X.Y.Z.'
+        fi
+    fi
     installer=setup-cm-cloud-bridge-ubuntu.sh
     if [[ $mode == native ]]; then installer=setup-cm-cloud-bridge-ubuntu-native.sh; fi
     base="https://$registry/repository/tools/cm-cloud-bridge-$version/latest"

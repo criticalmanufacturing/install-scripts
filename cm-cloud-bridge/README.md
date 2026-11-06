@@ -50,8 +50,11 @@ Check the cluster shown on screen and confirm with `y`. Enter registry
 credentials only if requested; the token is hidden while you type.
 
 To skip the menu, add `-s -- --mode native`, `-s -- --mode podman`, or
-`-s -- --mode helm` after `bash`. Ubuntu installations default to release `1.0.0`;
-Helm selects the latest stable release. Add `--version VERSION` after the mode
+`-s -- --mode helm` after `bash`. Ubuntu selects the verified stable CM Cloud Bridge
+release listed in the public `stable-version` catalog; Helm selects the latest
+stable chart release.
+If stable release selection is unavailable, installation stops with an error.
+Add `--version VERSION` after the mode
 to pin the release supplied by Critical Manufacturing. The selected version is shown
 before installation. Wait for installation to finish successfully.
 
@@ -82,4 +85,4 @@ support messages.
 
 For another application, ask your contact for the appropriate settings. The
 default Helm release is `cm-cloud-bridge` in namespace `default`. Rerunning
-Helm without `--version` can select a newer stable release.
+an installation without `--version` can select a newer stable release.
