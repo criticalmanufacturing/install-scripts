@@ -664,7 +664,13 @@ check_volumes() {
   fi
   while IFS='|' read -r sts vct size sc; do
     [[ -n "$sts" && -n "$vct" ]] || continue
-    live="$(kcn get statefulset "$sts" -o "jsonpath={range .spec.volumeClaimTemplates[*]}{.metadata.name}{\"|\"}{.spec.resources.requests.storage}{\"|\"}{.spec.storageClassName}{\"\\n\"}{end}" 2>/dev/null | tr -d '\r' | grep "^$vct|" || true)"
+    if ! live="$(kcn get statefulset "$sts" -o "jsonpath={range .spec.volumeClaimTemplates[*]}{.metadata.name}{\"|\"}{.spec.resources.requests.storage}{\"|\"}{.spec.storageClassName}{\"\\n\"}{end}" 2>&1)"; then
+      [[ "$ACTION" == resize ]] || continue
+      err "Cannot read StatefulSet '$sts' in namespace '$NAMESPACE':"
+      printf '%s\n' "$live" >&2
+      die "Storage maintenance stopped. See README.md for recovery instructions. No volumes or controllers were changed."
+    fi
+    live="$(printf '%s\n' "$live" | tr -d '\r' | grep "^$vct|" || true)"
     [[ -n "$live" ]] || continue                     # new StatefulSet or new volume: nothing to compare
     IFS='|' read -r _ lsize lsc <<<"$live"
     if [[ "$lsc" != "$sc" ]]; then

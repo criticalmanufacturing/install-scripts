@@ -292,7 +292,7 @@ This operation requires Helm 3.13+ (or Helm 4). It performs a server-side Helm p
 
 The affected releases are upgraded using the supplied values, so any other changes in those values are applied too. Expansion requests cannot shrink existing PVCs. Some storage drivers require a pod restart to finish filesystem expansion.
 
-If maintenance fails or is interrupted, the script reports the recovery directory. Recovery is manual: check the affected release and its controllers before retrying. For example, for ClickHouse:
+If maintenance fails or is interrupted, the script reports the recovery directory. Recovery is manual: check the affected release and its controllers before retrying. `--resize-storage` stops if an expected StatefulSet is missing or cannot be read. Restore missing controllers from that maintenance run's saved YAML before retrying. For example, for ClickHouse:
 
 ```bash
 kubectl -n <namespace> get statefulset <prefix>-clickhouse
