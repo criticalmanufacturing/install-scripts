@@ -635,6 +635,19 @@ rendered_vcts() {
     END { flush() }' "$1"
 }
 
+# require_storage_maintenance: save wizard answers before rejecting ordinary volume growth.
+require_storage_maintenance() {
+  [[ "$ACTION" == resize ]] && return 0
+  $DRY_RUN && return 0
+  if $INTERACTIVE; then
+    write_generated "$GENERATED_VALUES"
+    local maintenance_command
+    printf -v maintenance_command './install.sh -n %q -f %q --resize-storage' "$NAMESPACE" "$GENERATED_VALUES"
+    die "Volume growth requires explicit maintenance. No volumes or controllers were changed. Run: $maintenance_command"
+  fi
+  die "Volume growth requires explicit maintenance: rerun with --resize-storage and the same values file. No volumes or controllers were changed."
+}
+
 # check_volumes <component>: compare rendered and installed claims and add growth to RESIZE_PLAN.
 # Reject forbidden changes before anything is changed.
 check_volumes() {

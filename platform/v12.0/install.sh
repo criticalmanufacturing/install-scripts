@@ -807,7 +807,7 @@ live_checks() {
     [[ "$c" == otel ]] || check_volumes "$c"
   done
   if ((${#RESIZE_PLAN[@]} > 0)); then
-    [[ "$ACTION" == resize ]] || $DRY_RUN || die "Volume growth requires explicit maintenance: rerun with --resize-storage and the same values file. No volumes or controllers were changed."
+    require_storage_maintenance
     local comp sts vct size lsize
     heading "Volume resize"
     info "These volumes will be enlarged. Kubernetes cannot change the volume size of a StatefulSet,"
