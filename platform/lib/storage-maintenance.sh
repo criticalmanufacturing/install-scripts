@@ -91,8 +91,9 @@ run_storage_maintenance() {
   [[ $- != *m* ]] || had_monitor=true
   # A separate process group allows signals to stop Helm/kubectl as well as the worker.
   # All interactive confirmation happens above, in the foreground installer.
+  # Prompts must fail on EOF rather than suspend the background worker.
   set -m
-  storage_maintenance_worker &
+  storage_maintenance_worker </dev/null &
   maintenance_pid=$!
   $had_monitor || set +m
   wait "$maintenance_pid" || rc=$?
