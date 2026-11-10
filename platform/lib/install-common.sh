@@ -682,7 +682,7 @@ check_volumes() {
     local lb nb
     lb="$(to_bytes "$lsize")"; nb="$(to_bytes "$size")"
     if [[ "$lb" == -1 || "$nb" == -1 ]]; then
-      warn "$sts: cannot compare the volume sizes '$lsize' and '$size'; continuing."; continue
+      die "$sts: cannot compare the volume sizes '$lsize' and '$size'. Use supported units such as Mi, Gi or Ti before retrying."
     fi
     (( nb == lb )) && continue
     if (( nb < lb )); then
@@ -707,16 +707,20 @@ check_volumes() {
 
 # apply_resize <component>: expand planned PVCs and orphan affected StatefulSets for a subsequent Helm upgrade.
 apply_resize() {
-  local comp=$1 line c sts vct size lsize pvc cur
+  local comp=$1 line c sts vct size lsize pvc cur target_bytes current_bytes
   local -a done_sts=()
   for line in ${RESIZE_PLAN[@]+"${RESIZE_PLAN[@]}"}; do
     IFS='|' read -r c sts vct size lsize <<<"$line"
     [[ "$c" == "$comp" ]] || continue
+    target_bytes="$(to_bytes "$size")"
+    [[ "$target_bytes" != -1 ]] || die "Cannot parse the requested size '$size' for $sts. Storage maintenance stopped."
     while IFS= read -r pvc; do
       pvc=${pvc%$'\r'}; pvc=${pvc#persistentvolumeclaim/}
       [[ "$pvc" =~ ^$vct-$sts-[0-9]+$ ]] || continue
       cur="$(kcn get pvc "$pvc" -o 'jsonpath={.spec.resources.requests.storage}' 2>/dev/null | tr -d '\r' || true)"
-      if [[ -n "$cur" ]] && (( $(to_bytes "$cur") >= $(to_bytes "$size") )); then continue; fi
+      current_bytes="$(to_bytes "$cur")"
+      [[ "$current_bytes" != -1 ]] || die "Cannot read or parse the size '$cur' of PVC '$pvc'. Storage maintenance stopped."
+      (( current_bytes >= target_bytes )) && continue
       kcn patch pvc "$pvc" --type merge -p "{\"spec\":{\"resources\":{\"requests\":{\"storage\":\"$size\"}}}}" >/dev/null \
         || die "Could not resize volume $pvc (kubectl -n $NAMESPACE describe pvc $pvc)."
       ok "Volume $pvc: resize to $size requested"
