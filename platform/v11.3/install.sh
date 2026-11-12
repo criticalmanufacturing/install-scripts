@@ -8,6 +8,7 @@
 #   ./install.sh -n <namespace> -f <values.yaml>   non-interactive (asks to confirm)
 #   ./install.sh -n <namespace> -f <values.yaml> --yes
 #   ./install.sh ... --dry-run                     render to ./output/rendered/, install nothing
+#   ./install.sh ... --resize-storage              expand volumes and upgrade affected releases
 #   ./install.sh -n <namespace> --print            print the connection information again
 #   ./install.sh -n <namespace> --uninstall        remove the releases (data volumes are kept)
 #   ./install.sh -h                                help
@@ -55,7 +56,7 @@ ANN="cmf\\.criticalmanufacturing\\.com"   # annotation prefix, escaped for kubec
 # ----------------------------------------------------------------------------
 # Options and state
 # ----------------------------------------------------------------------------
-ACTION="install"          # install | uninstall | print
+ACTION="install"          # install | uninstall | print | resize
 NAMESPACE=""
 USER_VALUES=""
 DRY_RUN=false
@@ -75,7 +76,6 @@ declare -A BASE_VALUES=()             # values.yaml alone (the wizard writes onl
 declare -a VALUES_FILES=()      # values files passed to every release
 declare -a SAVED_FILES=()       # files written to ./output by print_connection_info
 VALUES_DISPLAY=""
-
 
 trap cleanup EXIT
 
@@ -110,6 +110,7 @@ Examples:
   ./install.sh
   ./install.sh -n mes-deps -f ${GENERATED_VALUES} --yes
   ./install.sh -n mes-deps -f values.yaml --dry-run
+  ./install.sh -n mes-deps -f ${GENERATED_VALUES} --resize-storage
   ./install.sh -n mes-deps --print
 
 Files written to ./output/: connection-info.txt, <component>-ca.crt and other
@@ -118,12 +119,8 @@ EOF
 }
 
 # ----------------------------------------------------------------------------
-# Small utilities
+# Component names
 # ----------------------------------------------------------------------------
-
-
-# Absolute path of an existing file (for comparing values files).
-
 
 component_title() {
   case "$1" in
@@ -133,15 +130,11 @@ component_title() {
 }
 
 # ----------------------------------------------------------------------------
-# Reading values without yq: render a tiny throw-away chart with helm.
-#
-# Why helm and not awk: install.sh passes values.yaml AND the user's file to every
-# release, so the effective value is Helm's merge of both. Letting Helm itself parse
-# and merge the files gives exactly the values the charts will see (any valid YAML:
-# flow maps, quoting, anchors, comments), and reports YAML syntax errors early.
-# Limits: maps are returned as their sorted key names, lists as comma-separated
-# items, multi-line strings with "\n"; values must not contain a newline to be
-# compared. That is enough for the keys install.sh needs.
+# Keys the shared reader extracts for this MES version's prompts and checks.
+# Each release receives the base values.yaml and the user's overrides, so the
+# installer must read the same merged values. The reader uses a temporary Helm
+# chart to let Helm parse and merge the YAML, without a separate YAML parser.
+# VALUE_KEYS selects the settings the installer needs from that merged result.
 # ----------------------------------------------------------------------------
 VALUE_KEYS=(
   global.namePrefix global.storageClass global.imageRegistry global.imagePullSecrets
@@ -159,11 +152,9 @@ VALUE_KEYS=(
   observability.tls.ca observability.headers@json observability.tls.ca@json
 )
 
-
 # ----------------------------------------------------------------------------
-# Step 1: prerequisites
+# Namespace checks
 # ----------------------------------------------------------------------------
-
 
 check_namespace() {
   $CLUSTER_OK || return 0
@@ -181,10 +172,8 @@ check_namespace() {
   ok "You can create the needed resources in '$NAMESPACE'"
 }
 
-# require_can_i <verb> <resource>...: stops when the user may not <verb> one of them.
-
 # ----------------------------------------------------------------------------
-# Step 2: detection
+# Cluster detection
 # ----------------------------------------------------------------------------
 
 detect_cluster() {
@@ -255,7 +244,6 @@ OVERRIDE_KEY_ORDER=(
   observability.otlpEndpoint observability.headers observability.tls.insecureSkipVerify observability.tls.ca
 
 )
-
 
 wizard_components() {
   heading "Step 3/8 - Components"
@@ -339,7 +327,6 @@ wizard_storage() {
     ask "WIZARD_ANSWERS[global.storageClass]" "StorageClass for the data volumes (empty = cluster default)" "${EFFECTIVE_VALUES[global.storageClass]:-}"
   fi
 
-
   note "Size of each data volume (e.g. 50Gi, 1Ti). It can be increased later (never decreased)"
   note "when the StorageClass allows expansion; use --resize-storage for existing volumes."
   [[ "${WIZARD_ANSWERS[kafka.enabled]}" == true ]] && ask_size kafka.storage.size "Kafka, per broker (x${EFFECTIVE_VALUES[kafka.replicas]:-3})" kafka data
@@ -417,6 +404,7 @@ run_wizard() {
 # ----------------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------------
+
 # Component layouts are specific to this MES version.
 show_component_summary() {
   local p=${EFFECTIVE_VALUES[global.namePrefix]}
