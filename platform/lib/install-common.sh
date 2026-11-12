@@ -669,15 +669,21 @@ require_storage_maintenance() {
 # check_volumes <component>: compare rendered and installed claims and add growth to RESIZE_PLAN.
 # Reject forbidden changes before anything is changed.
 check_volumes() {
-  local comp=$1 rel rendered line sts vct size sc live lsize lsc claim_templates
+  local comp=$1 rel rendered render_log line sts vct size sc live lsize lsc claim_templates
   local -A statefulset_claims=()
   rel="$(release_name "$comp")"
   make_tmp
   rendered="$TMP_DIR/check-$rel.yaml"
+  render_log="$TMP_DIR/check-$rel.log"
   local -a vargs=()
   local f
   for f in "${VALUES_FILES[@]}"; do vargs+=(-f "$f"); done
-  if ! "$HELM" template "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" "${vargs[@]}" >"$rendered" 2>/dev/null; then
+  if ! "$HELM" template "$rel" "$CHARTS_DIR/$comp" -n "$NAMESPACE" "${vargs[@]}" >"$rendered" 2>"$render_log"; then
+    if [[ "$ACTION" == resize ]]; then
+      err "Cannot render $(component_title "$comp") to check its volumes:"
+      sed 's/^/    /' "$render_log" >&2
+      die "Storage maintenance stopped. No volumes or controllers were changed."
+    fi
     warn "$(component_title "$comp"): could not render the chart to compare the volumes (see the install step)."
     return 0
   fi
