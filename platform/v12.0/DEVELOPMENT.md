@@ -224,6 +224,6 @@ and sends them over OTLP/HTTP to that endpoint (CM Observability).
   (`http://<prefix>-otel.<ns>.svc.<clusterDomain>:4318`) when `observability.otlpEndpoint` is set.
   The collector always exposes an OTLP receiver on 4317/4318 for this.
 
-Shared installer functions live in `../lib/install-common.sh`; version-specific prompts, layouts and connection guidance stay in each version entry point. Keep the `platform` directory structure when copying these samples.
+The shared workflow in `../lib/install-common.sh` writes wizard answers, reads historical values, checks upgrades and invokes Helm. Both entry points use it for their main install flow. Component summaries, storage prerequisites, wizard defaults and connection guidance stay in each version; MES 12 also handles Ceph RGW readiness there. Keep the `platform` directory structure when copying these samples.
 
 Configuration types and enums are validated by Helm using `values.schema.json`, including direct chart use. The version-level schema validates the wizard values; runtime cluster checks remain in the installer. Keep these schemas aligned when adding settings.
