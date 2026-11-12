@@ -13,7 +13,7 @@
 #   ./install.sh -n <namespace> --uninstall        remove the releases (data volumes are kept)
 #   ./install.sh -h                                help
 #
-# Requirements: bash >= 4, kubectl, helm >= 3.12 (Helm 4 is fine), openssl, and
+# Requirements: bash >= 4, kubectl, helm >= 3.13 (Helm 4 is fine), openssl, and
 # the usual coreutils (sed, awk, grep, sort, base64). Works on Linux, macOS and
 # Git Bash on Windows. No yq/jq/python needed.
 #
@@ -48,7 +48,7 @@ if [[ -z "${KUBECTL:-}" ]]; then
 fi
 HELM="${HELM:-helm}"
 MIN_HELM_MAJOR=3
-MIN_HELM_MINOR=12
+MIN_HELM_MINOR=13
 CM_OBSERVABILITY_URL="https://www.criticalmanufacturing.com/observability/"
 COMPONENTS=(kafka clickhouse s3)
 CONNECTION_LABEL="cmf.criticalmanufacturing.com/connection=true"

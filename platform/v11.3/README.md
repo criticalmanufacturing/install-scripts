@@ -16,7 +16,7 @@ ClickHouse has no high availability in this setup. MES 11.3 connects to the sing
 
 ## Install
 
-You need Bash 4+, Helm 3.12+, `kubectl` (or OpenShift `oc`), `openssl`, an existing namespace and a StorageClass for persistent volumes. The default Kafka layout needs three worker nodes.
+You need Bash 4+, Helm 3.13+, `kubectl` (or OpenShift `oc`), `openssl`, an existing namespace and a StorageClass for persistent volumes. The default Kafka layout needs three worker nodes.
 
 ```bash
 git clone https://github.com/criticalmanufacturing/install-scripts.git

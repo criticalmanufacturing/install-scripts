@@ -26,7 +26,7 @@ type into the **CM MES installer** (addresses, users, passwords) and saves the c
 **Your computer** (Linux, macOS, or Windows with Git Bash or WSL)
 - `bash`, [`kubectl`](https://kubernetes.io/docs/tasks/tools/) connected to the cluster (on OpenShift,
   `oc` is enough: the installer uses it when `kubectl` isn't installed),
-  [`helm`](https://helm.sh/docs/intro/install/) 3.12 or newer, and `openssl`.
+  [`helm`](https://helm.sh/docs/intro/install/) 3.13 or newer, and `openssl`.
 - Check it works with `kubectl get nodes` and `helm version`.
 
 ## Install
