@@ -651,7 +651,8 @@ require_storage_maintenance() {
 # check_volumes <component>: compare rendered and installed claims and add growth to RESIZE_PLAN.
 # Reject forbidden changes before anything is changed.
 check_volumes() {
-  local comp=$1 rel rendered line sts vct size sc live lsize lsc
+  local comp=$1 rel rendered line sts vct size sc live lsize lsc claim_templates
+  local -A statefulset_claims=()
   rel="$(release_name "$comp")"
   make_tmp
   rendered="$TMP_DIR/check-$rel.yaml"
@@ -664,13 +665,18 @@ check_volumes() {
   fi
   while IFS='|' read -r sts vct size sc; do
     [[ -n "$sts" && -n "$vct" ]] || continue
-    if ! live="$(kcn get statefulset "$sts" -o "jsonpath={range .spec.volumeClaimTemplates[*]}{.metadata.name}{\"|\"}{.spec.resources.requests.storage}{\"|\"}{.spec.storageClassName}{\"\\n\"}{end}" 2>&1)"; then
-      [[ "$ACTION" == resize ]] || continue
-      err "Cannot read StatefulSet '$sts' in namespace '$NAMESPACE':"
-      printf '%s\n' "$live" >&2
-      die "Storage maintenance stopped. See README.md for recovery instructions. No volumes or controllers were changed."
+    if [[ -z "${statefulset_claims[$sts]+set}" ]]; then
+      if ! claim_templates="$(kcn get statefulset "$sts" -o "jsonpath={range .spec.volumeClaimTemplates[*]}{.metadata.name}{\"|\"}{.spec.resources.requests.storage}{\"|\"}{.spec.storageClassName}{\"\\n\"}{end}" 2>&1)"; then
+        if [[ "$ACTION" == resize ]]; then
+          err "Cannot read StatefulSet '$sts' in namespace '$NAMESPACE':"
+          printf '%s\n' "$claim_templates" >&2
+          die "Storage maintenance stopped. See README.md for recovery instructions. No volumes or controllers were changed."
+        fi
+        claim_templates=""
+      fi
+      statefulset_claims[$sts]=$claim_templates
     fi
-    live="$(printf '%s\n' "$live" | tr -d '\r' | grep "^$vct|" || true)"
+    live="$(printf '%s\n' "${statefulset_claims[$sts]}" | tr -d '\r' | grep "^$vct|" || true)"
     [[ -n "$live" ]] || continue                     # new StatefulSet or new volume: nothing to compare
     IFS='|' read -r _ lsize lsc <<<"$live"
     if [[ "$lsc" != "$sc" ]]; then
@@ -707,8 +713,9 @@ check_volumes() {
 
 # apply_resize <component>: expand planned PVCs and orphan affected StatefulSets for a subsequent Helm upgrade.
 apply_resize() {
-  local comp=$1 line c sts vct size lsize pvc cur target_bytes current_bytes
+  local comp=$1 line c sts vct size lsize pvc cur target_bytes current_bytes pvc_list
   local -a done_sts=()
+  pvc_list="$(kcn get pvc -o name)" || die "Cannot list PVCs in namespace '$NAMESPACE'. Storage maintenance stopped."
   for line in ${RESIZE_PLAN[@]+"${RESIZE_PLAN[@]}"}; do
     IFS='|' read -r c sts vct size lsize <<<"$line"
     [[ "$c" == "$comp" ]] || continue
@@ -724,7 +731,7 @@ apply_resize() {
       kcn patch pvc "$pvc" --type merge -p "{\"spec\":{\"resources\":{\"requests\":{\"storage\":\"$size\"}}}}" >/dev/null \
         || die "Could not resize volume $pvc (kubectl -n $NAMESPACE describe pvc $pvc)."
       ok "Volume $pvc: resize to $size requested"
-    done < <(kcn get pvc -o name 2>/dev/null || true)
+    done <<<"$pvc_list"
     if [[ " ${done_sts[*]} " != *" $sts "* ]]; then
       kcn delete statefulset "$sts" --cascade=orphan >/dev/null \
         || die "Could not delete StatefulSet $sts (orphan). The volumes were resized; run install.sh again."
