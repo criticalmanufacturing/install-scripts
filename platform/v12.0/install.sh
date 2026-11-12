@@ -810,10 +810,15 @@ live_checks() {
     require_storage_maintenance
     local comp sts vct size lsize
     heading "Volume resize"
-    info "These volumes will be enlarged. Kubernetes cannot change the volume size of a StatefulSet,"
-    info "so install.sh resizes each existing volume, then deletes the StatefulSet object only"
-    info "(--cascade=orphan: the pods keep running) and the upgrade recreates it with the new size."
-    info "Some storage drivers finish growing the file system only when the pod restarts."
+    if [[ "$ACTION" == resize ]]; then
+      info "These volumes will be enlarged. Kubernetes cannot change the volume size of a StatefulSet,"
+      info "so install.sh resizes each existing volume, then deletes the StatefulSet object only"
+      info "(--cascade=orphan: the pods keep running) and the upgrade recreates it with the new size."
+      info "Some storage drivers finish growing the file system only when the pod restarts."
+    else
+      info "These volumes require --resize-storage. An ordinary installation or upgrade will stop"
+      info "before changing volumes or controllers."
+    fi
     for line in "${RESIZE_PLAN[@]}"; do
       IFS='|' read -r comp sts vct size lsize <<<"$line"
       info "  - $sts, volumes '$vct': $lsize -> $size"

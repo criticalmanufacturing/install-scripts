@@ -247,8 +247,9 @@ Kafka, ClickHouse and RustFS metrics there. If you leave it empty, nothing is in
 
 - **Change a setting or upgrade**: edit your values file and run `./install.sh -n <namespace> -f <file> --yes` again,
   or run `./install.sh` and reuse your saved answers. Passwords and certificates are kept.
-  Disks can only **grow**, and only if the StorageClass allows expansion. The installer resizes them
-  for you after asking. It refuses to shrink a disk or change its StorageClass.
+  Disks can only **grow**, and only if the StorageClass allows expansion. Use
+  `./install.sh -n <namespace> -f <file> --resize-storage` during a maintenance window.
+  Ordinary upgrades stop when larger volumes are requested. Disks cannot shrink or change StorageClass.
 - **Node maintenance**: drain one node at a time. The installer creates PodDisruptionBudgets, so
   Kubernetes won't stop more than one server of a component at once.
 - **Certificates**: in `auto` mode they're valid for 5 years (the CA for 10). To renew, set
