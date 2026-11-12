@@ -4,7 +4,7 @@ Pod-level helpers: images, pull secrets, security contexts and scheduling.
 
 {{/*
 Full image reference, honouring global.imageRegistry for private registries.
-image: { repository: "apache/kafka", tag: "3.8.1", pullPolicy: IfNotPresent }
+image: { repository: "apache/kafka", tag: "<version>", pullPolicy: IfNotPresent }
 Usage: include "common.image" (dict "ctx" $ "image" .Values.kafka.image)
 */}}
 {{- define "common.image" -}}

@@ -1,5 +1,5 @@
 {{/*
-Kafka chart helpers. Generic helpers live in charts/common.
+Kafka chart helpers. Generic helpers live in platform/common/chart.
 */}}
 
 {{/* UID/GID of the "appuser" account of the apache/kafka image. */}}
