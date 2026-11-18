@@ -1,0 +1,66 @@
+{{- /*
+helm test: connect with the MES credentials over verified AMQPS, then exercise
+a classic priority queue with a confirmed publish, consume, ack and cleanup.
+The RabbitMQ image supplies Erlang and the AMQP client. The test-only ConfigMap
+supplies the source, which is compiled into the writable /tmp volume at runtime.
+*/ -}}
+{{- $k := .Values.rabbitmq -}}
+{{- $uid := 999 -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "rabbitmq-test") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "rabbitmq-test") | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 180
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  {{- include "common.imagePullSecrets" . | nindent 2 }}
+  {{- include "common.podSecurityContext" (dict "ctx" . "uid" $uid "gid" $uid) | nindent 2 }}
+  {{- include "common.scheduling" (dict "ctx" . "nodeSelector" $k.nodeSelector "tolerations" $k.tolerations) | nindent 2 }}
+  containers:
+    - name: test
+      image: {{ include "common.image" (dict "ctx" . "image" $k.image) }}
+      imagePullPolicy: {{ $k.image.pullPolicy | default "IfNotPresent" }}
+      {{- include "common.containerSecurityContext" . | nindent 6 }}
+      env:
+        - name: RABBIT_HOST
+          value: {{ include "common.svcFqdn" (dict "ctx" . "name" (include "rabbitmq.fullname" .)) | quote }}
+        {{- range $env, $key := dict "RABBIT_USER" "username" "RABBIT_PASSWORD" "password" "RABBIT_VHOST" "virtual-host" }}
+        - name: {{ $env }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "rabbitmq.credentialsSecret" $ }}
+              key: {{ $key }}
+        {{- end }}
+        - name: ERL_LIBS
+          value: /opt/rabbitmq/plugins
+      command: ["/bin/sh", "-ec"]
+      args:
+        - |
+          erl -noshell -eval '
+            {ok, amqp_test} = compile:file("/cm/config/amqp_test.erl", [{outdir,"/tmp"},report]),
+            code:add_patha("/tmp"),
+            try amqp_test:run() of ok -> halt(0) catch C:E:S -> io:format("~p:~p ~p~n",[C,E,S]),halt(1) end.'
+      resources:
+        {{- toYaml $k.test.resources | nindent 8 }}
+      volumeMounts:
+        - {name: tls, mountPath: /cm/tls, readOnly: true}
+        - {name: config, mountPath: /cm/config, readOnly: true}
+        - {name: tmp, mountPath: /tmp}
+  volumes:
+    - name: tls
+      secret:
+        secretName: {{ include "rabbitmq.tlsSecret" . }}
+        items: [{key: ca.crt, path: ca.crt}]
+    - name: config
+      configMap:
+        name: {{ include "common.fullname" (dict "ctx" . "component" "rabbitmq-test") }}
+    - name: tmp
+      emptyDir: {sizeLimit: 256Mi}

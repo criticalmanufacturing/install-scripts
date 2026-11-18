@@ -1,0 +1,4 @@
+RabbitMQ is starting as one broker with persistent storage.
+AMQPS endpoint: {{ include "rabbitmq.fullname" . }}.{{ .Release.Namespace }}.svc.{{ include "common.clusterDomain" . }}:5671
+Run ./install.sh -n {{ .Release.Namespace }} -f <values-file> --print to save the MES credentials and CA.
+Use a values file with global.namePrefix set to {{ include "common.prefix" . }}.

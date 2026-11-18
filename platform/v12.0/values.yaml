@@ -17,8 +17,8 @@
 #   - Most settings can be changed later and applied by re-running install.sh.
 #     Exceptions are noted below ("cannot be changed after the first install").
 #   - Volume sizes ("size") can only be INCREASED later, and only when the StorageClass
-#     has "allowVolumeExpansion: true": install.sh then resizes the existing volumes
-#     (and asks first). They can never be decreased. The StorageClass of the volumes
+#     has "allowVolumeExpansion: true": run install.sh --resize-storage with the desired values.
+#     Expansion is an explicit maintenance operation. They can never be decreased. The StorageClass of the volumes
 #     ("storageClass") cannot be changed after the first install.
 #
 # Advanced settings (CPU/memory, images, tuning, ...) are in charts/<name>/values.yaml

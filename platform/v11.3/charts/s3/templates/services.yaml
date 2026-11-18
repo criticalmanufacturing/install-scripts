@@ -1,0 +1,65 @@
+{{- if eq (include "s3.provider" .) "rustfs" }}
+# S3 API. Port 443 lets MES use the plain host name as "Address"; 9000 is the native
+# RustFS port (for tools). Both are HTTPS.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "s3.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "s3") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "s3") | nindent 4 }}
+  ports:
+    - name: https
+      port: 443
+      targetPort: api
+      protocol: TCP
+    - name: api
+      port: {{ include "s3.apiPort" . }}
+      targetPort: api
+      protocol: TCP
+---
+# Per-pod DNS names used in RUSTFS_VOLUMES. Not-ready pods are published so that the
+# peers can find each other while the cluster is forming.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "s3.headless" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "s3") | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "s3") | nindent 4 }}
+  ports:
+    - name: api
+      port: {{ include "s3.apiPort" . }}
+      targetPort: api
+      protocol: TCP
+{{- if .Values.s3.rustfs.console.enabled }}
+---
+# RustFS web console (HTTPS), only reachable inside the cluster / via kubectl port-forward.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "s3-console") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "s3") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "common.selectorLabels" (dict "ctx" . "component" "s3") | nindent 4 }}
+  ports:
+    - name: console
+      port: {{ include "s3.consolePort" . }}
+      targetPort: console
+      protocol: TCP
+{{- end }}
+{{- end }}

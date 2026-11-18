@@ -1,0 +1,3 @@
+# Shared Bash/Helm sources must stay LF on Git for Windows too.
+lib/** text eol=lf
+common/** text eol=lf

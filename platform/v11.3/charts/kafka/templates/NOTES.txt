@@ -1,0 +1,10 @@
+Kafka uses a fixed KRaft controller quorum. Do not change kafka.replicas after installation.
+Changing the quorum or recovering a lost controller disk requires a separate recovery procedure;
+verify that a majority of controllers have the committed metadata before formatting replacement storage.
+
+Read the MES connection information with:
+  ./install.sh -n {{ .Release.Namespace }} -f <values-file> --print
+
+Use a values file with global.namePrefix set to {{ include "common.prefix" . }}.
+
+See README.md for installation and support limitations.

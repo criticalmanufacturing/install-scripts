@@ -1,0 +1,5 @@
+# Vendored library chart (rebuilt by install.sh / helm dependency build)
+charts/*/charts/
+# Generated output and local values overrides
+output/
+values.*.yaml

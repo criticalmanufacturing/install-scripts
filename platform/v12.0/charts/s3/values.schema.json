@@ -1,0 +1,449 @@
+{
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "namePrefix": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 20,
+          "minLength": 1
+        },
+        "storageClass": {
+          "type": "string"
+        },
+        "imageRegistry": {
+          "type": "string"
+        },
+        "imagePullSecrets": {
+          "type": "array"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "openshift",
+            "kubernetes"
+          ]
+        },
+        "clusterDomain": {
+          "type": "string"
+        },
+        "podAntiAffinity": {
+          "type": "string",
+          "enum": [
+            "hard",
+            "soft"
+          ]
+        },
+        "nodeSelector": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "existing",
+                "certManager"
+              ]
+            },
+            "caSecret": {
+              "type": "string"
+            },
+            "regenerate": {
+              "type": "boolean"
+            },
+            "validityDays": {
+              "type": "integer"
+            },
+            "certManager": {
+              "type": "object",
+              "properties": {
+                "issuerName": {
+                  "type": "string"
+                },
+                "issuerKind": {
+                  "type": "string"
+                },
+                "issuerGroup": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "s3": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "rustfs",
+            "rgw"
+          ]
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "rustfs": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                },
+                "pullPolicy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            },
+            "replicas": {
+              "type": "integer"
+            },
+            "volumesPerPod": {
+              "type": "integer"
+            },
+            "parity": {
+              "type": "integer"
+            },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "size": {
+                  "type": "string"
+                },
+                "storageClass": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            },
+            "allowSharedDisks": {
+              "type": "boolean"
+            },
+            "auth": {
+              "type": "object",
+              "properties": {
+                "rootUser": {
+                  "type": "string"
+                },
+                "rootPassword": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            },
+            "mesUser": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "accessKey": {
+                  "type": "string"
+                },
+                "secretKey": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            },
+            "versioning": {
+              "type": "boolean"
+            },
+            "region": {
+              "type": "string"
+            },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "existingSecret": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            },
+            "console": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": true
+            },
+            "telemetry": {
+              "type": "object",
+              "properties": {
+                "metrics": {
+                  "type": "boolean"
+                },
+                "traces": {
+                  "type": "boolean"
+                },
+                "logs": {
+                  "type": "boolean"
+                },
+                "interval": {
+                  "type": "integer"
+                }
+              },
+              "additionalProperties": true
+            },
+            "lockAcquireTimeout": {
+              "type": "integer"
+            },
+            "logLevel": {
+              "type": "string"
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "requests": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    },
+                    "memory": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "memory": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "additionalProperties": true
+            },
+            "terminationGracePeriodSeconds": {
+              "type": "integer"
+            },
+            "minReadySeconds": {
+              "type": "integer"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true
+            },
+            "tolerations": {
+              "type": "array"
+            },
+            "affinity": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true
+            },
+            "podAnnotations": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true
+            },
+            "extraEnv": {
+              "type": "array"
+            }
+          },
+          "additionalProperties": true
+        },
+        "awsCli": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                },
+                "pullPolicy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        },
+        "rgw": {
+          "type": "object",
+          "properties": {
+            "storageClass": {
+              "type": "string"
+            },
+            "additionalConfig": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true
+            },
+            "ca": {
+              "type": "object",
+              "properties": {
+                "configMap": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "required": [
+    "global",
+    "s3"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "global",
+          "s3"
+        ],
+        "properties": {
+          "global": {
+            "properties": {
+              "tls": {
+                "properties": {
+                  "mode": {
+                    "const": "existing"
+                  }
+                }
+              }
+            }
+          },
+          "s3": {
+            "properties": {
+              "enabled": {
+                "const": true
+              },
+              "provider": {
+                "const": "rustfs"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "s3": {
+            "properties": {
+              "rustfs": {
+                "properties": {
+                  "tls": {
+                    "properties": {
+                      "existingSecret": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "existingSecret"
+                    ]
+                  }
+                },
+                "required": [
+                  "tls"
+                ]
+              }
+            },
+            "required": [
+              "rustfs"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "global": {
+            "properties": {
+              "tls": {
+                "properties": {
+                  "mode": {
+                    "const": "certManager"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "global": {
+            "properties": {
+              "tls": {
+                "properties": {
+                  "certManager": {
+                    "properties": {
+                      "issuerName": {
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "issuerName"
+                    ]
+                  }
+                },
+                "required": [
+                  "certManager"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

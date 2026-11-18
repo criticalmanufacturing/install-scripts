@@ -1,6 +1,10 @@
 # install-scripts
 Critical Manufacturing Installation Scripts
 
+## CM MES v11.3 external dependencies
+
+See [platform/v11.3/README.md](platform/v11.3/README.md).
+
 ## CM MES v12 external dependencies (Kubernetes / OpenShift)
 
 Production-ready, highly available Kafka, ClickHouse and S3 storage for CM MES v12, installed into an existing namespace:

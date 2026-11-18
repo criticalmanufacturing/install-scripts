@@ -1,0 +1,15 @@
+{{- /*
+Keep the test source separate from the broker configuration so it is mounted
+only by the Helm test pod. This regular release resource remains available
+until the release is removed, including between repeated test runs.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.fullname" (dict "ctx" . "component" "rabbitmq-test") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" (dict "ctx" . "component" "rabbitmq-test") | nindent 4 }}
+data:
+  amqp_test.erl: |
+    {{- .Files.Get "files/amqp_test.erl" | nindent 4 }}
